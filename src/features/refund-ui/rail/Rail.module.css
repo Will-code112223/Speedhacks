@@ -1,0 +1,162 @@
+/* The rail's text lines up with the header wordmark; row highlights reach 8px into the gutter. */
+.rail {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-height: 100%;
+  padding: 16px 16px 24px 0;
+}
+
+.rail .newCase {
+  width: 100%;
+  justify-content: flex-start;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.headingRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 28px;
+}
+
+.heading {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--rc-ink-3);
+}
+
+.rail .addPlan {
+  margin-right: -10px;
+}
+
+.empty {
+  margin: 0;
+  font-size: 12px;
+  color: var(--rc-ink-3);
+  text-wrap: pretty;
+}
+
+.list {
+  margin: 0 0 0 -8px;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.row {
+  appearance: none;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  padding: 6px 8px 6px 6px;
+  border: 0;
+  border-left: 2px solid transparent;
+  border-radius: 0 var(--rc-radius) var(--rc-radius) 0;
+  background: transparent;
+  color: var(--rc-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--rc-fast) var(--rc-ease), border-color var(--rc-fast) var(--rc-ease),
+    color var(--rc-fast) var(--rc-ease);
+}
+
+.row:hover {
+  background: var(--rc-surface);
+}
+
+/* Selected: the tint, the accent edge and heavier text together, never the tint alone. */
+.rowSelected,
+.rowSelected:hover {
+  background: var(--rc-accent-tint);
+  border-left-color: var(--rc-accent);
+}
+
+.rowSelected .rowTitle {
+  font-weight: 600;
+}
+
+/* A plan row while the plans view is open: the edge alone, since several rows share it. */
+.rowOpen {
+  border-left-color: var(--rc-border-strong);
+}
+
+.rowTitle {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.rowMeta {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--rc-ink-2);
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.statusText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.toneAccent {
+  color: var(--rc-accent);
+}
+
+.toneWarning {
+  color: var(--rc-warning);
+}
+
+.toneDanger {
+  color: var(--rc-danger);
+}
+
+.dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.amount {
+  flex: none;
+  font-family: var(--rc-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--rc-ink-2);
+}
+
+.footer {
+  margin-top: auto;
+  padding-top: 16px;
+  border-top: 1px solid var(--rc-border);
+}

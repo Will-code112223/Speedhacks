@@ -1,0 +1,30 @@
+Worlds public beta license
+
+Copyright (c) 2026 Sparta AI. All rights reserved.
+
+Free internal beta use. No external redistribution or resale. No warranty.
+
+This software (the sparta_worlds runtime and the @worlds/client package) is
+licensed, not sold. You and your organization may install, copy and run this
+version without charge for internal testing and continuous integration (CI),
+including evaluation by your internal team and contractors acting on your
+behalf. You may keep internal copies, backups and internal package caches,
+private container images, and use the software on your organization's local
+machines and CI runners.
+Preserve this notice in those copies.
+
+You may not redistribute the software outside your organization and its
+contractors, sublicense it, sell it, rent it, publish it or offer it as a
+service to third parties. This permission does not grant rights to Sparta
+AI's trademarks or ownership of the software.
+
+No automatic billing applies. Using this beta does not enroll you in a paid
+service. Future versions or services may have different terms; any paid
+service requires a separate agreement. These beta permissions apply to this
+version.
+
+No service-level agreement or obligation of support or updates is provided.
+The software is provided "as is", without warranty of any kind, express or
+implied, including fitness for a particular purpose and non-infringement.
+To the extent permitted by law, Sparta AI is not liable for damages arising
+from its use.

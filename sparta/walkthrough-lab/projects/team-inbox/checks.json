@@ -1,0 +1,20 @@
+{
+  "urgent-triage": {
+    "builtin": {
+      "templateId": "team-inbox",
+      "missionId": "urgent-triage"
+    }
+  },
+  "answer-question": {
+    "builtin": {
+      "templateId": "team-inbox",
+      "missionId": "answer-question"
+    }
+  },
+  "clarify-request": {
+    "builtin": {
+      "templateId": "team-inbox",
+      "missionId": "clarify-request"
+    }
+  }
+}

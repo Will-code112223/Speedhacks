@@ -1,0 +1,106 @@
+.wrap {
+  flex: none;
+  padding: 8px 24px 12px;
+  background: var(--rc-canvas);
+}
+
+/* The composer is an interactive container. */
+.composer {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 6px 6px 6px 12px;
+  border: 1px solid var(--rc-border-strong);
+  border-radius: var(--rc-radius-panel);
+  background: var(--rc-canvas);
+  transition: border-color var(--rc-fast) var(--rc-ease);
+}
+
+.composer:hover {
+  border-color: var(--rc-ink-3);
+}
+
+.composer:focus-within {
+  border-color: var(--rc-accent);
+}
+
+/* The ring moves to the container so it wraps the whole box, not the bare textarea. */
+.composer:has(.input:focus-visible) {
+  outline: 2px solid var(--rc-accent);
+  outline-offset: 2px;
+}
+
+.label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  min-height: 32px;
+  max-height: 168px;
+  padding: 6px 0;
+  border: 0;
+  background: transparent;
+  color: var(--rc-ink);
+  font: inherit;
+  line-height: 1.45;
+  resize: none;
+  overflow-y: auto;
+}
+
+.input:focus-visible {
+  outline: none;
+}
+
+.input::placeholder {
+  color: var(--rc-ink-3);
+}
+
+.send {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+}
+
+.hint {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  max-width: 720px;
+  margin: 6px auto 0;
+  font-size: 12px;
+  color: var(--rc-ink-3);
+}
+
+.keys {
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.keys kbd {
+  font-family: var(--rc-mono);
+  font-size: 11px;
+  padding: 0 4px;
+  border: 1px solid var(--rc-border);
+  border-radius: 4px;
+  color: var(--rc-ink-2);
+}
+
+@media (max-width: 767px) {
+  .wrap {
+    padding: 8px 16px 12px;
+  }
+  .keys {
+    display: none;
+  }
+}

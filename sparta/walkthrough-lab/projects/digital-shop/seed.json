@@ -1,0 +1,153 @@
+{
+  "name": "starter-digital-shop",
+  "version": 1,
+  "epoch": 1789516800,
+  "clock_mode": "manual",
+  "auto_tick_seconds": 1,
+  "data": {
+    "customers": [
+      {
+        "id": "cus_shop_mira",
+        "name": "Mira Shah",
+        "email": "mira@example.test",
+        "description": null,
+        "phone": null,
+        "balance": 0,
+        "metadata": {},
+        "created_offset": 0
+      }
+    ],
+    "products": [
+      {
+        "id": "prod_shop_icons",
+        "name": "Vector Icons",
+        "description": "One digital vector icon pack.",
+        "active": true,
+        "metadata": {}
+      },
+      {
+        "id": "prod_shop_templates",
+        "name": "Slide Templates",
+        "description": "One digital presentation template pack.",
+        "active": true,
+        "metadata": {}
+      },
+      {
+        "id": "prod_shop_tools",
+        "name": "Design Tools",
+        "description": "One individual, one-time digital tool license.",
+        "active": true,
+        "metadata": {}
+      },
+      {
+        "id": "prod_shop_effects",
+        "name": "Sound Effects",
+        "description": "One digital sound effects pack.",
+        "active": true,
+        "metadata": {}
+      },
+      {
+        "id": "prod_shop_music",
+        "name": "Music Loops",
+        "description": "One digital music loop pack.",
+        "active": true,
+        "metadata": {}
+      },
+      {
+        "id": "prod_shop_photos",
+        "name": "Stock Photos",
+        "description": "One digital photo pack.",
+        "active": true,
+        "metadata": {}
+      }
+    ],
+    "prices": [
+      {
+        "id": "price_shop_icons",
+        "product": "prod_shop_icons",
+        "unit_amount": 1200,
+        "currency": "usd",
+        "nickname": null,
+        "recurring": null,
+        "active": true,
+        "metadata": {}
+      },
+      {
+        "id": "price_shop_templates",
+        "product": "prod_shop_templates",
+        "unit_amount": 1800,
+        "currency": "usd",
+        "nickname": null,
+        "recurring": null,
+        "active": true,
+        "metadata": {}
+      },
+      {
+        "id": "price_shop_tools",
+        "product": "prod_shop_tools",
+        "unit_amount": 1600,
+        "currency": "usd",
+        "nickname": null,
+        "recurring": null,
+        "active": true,
+        "metadata": {}
+      },
+      {
+        "id": "price_shop_effects",
+        "product": "prod_shop_effects",
+        "unit_amount": 900,
+        "currency": "usd",
+        "nickname": null,
+        "recurring": null,
+        "active": true,
+        "metadata": {}
+      },
+      {
+        "id": "price_shop_music",
+        "product": "prod_shop_music",
+        "unit_amount": 2100,
+        "currency": "usd",
+        "nickname": null,
+        "recurring": null,
+        "active": true,
+        "metadata": {}
+      },
+      {
+        "id": "price_shop_photos",
+        "product": "prod_shop_photos",
+        "unit_amount": 1500,
+        "currency": "usd",
+        "nickname": null,
+        "recurring": null,
+        "active": true,
+        "metadata": {}
+      },
+      {
+        "id": "price_shop_tools_monthly",
+        "product": "prod_shop_tools",
+        "unit_amount": 800,
+        "currency": "usd",
+        "nickname": null,
+        "recurring": {
+          "interval": "month",
+          "interval_count": 1
+        },
+        "active": true,
+        "metadata": {}
+      },
+      {
+        "id": "price_shop_icons_retired",
+        "product": "prod_shop_icons",
+        "unit_amount": 600,
+        "currency": "usd",
+        "nickname": null,
+        "recurring": null,
+        "active": false,
+        "metadata": {}
+      }
+    ],
+    "invoices": [],
+    "subscriptions": [],
+    "tickets": []
+  }
+}

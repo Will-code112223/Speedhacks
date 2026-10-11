@@ -1,0 +1,135 @@
+/* A decision card is an interactive container: the person answers inside it. */
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--rc-border);
+  border-radius: var(--rc-radius-panel);
+  background: var(--rc-canvas);
+  transition: border-color var(--rc-default) var(--rc-ease), background-color var(--rc-default) var(--rc-ease);
+}
+
+/* Amber is the pending role: the card waits on the person. */
+.pending {
+  border-color: var(--rc-warning);
+}
+
+.prominent.pending {
+  background: var(--rc-warning-tint);
+  animation: arrive var(--rc-default) var(--rc-ease);
+}
+
+.resolved {
+  border-color: var(--rc-border);
+}
+
+.top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.eyebrow,
+.eyebrowPending {
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--rc-ink-3);
+}
+
+.eyebrowPending {
+  color: var(--rc-warning);
+}
+
+.countdown {
+  font-size: 12px;
+  color: var(--rc-warning);
+  white-space: nowrap;
+}
+
+.countdown time {
+  font-family: var(--rc-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.question {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: -0.005em;
+  color: var(--rc-ink);
+  text-wrap: balance;
+}
+
+.inline .question {
+  font-size: 13px;
+}
+
+.options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.prominent .options {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.prominent .options > button {
+  justify-content: center;
+  white-space: normal;
+  min-height: 36px;
+  height: auto;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  line-height: 1.3;
+  text-align: center;
+}
+
+.fallback {
+  margin: 0;
+  font-size: 12px;
+  color: var(--rc-ink-2);
+}
+
+.resolution {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.resolutionIcon {
+  display: inline-flex;
+  flex: none;
+  margin-top: 1px;
+  color: var(--rc-ink-2);
+}
+
+.resolutionText {
+  margin: 0;
+  flex: 1;
+  color: var(--rc-ink-2);
+}
+
+@keyframes arrive {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .prominent.pending {
+    animation: none;
+  }
+}

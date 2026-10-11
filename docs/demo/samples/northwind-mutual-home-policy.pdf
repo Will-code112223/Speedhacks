@@ -1,0 +1,73 @@
+%PDF-1.4
+%‚„œ”
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R /ViewerPreferences << /DisplayDocTitle true >> >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>
+endobj
+6 0 obj
+<< /Length 2199 >>
+stream
+BT /F2 20 Tf 0 g 72 716 Td (Northwind Mutual home policy) Tj ET
+BT /F1 11 Tf 0.4 g 72 694 Td (Homeowners policy - declarations page) Tj ET
+0.8 G 0.75 w 72 676 m 540 676 l S
+BT /F1 11 Tf 0.4 g 72 652 Td (Policy number) Tj ET
+BT /F1 11 Tf 0 g 288 652 Td (NWM-HO-0441772) Tj ET
+BT /F1 11 Tf 0.4 g 72 635 Td (Named insured) Tj ET
+BT /F1 11 Tf 0 g 288 635 Td (Jordan Lee) Tj ET
+BT /F1 11 Tf 0.4 g 72 618 Td (Insured property) Tj ET
+BT /F1 11 Tf 0 g 288 618 Td (1420 Alder Lane, Springfield) Tj ET
+BT /F1 11 Tf 0.4 g 72 601 Td (Policy period) Tj ET
+BT /F1 11 Tf 0 g 288 601 Td (November 1, 2025 to November 1, 2026) Tj ET
+BT /F2 12 Tf 0 g 72 574 Td (Coverages and limits) Tj ET
+BT /F1 11 Tf 0.4 g 72 554 Td (Coverage A - Dwelling) Tj ET
+BT /F1 11 Tf 0 g 288 554 Td ($350,000) Tj ET
+BT /F1 11 Tf 0.4 g 72 537 Td (Coverage B - Other structures) Tj ET
+BT /F1 11 Tf 0 g 288 537 Td ($35,000) Tj ET
+BT /F1 11 Tf 0.4 g 72 520 Td (Coverage C - Personal property) Tj ET
+BT /F1 11 Tf 0 g 288 520 Td ($175,000) Tj ET
+BT /F1 11 Tf 0.4 g 72 503 Td (Coverage D - Loss of use) Tj ET
+BT /F1 11 Tf 0 g 288 503 Td ($70,000) Tj ET
+BT /F1 11 Tf 0.4 g 72 486 Td (Deductible, all perils) Tj ET
+BT /F1 11 Tf 0 g 288 486 Td ($500) Tj ET
+BT /F2 12 Tf 0 g 72 459 Td (Water damage) Tj ET
+BT /F1 11 Tf 0 g 72 439 Td (Covered: sudden and accidental discharge of water or steam from within a) Tj ET
+BT /F1 11 Tf 0 g 72 424 Td (plumbing, heating or air conditioning system or a household appliance,) Tj ET
+BT /F1 11 Tf 0 g 72 409 Td (including the cost of tearing out and replacing the part of the building) Tj ET
+BT /F1 11 Tf 0 g 72 394 Td (needed to reach and repair the system.) Tj ET
+BT /F1 11 Tf 0 g 72 379 Td (Not covered: continuous or repeated seepage or leakage over 14 days or more.) Tj ET
+BT /F2 12 Tf 0 g 72 354 Td (How to file a claim) Tj ET
+BT /F1 11 Tf 0 g 72 334 Td (Report a loss as soon as you can. Claims line: +1 \(800\) 555-0142, 24 hours a day.) Tj ET
+BT /F1 11 Tf 0 g 72 319 Td (Have your policy number, the date of loss and a short description ready.) Tj ET
+0.8 G 0.75 w 72 70 m 540 70 l S
+BT /F1 8 Tf 0.45 g 72 54 Td (Sample document generated for a product demo. Northwind Mutual is a fictional insurer.) Tj ET
+endstream
+endobj
+7 0 obj
+<< /Title (Northwind Mutual home policy) /Subject (Homeowners policy declarations) /Author (Recourse demo samples) /Creator (docs/demo/make-samples.mjs) /CreationDate (D:20251015090000Z) /ModDate (D:20251015090000Z) >>
+endobj
+xref
+0 8
+0000000000 65535 f 
+0000000015 00000 n 
+0000000111 00000 n 
+0000000168 00000 n 
+0000000304 00000 n 
+0000000401 00000 n 
+0000000503 00000 n 
+0000002754 00000 n 
+trailer
+<< /Size 8 /Root 1 0 R /Info 7 0 R /ID [<4a36f0e60f89e66220e155b8d7169930> <4a36f0e60f89e66220e155b8d7169930>] >>
+startxref
+2988
+%%EOF

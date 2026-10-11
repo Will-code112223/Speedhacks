@@ -1,0 +1,372 @@
+.app {
+  --rc-canvas: #ffffff;
+  --rc-surface: #f7f8fa;
+  --rc-border: #e3e6ea;
+  --rc-border-strong: #8b9098;
+  --rc-ink: #141821;
+  --rc-ink-2: #4b5563;
+  --rc-ink-3: #697282;
+  --rc-accent: #2457e6;
+  --rc-accent-hover: #1d49c4;
+  --rc-accent-tint: #eaf0ff;
+  --rc-on-accent: #ffffff;
+  --rc-success: #15803d;
+  --rc-success-tint: #ecfdf3;
+  --rc-warning: #b45309;
+  --rc-warning-tint: #fff7e6;
+  --rc-danger: #b91c1c;
+  --rc-danger-tint: #fef2f2;
+  --rc-scrim: rgb(20 24 33 / 0.32);
+  --rc-font: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --rc-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --rc-fast: 120ms;
+  --rc-default: 200ms;
+  --rc-ease: cubic-bezier(0.2, 0, 0, 1);
+  --rc-radius: 6px;
+  --rc-radius-panel: 8px;
+  --rc-header: 48px;
+
+  height: 100vh;
+  height: 100dvh;
+  display: grid;
+  grid-template-rows: var(--rc-header) minmax(0, 1fr);
+  overflow: hidden;
+  background: var(--rc-canvas);
+  color: var(--rc-ink);
+  font-family: var(--rc-font);
+  font-size: 13px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+@media (prefers-color-scheme: dark) {
+  .app {
+    --rc-canvas: #0b0c0e;
+    --rc-surface: #141619;
+    --rc-border: #262a30;
+    --rc-border-strong: #5e646d;
+    --rc-ink: #f1f3f5;
+    --rc-ink-2: #a7afbb;
+    --rc-ink-3: #77808e;
+    --rc-accent: #6f93ff;
+    --rc-accent-hover: #86a6ff;
+    --rc-accent-tint: #172349;
+    --rc-on-accent: #0b0c0e;
+    --rc-success: #4ade80;
+    --rc-success-tint: #0f2a1a;
+    --rc-warning: #fbbf24;
+    --rc-warning-tint: #2d2008;
+    --rc-danger: #f87171;
+    --rc-danger-tint: #2b1111;
+    --rc-scrim: rgb(0 0 0 / 0.5);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app {
+    --rc-fast: 0ms;
+    --rc-default: 0ms;
+  }
+}
+
+.app :focus-visible {
+  outline: 2px solid var(--rc-accent);
+  outline-offset: 2px;
+}
+
+/* Keep a control that receives focus clear of the sticky header. */
+.app :is(a, button, input, select, textarea, summary, [tabindex]) {
+  scroll-margin-top: 56px;
+}
+
+.app :is(button, a, input, select, textarea) {
+  touch-action: manipulation;
+}
+
+/* ------------------------------------------------------------------------- */
+/* Header                                                                     */
+/* ------------------------------------------------------------------------- */
+
+.header {
+  position: relative;
+  z-index: 40;
+  background: var(--rc-canvas);
+  border-bottom: 1px solid var(--rc-border);
+}
+
+.headerInner {
+  max-width: 1440px;
+  height: 100%;
+  margin: 0 auto;
+  padding: 0 32px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* The header sits at the top edge: draw focus rings inside so they are not clipped. */
+.header :focus-visible {
+  outline-offset: -2px;
+}
+
+.headerInner .menuButton {
+  display: none;
+  margin-left: -8px;
+}
+
+.wordmark {
+  flex: none;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--rc-ink);
+}
+
+.crumb {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.crumbSeparator {
+  color: var(--rc-border-strong);
+}
+
+.caseName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--rc-ink-2);
+  font-weight: 500;
+}
+
+.headerRight {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+
+/* ------------------------------------------------------------------------- */
+/* Body: rail, chat, call                                                     */
+/* ------------------------------------------------------------------------- */
+
+/* Up to 1440px wide with 32px gutters; the chat track takes what the rail and call column leave. */
+.body {
+  width: 100%;
+  max-width: 1440px;
+  min-height: 0;
+  margin: 0 auto;
+  padding: 0 32px;
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  /* One row exactly as tall as the body, so each region scrolls inside itself. */
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.bodyWithCall {
+  grid-template-columns: 240px minmax(0, 1fr) 360px;
+}
+
+.rail {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-right: 1px solid var(--rc-border);
+  background: var(--rc-canvas);
+}
+
+.main {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.callColumn {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--rc-border);
+}
+
+.focused {
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Boot: the shell paints at once and skeleton rows stand in for content. */
+.boot {
+  width: 100%;
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 32px;
+}
+
+.bootInner {
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+/* ------------------------------------------------------------------------- */
+/* Overlays: the call sheet under 1024px, the rail under 768px                */
+/* ------------------------------------------------------------------------- */
+
+.scrim {
+  position: fixed;
+  inset: var(--rc-header) 0 0 0;
+  z-index: 30;
+  background: var(--rc-scrim);
+  animation: fadeIn var(--rc-default) var(--rc-ease);
+}
+
+.sheet {
+  position: fixed;
+  top: var(--rc-header);
+  right: 0;
+  bottom: 0;
+  z-index: 35;
+  width: min(360px, 100%);
+  display: flex;
+  flex-direction: column;
+  background: var(--rc-canvas);
+  border-left: 1px solid var(--rc-border);
+  overscroll-behavior: contain;
+  animation: slideFromRight var(--rc-default) var(--rc-ease);
+}
+
+/* The sheet takes focus as a whole when it opens; its controls carry their own rings. */
+.sheet:focus {
+  outline: none;
+}
+
+.sheetBody {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.sheetHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  height: 44px;
+  padding: 0 8px 0 16px;
+  border-bottom: 1px solid var(--rc-border);
+  flex: none;
+}
+
+.sheetTitle {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.app .iconButton {
+  width: 32px;
+  padding: 0;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideFromRight {
+  from {
+    transform: translateX(16px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+@keyframes slideFromLeft {
+  from {
+    transform: translateX(-16px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+@media (max-width: 1279px) {
+  .headerInner {
+    padding: 0 24px;
+  }
+  .body {
+    padding: 0 24px;
+  }
+  .boot {
+    padding: 32px 24px;
+  }
+}
+
+@media (max-width: 1023px) {
+  .bodyWithCall {
+    grid-template-columns: 240px minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 767px) {
+  .headerInner {
+    padding: 0 16px;
+  }
+  .headerInner .menuButton {
+    display: inline-flex;
+  }
+  .crumbSeparator {
+    display: none;
+  }
+  .body,
+  .bodyWithCall {
+    padding: 0;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .rail {
+    position: fixed;
+    top: var(--rc-header);
+    left: 0;
+    bottom: 0;
+    z-index: 35;
+    width: min(280px, 85vw);
+    padding-left: 16px;
+    animation: slideFromLeft var(--rc-default) var(--rc-ease);
+  }
+  .railClosed {
+    display: none;
+  }
+  .boot {
+    padding: 24px 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .caseName {
+    display: none;
+  }
+}
