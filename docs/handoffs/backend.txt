@@ -214,3 +214,15 @@ KEEWANO (optional sponsor integration; nothing in the shared contract changed)
   Judging criteria from the quickstart: Keewano must be load-bearing (here: the brief changes with the finding) and at
   least one live query must run in the demo (here: the check on case creation / review screen).
 - Demo data: npm run keewano:demo-cases [-- --count 24 --seed 1 --concurrency 3] creates synthetic cases over the HTTP API (create → authorize → call → poll; own next dev on a free port with DATA_DIR=./data-demo unless BASE_URL is set) with a planned outcome mix per merchant (src/integrations/keewano/demo-plan.ts; scenario = last four digits of supportPhone), so the mirror fills Keewano for "which merchants approve" / "where do cases stall" queries.
+
+VOICE CONTRACT V1.1 (agreed with T3, Alike reply 4383d1e6, 2026-10-11) — canonical types only, no behavior change yet
+- src/contracts/voice.ts: CALL_PURPOSES / CallPurpose ("request_refund" | "gather_information"), CallPlanV1, CallPlanFacts,
+  CALL_PLAN_ACTIONS (server-owned constants per purpose; gather_information forbids requesting a refund or filing a claim),
+  CALL_PLAN_LIMITS, validateCallPlan(plan) → string[] (strict keys, bounded text/arrays, constant actions, refund needs
+  amount+currency), planForProvider(plan) (drops undisclosed fact values from serialized data; null still = unknown).
+  AuthorizedCallInput.plan?: CallPlanV1 (optional; brief stays required as the V1 rendering).
+- src/contracts/case.ts: AuthorizeCaseRequest.purpose?, CaseV1.authorization.purpose?, CaseV1.proposedUpdates?:
+  ProposedUpdateV1[] bound to callId + authorizationId + revision; never auto-applied.
+- facts.ts PERMITTED_ACTIONS/FORBIDDEN_ACTIONS now alias CALL_PLAN_ACTIONS.request_refund (identical text).
+- Deferred: status events/SSE (slice 3). Next T2: build/freeze plan at authorization, purpose-aware missing facts.
+  Next T3: render planForProvider output after a purpose-conditional mandatory instruction.
