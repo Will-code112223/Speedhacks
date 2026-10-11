@@ -21,9 +21,8 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-const NORTHWIND_PHONE = "+14155550162";
-// NANP reserves 555-0100 through 555-0199 for fictional use.
-const FICTIONAL_PHONE = /^\+1[2-9]\d{2}55501\d{2}$/;
+// The demo's AAA claims line, from the sample declarations page; the fixture dials nothing else.
+const AAA_CLAIMS_PHONE = "+19495200007";
 const REAL_INSURERS = [
   "Aetna",
   "Allstate",
@@ -43,13 +42,13 @@ const REAL_INSURERS = [
 
 function sampleSummary(overrides: Partial<InsurerSummary> = {}): InsurerSummary {
   return {
-    id: "northwind-mutual",
-    name: "Northwind Mutual",
+    id: "aaa",
+    name: "AAA",
     legalName: null,
     parentId: null,
-    categories: ["property"],
-    lines: ["homeowners"],
-    aliases: ["Northwind"],
+    categories: ["auto"],
+    lines: ["auto"],
+    aliases: ["Triple A"],
     eligibility: null,
     website: null,
     tosUrl: null,
@@ -62,7 +61,7 @@ function sampleSummary(overrides: Partial<InsurerSummary> = {}): InsurerSummary 
 function sampleLookup(): InsurerLookup {
   return {
     ...sampleSummary(),
-    supportPhone: NORTHWIND_PHONE,
+    supportPhone: AAA_CLAIMS_PHONE,
     supportPhoneConfidence: "verified_official",
     claimsPhone: null,
     claimsPhoneConfidence: null,
@@ -70,7 +69,7 @@ function sampleLookup(): InsurerLookup {
     contacts: [],
     terms: [],
     openQuestions: [],
-    match: { via: "alias", matched: "Northwind" },
+    match: { via: "alias", matched: "Triple A" },
   };
 }
 
@@ -104,7 +103,7 @@ async function allFixtureInsurers(): Promise<InsurerLookup[]> {
 
 type Call = (api: InsurerApi) => Promise<unknown>;
 const listCall: Call = (api) => api.listInsurers();
-const lookupCall: Call = (api) => api.lookupInsurer("Northwind");
+const lookupCall: Call = (api) => api.lookupInsurer("Triple A");
 
 describe("insurer api: http", () => {
   it("lists insurers with a same-origin GET that accepts JSON", async () => {
@@ -118,10 +117,10 @@ describe("insurer api: http", () => {
 
   it("looks a trimmed name up on the base URL with same-origin credentials", async () => {
     const { api, requests } = httpApi([jsonResponse(200, { insurer: sampleLookup() })], "https://api.example.test/");
-    expect(await api.lookupInsurer("  Northwind  ")).toEqual(sampleLookup());
+    expect(await api.lookupInsurer("  Triple A  ")).toEqual(sampleLookup());
     expect(requests).toHaveLength(1);
     expect(requests[0]).toMatchObject({
-      url: "https://api.example.test/api/insurers?name=Northwind",
+      url: "https://api.example.test/api/insurers?name=Triple%20A",
       method: "GET",
       credentials: "same-origin",
     });
@@ -171,7 +170,7 @@ describe("insurer api: http", () => {
   it("reports a rejected fetch as an ApiUnreachableError", async () => {
     const cause = new TypeError("Failed to fetch");
     const { api } = httpApi([cause]);
-    const error = await unreachableOf(api.lookupInsurer("Northwind"));
+    const error = await unreachableOf(api.lookupInsurer("Triple A"));
     expect(error.message).toBe("The server could not be reached.");
     expect(error.cause).toBe(cause);
   });
@@ -186,8 +185,8 @@ describe("insurer api: http", () => {
 
   it.each<[string, unknown]>([
     ["no insurers member", {}],
-    ["insurers that is not an array", { insurers: { id: "northwind-mutual" } }],
-    ["an insurer without a string id", { insurers: [{ id: 7, name: "Northwind Mutual" }] }],
+    ["insurers that is not an array", { insurers: { id: "aaa" } }],
+    ["an insurer without a string id", { insurers: [{ id: 7, name: "AAA" }] }],
     ["a bare array", [sampleSummary()]],
   ])("rejects a list body with %s as an unexpected shape", async (_label, body) => {
     const { api } = httpApi([jsonResponse(200, body)]);
@@ -199,7 +198,7 @@ describe("insurer api: http", () => {
   it.each<[string, unknown]>([
     ["no insurer member", {}],
     ["a null insurer", { insurer: null }],
-    ["an insurer without a name", { insurer: { id: "northwind-mutual" } }],
+    ["an insurer without a name", { insurer: { id: "aaa" } }],
     ["a summary without lookup details", { insurer: sampleSummary() }],
     ["a missing contacts array", { insurer: { ...sampleLookup(), contacts: null } }],
     ["a malformed contact", { insurer: { ...sampleLookup(), contacts: [{ purpose: "claims" }] } }],
@@ -208,7 +207,7 @@ describe("insurer api: http", () => {
     ["a list instead", { insurers: [sampleSummary()] }],
   ])("rejects a lookup body with %s as an unexpected shape", async (_label, body) => {
     const { api } = httpApi([jsonResponse(200, body)]);
-    expect((await unreachableOf(api.lookupInsurer("Northwind"))).message).toMatch(/unexpected insurer response shape/);
+    expect((await unreachableOf(api.lookupInsurer("Triple A"))).message).toMatch(/unexpected insurer response shape/);
   });
 
   it.each(["", "   ", "\t\n"])("resolves the blank name %j to null without a request", async (name) => {
@@ -219,45 +218,45 @@ describe("insurer api: http", () => {
 });
 
 describe("insurer api: fixture", () => {
-  it("lists the fictional insurers by name, as summaries only", async () => {
+  it("lists the demo's AAA and the fictional health insurer by name, as summaries only", async () => {
     const insurers = await fixtureApi().listInsurers();
-    expect(insurers.map((i) => i.name)).toEqual(["Harborline Health", "Northwind Mutual"]);
+    expect(insurers.map((i) => i.name)).toEqual(["AAA", "Harborline Health"]);
     for (const insurer of insurers) expect(Object.keys(insurer).sort()).toEqual(SUMMARY_KEYS);
   });
 
   it.each<[string, InsurerMatch]>([
-    ["northwind-mutual", { via: "id", matched: "northwind-mutual" }],
-    ["  Northwind-Mutual ", { via: "id", matched: "northwind-mutual" }],
-    ["NORTHWIND MUTUAL", { via: "name", matched: "Northwind Mutual" }],
-    ["northwind", { via: "alias", matched: "Northwind" }],
+    ["aaa", { via: "id", matched: "aaa" }],
+    ["  AAA ", { via: "id", matched: "aaa" }],
+    ["AAA Insurance", { via: "name", matched: "AAA" }],
+    ["triple a", { via: "alias", matched: "Triple A" }],
+    ["CSAA insurance group", { via: "alias", matched: "CSAA Insurance Group" }],
     ["harborline health plan", { via: "alias", matched: "Harborline Health Plan" }],
   ])("looks %j up by id, name or alias, ignoring case", async (name, match) => {
     expect((await lookupOrFail(fixtureApi(), name)).match).toEqual(match);
   });
 
-  it('drops filler words as the server does: "the Northwind insurance co" is the alias "Northwind"', async () => {
-    expect(await lookupOrFail(fixtureApi(), "the Northwind insurance co")).toMatchObject({
-      id: "northwind-mutual",
-      match: { via: "alias", matched: "Northwind" },
+  it('drops filler words as the server does: "the Triple A insurance co" is the alias "Triple A"', async () => {
+    expect(await lookupOrFail(fixtureApi(), "the Triple A insurance co")).toMatchObject({
+      id: "aaa",
+      match: { via: "alias", matched: "Triple A" },
     });
   });
 
-  it("matches the insurance_claim scenario's merchant by tokens and shares its phone", async () => {
+  it("matches the insurance_claim scenario's merchant by tokens and shares its claims line", async () => {
     const created = await createFixtureCaseApi({ scenario: "insurance_claim" }).createCase({
-      summary: "Water damage to the kitchen ceiling",
+      summary: "Rear-ended on October 10",
     });
-    expect(created.merchant.name).toBe("Northwind Mutual claims line");
+    expect(created.merchant).toEqual({ name: "AAA claims line", supportPhone: AAA_CLAIMS_PHONE });
     expect(await lookupOrFail(fixtureApi(), created.merchant.name ?? "")).toMatchObject({
-      id: "northwind-mutual",
-      supportPhone: created.merchant.supportPhone,
+      id: "aaa",
       claimsPhone: created.merchant.supportPhone,
-      match: { via: "tokens", matched: "Northwind Mutual" },
+      match: { via: "tokens", matched: "AAA" },
     });
   });
 
   it.each([
     ["an unknown name", "Acme Widgets"],
-    ["a name that matches both insurers", "Northwind or Harborline"],
+    ["a name that matches both insurers", "AAA or Harborline"],
     ["a name of filler words only", "The Insurance Company"],
     ["a blank name", "   "],
   ])("resolves %s to null", async (_label, name) => {
@@ -272,29 +271,27 @@ describe("insurer api: fixture", () => {
     });
   });
 
-  it("gives Northwind Mutual verified national numbers, two contacts, three terms and an open question", async () => {
-    const northwind = await lookupOrFail(fixtureApi(), "Northwind Mutual");
-    expect(northwind).toMatchObject({
-      id: "northwind-mutual",
-      categories: ["property"],
-      lines: ["homeowners", "renters"],
-      aliases: ["Northwind", "Northwind Mutual Insurance"],
-      supportPhone: NORTHWIND_PHONE,
-      supportPhoneConfidence: "verified_official",
-      claimsPhone: NORTHWIND_PHONE,
+  it("gives AAA the demo claims line from the declarations page, one claims term and the deductible question", async () => {
+    const aaa = await lookupOrFail(fixtureApi(), "AAA");
+    expect(aaa).toMatchObject({
+      id: "aaa",
+      legalName: "CSAA Insurance Group",
+      categories: ["auto"],
+      lines: ["auto"],
+      aliases: ["Triple A", "CSAA Insurance Group"],
+      supportPhone: null,
+      supportPhoneConfidence: null,
+      claimsPhone: AAA_CLAIMS_PHONE,
       claimsPhoneConfidence: "verified_official",
       needsPlanOrRegion: false,
     });
-    expect(northwind.contacts.map((c) => [c.purpose, c.scope, c.purposeVerified, c.phoneE164, c.sourceUrl])).toEqual([
-      ["customer_service", "national", true, NORTHWIND_PHONE, "https://example.invalid/northwind/contact"],
-      ["claims", "national", true, NORTHWIND_PHONE, "https://example.invalid/northwind/contact"],
+    expect(aaa.contacts.map((c) => [c.purpose, c.scope, c.purposeVerified, c.phoneE164, c.hours, c.sourceUrl])).toEqual([
+      ["claims", "national", true, AAA_CLAIMS_PHONE, "24/7", "https://example.invalid/aaa/declarations"],
     ]);
-    expect(northwind.terms.map((t) => t.key)).toEqual([
-      "claim_filing_method",
-      "claim_report_deadline",
-      "claim_decision_timeline",
+    expect(aaa.terms.map((t) => [t.line, t.key, t.value])).toEqual([["auto", "claim_filing_method", "Phone, 24 hours a day"]]);
+    expect(aaa.openQuestions.map((q) => q.question)).toEqual([
+      "Is the $500 collision deductible waived up front, or refunded once the other driver's insurer pays?",
     ]);
-    expect(northwind.openQuestions).toHaveLength(1);
   });
 
   it("leaves Harborline Health's number to the member's ID card", async () => {
@@ -334,22 +331,22 @@ describe("insurer api: fixture", () => {
 
   it("hands out copies, so callers cannot change the fixture", async () => {
     const api = fixtureApi();
-    const first = await lookupOrFail(api, "Northwind");
+    const first = await lookupOrFail(api, "AAA");
     first.contacts.length = 0;
     first.aliases.push("Changed");
-    (await api.listInsurers())[0]?.aliases.push("Changed too");
-    const again = await lookupOrFail(api, "Northwind");
-    expect(again.contacts).toHaveLength(2);
-    expect(again.aliases).toEqual(["Northwind", "Northwind Mutual Insurance"]);
-    expect((await api.listInsurers())[0]?.aliases).toEqual(["Harborline", "Harborline Health Plan"]);
+    (await api.listInsurers())[1]?.aliases.push("Changed too");
+    const again = await lookupOrFail(api, "AAA");
+    expect(again.contacts).toHaveLength(1);
+    expect(again.aliases).toEqual(["Triple A", "CSAA Insurance Group"]);
+    expect((await api.listInsurers())[1]?.aliases).toEqual(["Harborline", "Harborline Health Plan"]);
   });
 
-  it("uses only phone numbers from the fictional 555-01XX range", async () => {
+  it("lists no phone number but the demo's AAA claims line", async () => {
     const phones = (await allFixtureInsurers())
       .flatMap((i) => [i.supportPhone, i.claimsPhone, ...i.contacts.map((c) => c.phoneE164)])
       .filter((phone): phone is string => phone !== null);
     expect(phones.length).toBeGreaterThan(0);
-    for (const phone of phones) expect(phone).toMatch(FICTIONAL_PHONE);
+    for (const phone of phones) expect(phone).toBe(AAA_CLAIMS_PHONE);
   });
 
   it("links only to the reserved example.invalid domain", async () => {
@@ -366,7 +363,7 @@ describe("insurer api: fixture", () => {
     for (const url of urls) expect(new URL(url).hostname).toBe("example.invalid");
   });
 
-  it("names no real insurer and resolves none", async () => {
+  it("names no real insurer besides the demo's AAA and resolves none", async () => {
     const names = (await allFixtureInsurers())
       .flatMap((i) => [i.name, i.legalName, ...i.aliases])
       .filter((name): name is string => name !== null)
@@ -381,16 +378,17 @@ describe("insurer api: fixture", () => {
 
 describe("insurer lookup helpers", () => {
   it.each([
-    ["The Northwind Insurance Co.", "northwind"],
+    ["The Harborline Insurance Co.", "harborline"],
     ["Harbor & Line, Inc.", "harbor and line"],
-    ["  NORTHWIND   Mutual Group ", "northwind mutual"],
+    ["  HARBORLINE   Mutual Group ", "harborline mutual"],
+    ["CSAA Insurance Group", "csaa"],
     ["The Insurance Company", ""],
   ])("normalizes %j to %j", (input, expected) => {
     expect(normalizeInsurerName(input)).toBe(expected);
   });
 
   it.each<[string | null, string | null]>([
-    [" Northwind ", "Northwind"],
+    [" Triple A ", "Triple A"],
     ["", null],
     [" \t\n", null],
     [null, null],

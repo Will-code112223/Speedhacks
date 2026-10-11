@@ -186,7 +186,7 @@ class FixtureCaseApi implements CaseApi {
       this.log(record, now, "authorization_cleared", `Authorization ${record.authorizationId} cleared by a material edit.`);
       record.authorizationId = null;
     }
-    const status = missingFields(next).length > 0 ? "needs_information" : "ready_for_approval";
+    const status = missingFields(next, record.scenario.kind).length > 0 ? "needs_information" : "ready_for_approval";
     if (status !== before.case.status) this.logReadiness(record, now);
     return this.view(record, now);
   };
@@ -202,9 +202,10 @@ class FixtureCaseApi implements CaseApi {
     if (expectedRevision !== record.revision) {
       fail(409, "REVISION_CONFLICT", `Case is at revision ${record.revision}, not ${expectedRevision}`);
     }
-    const frozen = freeze(record.facts);
+    const kind = record.scenario.kind;
+    const frozen = freeze(record.facts, kind);
     if (frozen === null) {
-      fail(422, "MISSING_REQUIRED_FACTS", "Authorization requires every required fact", missingFields(record.facts));
+      fail(422, "MISSING_REQUIRED_FACTS", "Authorization requires every required fact", missingFields(record.facts, kind));
     }
     // Idempotent per revision: never mint a fresh id that would bypass dispatch deduplication.
     const existing = record.authorizations.find((a) => a.revision === record.revision);
@@ -215,11 +216,13 @@ class FixtureCaseApi implements CaseApi {
     const authorization: AuthorizationRecord = { id: newId(), revision: record.revision, approvedAtMs: now, frozen };
     record.authorizations.push(authorization);
     record.authorizationId = authorization.id;
+    const about =
+      frozen.amountMinor === null ? `a ${kind} with no amount yet` : formatMoney(frozen.amountMinor, frozen.currency);
     this.log(
       record,
       now,
       "authorized",
-      `Authorized revision ${record.revision}: call ${frozen.supportPhone} (${frozen.merchantName}) about ${formatMoney(frozen.amountMinor, frozen.currency)}.`,
+      `Authorized revision ${record.revision}: call ${frozen.supportPhone} (${frozen.merchantName}) about ${about}.`,
     );
     return this.view(record, now);
   };
@@ -431,7 +434,7 @@ class FixtureCaseApi implements CaseApi {
   }
 
   private logReadiness(record: CaseRecord, atMs: number): void {
-    const missing = missingFields(record.facts);
+    const missing = missingFields(record.facts, record.scenario.kind);
     if (missing.length > 0) this.log(record, atMs, "needs_information", `Missing: ${missing.join(", ")}.`);
     else this.log(record, atMs, "ready_for_approval", "All required facts present; draft generated.");
   }

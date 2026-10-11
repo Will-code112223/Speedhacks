@@ -30,7 +30,8 @@ export interface ScenarioDefinition {
 
 const CUSTOMER = "Jordan Avery";
 const RIDGELINE = { merchantName: "Ridgeline Outfitters billing", supportPhone: "+14155550177" };
-const NORTHWIND = { merchantName: "Northwind Mutual claims line", supportPhone: "+14155550162" };
+/** The demo's AAA claims line; the policyholder's AAA auto declarations page gives this number. */
+const AAA_CLAIMS = { merchantName: "AAA claims line", supportPhone: "+19495200007" };
 const DUPLICATE_REASON = "Charged twice for the same order; refund the duplicate charge.";
 
 export const DISPATCH_UNKNOWN_ERROR =
@@ -40,8 +41,10 @@ export const SCENARIOS: Record<FixtureScenario, ScenarioDefinition> = {
   insurance_claim: {
     id: "insurance_claim",
     kind: "claim",
-    extracted: { customerName: CUSTOMER, customerEmail: null, ...NORTHWIND, amountMinor: 120_000, currency: "USD" },
-    documentReason: "Water damage to the kitchen ceiling on Oct 3; filing a claim for the repair.",
+    // No repair estimate exists yet, so no amount is known; a claim is filed without one (see facts.ts).
+    extracted: { customerName: CUSTOMER, customerEmail: null, ...AAA_CLAIMS, amountMinor: null, currency: "USD" },
+    documentReason:
+      "Rear-ended on October 10 by a silver sedan, CA plate 8UFJ426; filing a collision claim for the damage to my car.",
     dispatch: { kind: "accepted", conversation: insuranceClaimCall },
   },
   duplicate_charge: {
@@ -81,13 +84,16 @@ export const SCENARIOS: Record<FixtureScenario, ScenarioDefinition> = {
   },
 };
 
+/** Words that pick the insurance claim: a claim or insurance, a car accident, or AAA by name. */
+const CLAIM_WORDS = ["claim", "insurance", "accident", "rear-end", "rear end", "collision", "aaa", "triple a"];
+
 /**
  * Picks a scenario from the user's words. Checked in this order, first match
  * wins, case-insensitive substrings; the header's fixture picker overrides it.
  */
 export function inferScenario(summary: string): FixtureScenario {
   const text = summary.toLowerCase();
-  if (text.includes("claim") || text.includes("insurance")) return "insurance_claim";
+  if (CLAIM_WORDS.some((word) => text.includes(word))) return "insurance_claim";
   if (text.includes("duplicate")) return "duplicate_charge";
   if (text.includes("no receipt") || text.includes("lost")) return "needs_evidence";
   if (text.includes("uncertain")) return "uncertain_dispatch";

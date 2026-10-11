@@ -245,7 +245,7 @@ export interface CaseApi {
  * the user's message; the fixture picker in the header overrides it.
  */
 export type FixtureScenario =
-  | "insurance_claim" // headline demo: file a claim, insurer bot answers, approval prompt, outcome requested
+  | "insurance_claim" // headline demo: AAA collision claim, menu and bot then a rep, repair shop prompt, outcome requested
   | "duplicate_charge" // $49.99 duplicate charge, human rep, refund requested, payment unconfirmed
   | "needs_evidence" // extraction leaves missing fields; no call until provided
   | "uncertain_dispatch" // call attempt ends in dispatch_unknown

@@ -27,7 +27,8 @@ During the demo
    Then send the summary by text from the outcome card.
 
 If the live server cannot be used
-Open http://localhost:3001/?api=fixture. The fixture plays the same AAA accident claim with the call plan dashboard, the live transcript, a claim number and the texted summary, with no real call.
+Since commit 53c66b6 the page always talks to the real server, so there is no in-browser fixture fallback at runtime.
+The scripted AAA accident claim (five-step call plan, AAA rep transcript, claim number 1002-48-7731, texted summary) lives in the fixture engine and its tests under src/features/refund-ui/api/fixture-engine.
 
 Good to know
 - The live workflow's insurer call is an information call by design: the agent asks what documents and process apply and does not itself open the claim. The roleplay representative can still issue a claim number on the call.

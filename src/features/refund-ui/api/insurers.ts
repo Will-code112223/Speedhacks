@@ -1,8 +1,8 @@
 /**
  * Insurer knowledge base client. http mode reads GET /api/insurers
  * (src/app/api/insurers/route.ts on origin/codex/voice f8a65a4); fixture mode
- * serves a few fictional insurers from memory. The mode is chosen up front, as
- * for CaseApi; http never falls back to fixture data.
+ * serves the demo's AAA and a fictional health insurer from memory. The mode is
+ * chosen up front, as for CaseApi; http never falls back to fixture data.
  *
  * Name matching mirrors the server's lookupInsurer: an exact id, then a unique
  * normalized name or alias, then a token match only one insurer satisfies.
@@ -66,7 +66,7 @@ const FILLER_WORDS = new Set([
   "of",
 ]);
 
-/** Lowercase, strip punctuation, drop filler words: "The Northwind Insurance Co." is "northwind". */
+/** Lowercase, strip punctuation, drop filler words: "The Harborline Insurance Co." is "harborline". */
 export function normalizeInsurerName(input: string): string {
   return input
     .toLowerCase()
@@ -250,109 +250,70 @@ function unreachable(message: string, cause: unknown): ApiUnreachableError {
 
 type FixtureInsurer = Omit<InsurerLookup, "match">;
 
-// Fictional insurers only. Phone numbers come from the NANP fictional range
-// (555-0100 to 555-0199) and URLs from the reserved .invalid domain.
-// Northwind's number is the insurance_claim scenario's "Northwind Mutual claims
-// line" in fixture-engine/scenarios.ts, so both fixtures agree.
-const NORTHWIND_PHONE = "+14155550162";
-const NORTHWIND_SOURCE = "https://example.invalid/northwind/contact";
+// AAA is the insurer in the insurance_claim scenario (fixture-engine/scenarios.ts),
+// and its claims line is that scenario's "AAA claims line", so both fixtures
+// agree. That number and every AAA fact here come from the demo's sample
+// declarations page, not from AAA's published contacts or terms. Harborline
+// Health is fictional. URLs use the reserved .invalid domain.
+const AAA_CLAIMS_PHONE = "+19495200007";
+const AAA_SOURCE = "https://example.invalid/aaa/declarations";
 const HARBORLINE_SOURCE = "https://example.invalid/harborline/contact";
 const RETRIEVED_AT = "2026-10-11";
 
 const FIXTURE_INSURERS: readonly FixtureInsurer[] = [
   {
-    id: "northwind-mutual",
-    name: "Northwind Mutual",
-    legalName: "Northwind Mutual Insurance Company",
+    id: "aaa",
+    name: "AAA",
+    legalName: "CSAA Insurance Group",
     parentId: null,
-    categories: ["property"],
-    lines: ["homeowners", "renters"],
-    aliases: ["Northwind", "Northwind Mutual Insurance"],
+    categories: ["auto"],
+    lines: ["auto"],
+    aliases: ["Triple A", "CSAA Insurance Group"],
     eligibility: null,
-    website: "https://example.invalid/northwind",
+    website: "https://example.invalid/aaa",
     tosUrl: null,
     privacyUrl: null,
-    notes: null,
-    supportPhone: NORTHWIND_PHONE,
-    supportPhoneConfidence: "verified_official",
-    claimsPhone: NORTHWIND_PHONE,
+    notes: "Demo data from the sample declarations page.",
+    supportPhone: null,
+    supportPhoneConfidence: null,
+    claimsPhone: AAA_CLAIMS_PHONE,
     claimsPhoneConfidence: "verified_official",
     needsPlanOrRegion: false,
     contacts: [
-      {
-        purpose: "customer_service",
-        channel: "phone",
-        scope: "national",
-        region: null,
-        purposeVerified: true,
-        phoneE164: NORTHWIND_PHONE,
-        hours: "Mon-Fri 8am-8pm ET",
-        url: null,
-        notes: "One number for service and claims; press 2 for existing claims.",
-        sourceUrl: NORTHWIND_SOURCE,
-        retrievedAt: RETRIEVED_AT,
-        confidence: "verified_official",
-      },
       {
         purpose: "claims",
         channel: "phone",
         scope: "national",
         region: null,
         purposeVerified: true,
-        phoneE164: NORTHWIND_PHONE,
+        phoneE164: AAA_CLAIMS_PHONE,
         hours: "24/7",
         url: null,
-        notes: null,
-        sourceUrl: NORTHWIND_SOURCE,
+        notes: "Press 1 to report a new claim.",
+        sourceUrl: AAA_SOURCE,
         retrievedAt: RETRIEVED_AT,
         confidence: "verified_official",
       },
     ],
     terms: [
       {
-        line: "all",
+        line: "auto",
         key: "claim_filing_method",
-        value: "Phone or online claim form",
+        value: "Phone, 24 hours a day",
         valueNumber: null,
         unit: null,
-        jurisdictionScope: "US",
-        notes: null,
-        sourceUrl: NORTHWIND_SOURCE,
-        sourceQuote: null,
-        retrievedAt: RETRIEVED_AT,
-        confidence: "verified_official",
-      },
-      {
-        line: "homeowners",
-        key: "claim_report_deadline",
-        value: "Within 60 days of the loss",
-        valueNumber: 60,
-        unit: "days",
-        jurisdictionScope: "US",
-        notes: null,
-        sourceUrl: NORTHWIND_SOURCE,
-        sourceQuote: null,
-        retrievedAt: RETRIEVED_AT,
-        confidence: "verified_official",
-      },
-      {
-        line: "all",
-        key: "claim_decision_timeline",
-        value: "Within 30 days of a complete claim",
-        valueNumber: 30,
-        unit: "days",
-        jurisdictionScope: "US",
-        notes: null,
-        sourceUrl: NORTHWIND_SOURCE,
-        sourceQuote: null,
+        jurisdictionScope: "CA",
+        notes: "Have the policy number, the date and place of the loss, the other driver's plate and insurer, and photos ready.",
+        sourceUrl: AAA_SOURCE,
+        sourceQuote: "Report a claim 24 hours a day.",
         retrievedAt: RETRIEVED_AT,
         confidence: "verified_official",
       },
     ],
     openQuestions: [
       {
-        question: "Does the 60-day reporting window also apply to renters policies?",
-        whyItMatters: "A late renters claim could be refused if the window differs.",
+        question: "Is the $500 collision deductible waived up front, or refunded once the other driver's insurer pays?",
+        whyItMatters: "It decides whether the deductible is due when the car is repaired.",
       },
     ],
   },

@@ -42,12 +42,12 @@ describe("composeSummary", () => {
     const call = sampleCall({ state: "completed", transcript: null, updatedAt: iso(T0 + 65_000) });
     const caseData = sampleCase({
       status: "awaiting_response",
-      merchant: { name: "Northwind Mutual", supportPhone: "+18005550199" },
-      amountMinor: 120_000,
+      merchant: { name: "AAA claims line", supportPhone: "+19495200007" },
+      amountMinor: 245_000,
       calls: [call],
       outcome: {
         decision: "requested",
-        referenceNumber: "NWM-2026-48213",
+        referenceNumber: "1002-48-7731",
         nextAction: null,
         paymentStatus: "confirmed",
         supportingQuote: null,
@@ -58,9 +58,9 @@ describe("composeSummary", () => {
     expect(delivery.subject).toBeNull();
     expect(delivery.summary).toEqual([
       "Support decision: Requested",
-      "Reference NWM-2026-48213",
+      "Reference 1002-48-7731",
       "Payment: confirmed",
-      `Call with Northwind Mutual lasted 1:05 on ${day}`,
+      `Call with AAA claims line lasted 1:05 on ${day}`,
     ]);
     expect(delivery.transcript).toBe("Transcript not available yet.");
   });
@@ -166,5 +166,24 @@ describe("fixture sendSummary", () => {
     expect((await api.getCase(caseId)).timeline.filter((t) => t.type === "summary_sent").at(-1)?.message).toBe(
       "Transcript and summary sent by email to jordan@example.com (simulated).",
     );
+  });
+
+  it("sums up the AAA claim by its claim number and next step, with no amount", async () => {
+    const { api, caseId, callId, live, caseAt } = await startedCall("insurance_claim");
+    const decision = (await live(46)).pendingDecision;
+    if (decision === null) throw new Error("Expected a pending decision at 46 s.");
+    await api.answerDecision(caseId, callId, decision.id, "accept");
+    await caseAt(80);
+
+    const sent = await api.sendSummary(caseId, { channel: "email", to: "jordan@example.com" });
+    expect(sent.subject).toBe("Recourse: AAA claims line - Requested 1002-48-7731");
+    expect(sent.summary).toEqual([
+      "Support decision: Requested",
+      "Reference 1002-48-7731",
+      "Payment: unverified",
+      "Next step: Upload the damage and plate photos to claim 1002-48-7731 before the adjuster calls within one business day; the direct repair shop will call to schedule the repair",
+      `Call with AAA claims line lasted 1:16 on ${day}`,
+    ]);
+    expect(sent.transcript).toContain("Support: I've opened the claim. Your claim number is 1002-48-7731.");
   });
 });

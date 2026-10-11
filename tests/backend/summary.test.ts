@@ -218,7 +218,7 @@ describe("summary helpers", () => {
   it("composes 3 to 5 lines from the stored outcome", () => {
     const lines = composeSummaryLines(
       {
-        merchant: { name: "Northwind", supportPhone: "+14155551000" },
+        merchant: { name: "Ridgeline", supportPhone: "+14155551000" },
         amountMinor: 1200,
         currency: "USD",
         outcome: { decision: "denied", referenceNumber: null, nextAction: "Dispute the charge.", paymentStatus: "unverified", supportingQuote: null },
@@ -227,9 +227,9 @@ describe("summary helpers", () => {
       { transcript: "Support: no.", createdAt: "2026-10-11T20:00:00.000Z", updatedAt: "2026-10-11T20:09:00.000Z" },
     );
     expect(lines).toEqual([
-      "Northwind declined the $12.00 refund on the call.",
+      "Ridgeline declined the $12.00 refund on the call.",
       "Next step: Dispute the charge.",
-      "The call with Northwind lasted 1 minute 5 seconds.",
+      "The call with Ridgeline lasted 1 minute 5 seconds.",
     ]);
     const bare = composeSummaryLines(
       {

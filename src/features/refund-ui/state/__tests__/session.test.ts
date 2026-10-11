@@ -97,7 +97,7 @@ function harness(scenario: FixtureScenario, options: Omit<FixtureOptions, "now" 
 describe("session reducer with the fixture backend", () => {
   it("runs an insurance claim from facts to outcome without repeating lines", async () => {
     const h = harness("insurance_claim");
-    await h.start("File an insurance claim against Northwind for the water damage");
+    await h.start("I was rear-ended yesterday. File a claim with AAA for the damage to my car.");
     expect(h.kinds()).toEqual(["user", "understood", "approval"]);
 
     await h.approve();
@@ -107,22 +107,25 @@ describe("session reducer with the fixture backend", () => {
     expect(h.session().startedCall).toBeNull();
     expect(h.session().caseData?.status).toBe("calling");
 
-    for (const second of [0, 1, 4, 10, 17, 18]) {
+    for (const second of [0, 1, 3, 7, 11, 15, 16]) {
       h.seconds(second);
       await h.live();
     }
     expect(h.events()).toEqual([
-      "Dialing Northwind Mutual claims line",
+      "Dialing AAA claims line",
+      "Ringing",
       "Navigating the phone menu",
-      "On hold",
       "Talking",
       "An automated agent answered",
+      "On hold",
+      "Talking",
+      "Transferred to a person",
     ]);
 
-    h.seconds(24);
+    h.seconds(45);
     await h.live();
     const pending = pendingDecision(h.session());
-    expect(pending?.decision.options.map((option) => option.id)).toEqual(["accept", "ask_for_other_times", "decline"]);
+    expect(pending?.decision.options.map((option) => option.id)).toEqual(["accept", "own_shop", "decide_later"]);
     expect(h.kinds().filter((kind) => kind === "decision")).toHaveLength(1);
     expect(h.events().at(-1)).toBe("Waiting for your answer");
 
@@ -131,7 +134,7 @@ describe("session reducer with the fixture backend", () => {
     await h.live();
     expect(h.session().thread.length).toBe(before);
 
-    h.seconds(25);
+    h.seconds(46);
     const decisionId = pending!.decision.id;
     h.run({ type: "decision/answering", key: KEY, decisionId, optionId: "accept" });
     const answered = await h.api.answerDecision(h.session().caseId!, pending!.callId, decisionId, "accept");
@@ -140,13 +143,13 @@ describe("session reducer with the fixture backend", () => {
     expect(pendingDecision(h.session())).toBeNull();
     expect(decisionForCallScreen(h.session(), pending!.callId)?.status).toBe("answered");
 
-    h.seconds(50);
+    h.seconds(80);
     const ended = await h.live();
     expect(ended?.phase).toBe("ended");
     expect(h.events().at(-1)).toMatch(/^Call ended after \d+:\d{2}$/);
     const finished = await h.poll();
     expect(["approved", "awaiting_response"]).toContain(finished.status);
-    expect(finished.outcome.referenceNumber).toBe("NWM-2026-48213");
+    expect(finished.outcome.referenceNumber).toBe("1002-48-7731");
     expect(h.kinds().filter((kind) => kind === "result")).toHaveLength(1);
     // A finished case does not offer another approval.
     expect(h.kinds().filter((kind) => kind === "approval")).toHaveLength(1);
@@ -157,11 +160,11 @@ describe("session reducer with the fixture backend", () => {
     await h.start("insurance claim");
     await h.approve();
     await h.poll();
-    h.seconds(24);
+    h.seconds(45);
     await h.live();
     const pending = pendingDecision(h.session());
     expect(pending).not.toBeNull();
-    h.seconds(46);
+    h.seconds(67);
     await h.live();
     expect(h.session().decisions[pending!.decision.id]).toMatchObject({ status: "closed", expired: true });
   });

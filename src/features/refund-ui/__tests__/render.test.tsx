@@ -209,7 +209,7 @@ describe("server render of each stage", () => {
     expect(empty).toContain('data-testid="composer-input"');
     expect(empty).toContain('data-testid="composer-send"');
 
-    s.begin("File an insurance claim against Northwind");
+    s.begin("I was rear-ended yesterday; file a claim with AAA");
     const creating = chat(s.controller());
     expect(creating).toContain("Reading your request");
     expect(creating).toContain("policy.pdf");
@@ -217,8 +217,8 @@ describe("server render of each stage", () => {
 
   it("renders the facts card and the approval step for a ready case", async () => {
     const s = stage("insurance_claim");
-    s.begin("File an insurance claim against Northwind");
-    await s.create("File an insurance claim against Northwind");
+    s.begin("I was rear-ended yesterday; file a claim with AAA");
+    await s.create("I was rear-ended yesterday; file a claim with AAA");
     const html = chat(s.controller());
     for (const id of [
       "facts-card",
@@ -236,8 +236,9 @@ describe("server render of each stage", () => {
     ]) {
       expect(html).toContain(`data-testid="${id}"`);
     }
-    expect(html).toContain("Approve the call to Northwind Mutual claims line");
-    expect(html).toContain("$1,200.00");
+    expect(html).toContain("Approve the call to AAA claims line");
+    expect(html).toContain("+1 949 520 0007");
+    expect(html).toContain("Claim filed and a reference number");
     expect(html.indexOf('data-testid="case-documents"')).toBeLessThan(html.indexOf('data-testid="approve-button"'));
   });
 
@@ -311,7 +312,7 @@ describe("server render of each stage", () => {
     expect(html).toContain('aria-current="step"');
     expect(html).toContain('aria-label="Call plan"');
 
-    s.seconds(18);
+    s.seconds(8);
     await s.live();
     html = callScreen(s.controller());
     expect(html).toContain("Talking to: an automated agent");
@@ -320,15 +321,22 @@ describe("server render of each stage", () => {
     // The spoken lines stream above the agent's activity, each with who said it.
     expect(html).toContain('data-testid="call-transcript"');
     expect(html).toContain(">Support</span>");
-    expect(html).toContain("This is the automated claims assistant. How can I help?");
+    expect(html).toContain("This is the automated claims assistant. Please enter the policy number, then press pound.");
     expect(html.indexOf('data-testid="call-plan"')).toBeLessThan(html.indexOf('data-testid="call-transcript"'));
     expect(html.indexOf('data-testid="call-transcript"')).toBeLessThan(html.indexOf('data-testid="call-notes"'));
 
-    s.seconds(24);
+    s.seconds(18);
+    await s.live();
+    html = callScreen(s.controller());
+    expect(html).toContain("Talking to: a person");
+    expect(html).toContain("AAA claims, this is Dana. Who am I speaking with?");
+
+    s.seconds(45);
     await s.live();
     const controller = s.controller();
     html = callScreen(controller);
     expect(html).toContain('data-testid="decision-card"');
+    expect(html).toContain("Use AAA&#x27;s shop");
     expect(html.indexOf('data-testid="call-timer"')).toBeLessThan(html.indexOf('data-testid="decision-card"'));
     expect(html).toContain('data-testid="decision-option-accept"');
     expect(html).toContain('data-testid="decision-countdown"');
@@ -382,7 +390,7 @@ describe("server render of each stage", () => {
     for (const id of ["outcome-card", "outcome-reference", "outcome-approval", "outcome-payment", "transcript-toggle", "packet-download"]) {
       expect(html).toContain(`data-testid="${id}"`);
     }
-    expect(html).toContain("NWM-2026-48213");
+    expect(html).toContain("1002-48-7731");
     const screen = callScreen(s.controller());
     expect(screen).toContain("Ended");
   });

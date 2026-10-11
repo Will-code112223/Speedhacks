@@ -1,10 +1,16 @@
 /**
  * Case fact rules, mirroring the server (src/server/cases/facts.ts on
  * codex/case-engine) so fixture mode rejects and accepts the same input.
+ *
+ * One deliberate difference: a claim may be filed without an amount. A claim
+ * is opened before any repair estimate exists, so the insurance_claim story
+ * reaches approval with no amount. An amount that is given must still be
+ * valid, and a refund still requires one, as on the server.
  */
 
 import type { CaseChanges, CaseV1 } from "../../../../contracts/case";
 import { isRecord } from "../validate";
+import type { RequestKind } from "./scenarios";
 
 export type Facts = Pick<CaseV1, "customer" | "merchant" | "amountMinor" | "currency" | "reason">;
 
@@ -18,13 +24,18 @@ export function isValidAmountMinor(v: unknown): v is number {
   return typeof v === "number" && Number.isSafeInteger(v) && v > 0 && v <= MAX_AMOUNT_MINOR;
 }
 
+/** Whether a request of this kind can go ahead without an amount: only a claim, before any estimate. */
+function amountOptional(kind: RequestKind, amountMinor: number | null): boolean {
+  return kind === "claim" && amountMinor === null;
+}
+
 /** In the server's order, which is also the order of a 422 `fields` list. */
-export function missingFields(facts: Facts): string[] {
+export function missingFields(facts: Facts, kind: RequestKind): string[] {
   const missing: string[] = [];
   if (!facts.customer.name?.trim()) missing.push("customer.name");
   if (!facts.merchant.name?.trim()) missing.push("merchant.name");
   if (!facts.merchant.supportPhone || !E164.test(facts.merchant.supportPhone)) missing.push("merchant.supportPhone");
-  if (!isValidAmountMinor(facts.amountMinor)) missing.push("amountMinor");
+  if (!amountOptional(kind, facts.amountMinor) && !isValidAmountMinor(facts.amountMinor)) missing.push("amountMinor");
   if (!CURRENCY.test(facts.currency)) missing.push("currency");
   if (!facts.reason.trim()) missing.push("reason");
   return missing;
@@ -112,24 +123,23 @@ export interface FrozenFacts {
   customerEmail: string | null;
   merchantName: string;
   supportPhone: string;
-  amountMinor: number;
+  /** Null only for a claim filed before any estimate; a refund always has one. */
+  amountMinor: number | null;
   currency: string;
   reason: string;
 }
 
 /** Every required fact, narrowed to non-null, or null while any is missing. */
-export function freeze(facts: Facts): FrozenFacts | null {
-  const { customer, merchant, amountMinor } = facts;
-  if (missingFields(facts).length > 0) return null;
-  if (customer.name === null || merchant.name === null || merchant.supportPhone === null || amountMinor === null) {
-    return null;
-  }
+export function freeze(facts: Facts, kind: RequestKind): FrozenFacts | null {
+  const { customer, merchant } = facts;
+  if (missingFields(facts, kind).length > 0) return null;
+  if (customer.name === null || merchant.name === null || merchant.supportPhone === null) return null;
   return {
     customerName: customer.name,
     customerEmail: customer.email,
     merchantName: merchant.name,
     supportPhone: merchant.supportPhone,
-    amountMinor,
+    amountMinor: facts.amountMinor,
     currency: facts.currency,
     reason: facts.reason,
   };

@@ -61,14 +61,14 @@ export function callContext(f: FrozenFacts): CallContext {
     customerName: f.customerName,
     merchantName: f.merchantName,
     phone: f.supportPhone,
-    amount: formatMoney(f.amountMinor, f.currency),
+    amount: f.amountMinor === null ? null : formatMoney(f.amountMinor, f.currency),
   };
 }
 
 export function projectCase(record: CaseRecord, nowMs: number, speed: number): ProjectedCase {
   const calls = record.calls.map((call) => projectCall(record.scenario, call, nowMs, speed));
   const outcome = latestOutcome(record.outcome, calls);
-  const missing = missingFields(record.facts);
+  const missing = missingFields(record.facts, record.scenario.kind);
   const timeline = [...record.timeline, ...calls.flatMap((c) => c.timeline)].sort((a, b) => a.atMs - b.atMs);
   const authorization = record.authorizations.find((a) => a.id === record.authorizationId) ?? null;
   return {

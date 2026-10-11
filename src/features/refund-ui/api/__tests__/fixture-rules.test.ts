@@ -8,7 +8,7 @@ import { authorizationIdOf, failureOf, fixture } from "./support";
 describe("fixture: creating a case", () => {
   it("extracts the insurance scenario's facts and labels the case simulated", async () => {
     const { api } = fixture();
-    const c = await api.createCase({ summary: "File a claim for the water damage on Oct 3" });
+    const c = await api.createCase({ summary: "I was rear-ended on Oct 10; file a claim with AAA" });
     expect(isCaseV1(c)).toBe(true);
     expect(c).toMatchObject({
       schemaVersion: 1,
@@ -16,17 +16,31 @@ describe("fixture: creating a case", () => {
       revision: 1,
       status: "ready_for_approval",
       customer: { name: "Jordan Avery", email: null },
-      merchant: { name: "Northwind Mutual claims line", supportPhone: "+14155550162" },
-      amountMinor: 120_000,
+      merchant: { name: "AAA claims line", supportPhone: "+19495200007" },
+      amountMinor: null,
       currency: "USD",
-      reason: "File a claim for the water damage on Oct 3",
+      reason: "I was rear-ended on Oct 10; file a claim with AAA",
       missingFields: [],
       authorization: null,
       calls: [],
       outcome: { decision: "unknown", paymentStatus: "unverified" },
     });
-    expect(c.draft?.subject).toBe("Claim request: $1,200.00 with Northwind Mutual claims line");
+    expect(c.draft?.subject).toBe("Claim request with AAA claims line");
+    expect(c.draft?.body).toContain("I am filing a claim. The amount is not known yet.");
     expect(c.timeline.map((t) => t.type)).toEqual(["case_created", "facts_extracted", "ready_for_approval"]);
+    expect(c.timeline.find((t) => t.type === "facts_extracted")?.message).toBe(
+      "Simulated extraction (fixture scenario insurance_claim) found customerName, merchantName, supportPhone, currency.",
+    );
+  });
+
+  it("reads the collision from the files alone when there is no summary", async () => {
+    const { api } = fixture("insurance_claim");
+    const declarations = new File(["%PDF-1.7"], "aaa-auto-policy-declarations.pdf", { type: "application/pdf" });
+    const c = await api.createCase({ summary: "", files: [declarations] });
+    expect(c.reason).toBe(
+      "Rear-ended on October 10 by a silver sedan, CA plate 8UFJ426; filing a collision claim for the damage to my car.",
+    );
+    expect(c.draft?.body).toContain("1. aaa-auto-policy-declarations.pdf (application/pdf)");
   });
 
   it("lets explicit fields override extraction and records uploaded evidence", async () => {
@@ -85,6 +99,43 @@ describe("fixture: revisions", () => {
     );
     expect(invalid).toMatchObject({ status: 400, code: "BAD_REQUEST", fields: ["merchant.supportPhone", "amountMinor"] });
     expect(await failureOf(api.patchCase(c.id, 0, {}))).toMatchObject({ status: 400, fields: ["expectedRevision"] });
+  });
+});
+
+describe("fixture: a claim without an amount", () => {
+  it("authorizes a claim filed before any estimate exists", async () => {
+    const { api } = fixture("insurance_claim");
+    const c = await api.createCase({ summary: "Rear-ended yesterday" });
+    expect(c).toMatchObject({ status: "ready_for_approval", amountMinor: null, missingFields: [] });
+    const authorized = await api.authorize(c.id, 1);
+    expect(authorized).toMatchObject({ status: "authorized", authorization: { revision: 1 } });
+    expect(authorized.timeline.at(-1)?.message).toBe(
+      "Authorized revision 1: call +19495200007 (AAA claims line) about a claim with no amount yet.",
+    );
+  });
+
+  it("still validates an amount that is given and words the draft with it", async () => {
+    const { api } = fixture("insurance_claim");
+    const c = await api.createCase({ summary: "Rear-ended yesterday" });
+    expect(await failureOf(api.patchCase(c.id, 1, { amountMinor: -5 }))).toMatchObject({
+      status: 400,
+      fields: ["amountMinor"],
+    });
+    const estimated = await api.patchCase(c.id, 1, { amountMinor: 245_000 });
+    expect(estimated).toMatchObject({ status: "ready_for_approval", revision: 2, missingFields: [] });
+    expect(estimated.draft?.subject).toBe("Claim request: $2,450.00 with AAA claims line");
+    const cleared = await api.patchCase(c.id, 2, { amountMinor: null });
+    expect(cleared).toMatchObject({ status: "ready_for_approval", revision: 3, amountMinor: null, missingFields: [] });
+  });
+
+  it("says the amount is not known yet in the packet, rather than missing", async () => {
+    const { api } = fixture("insurance_claim");
+    const c = await api.createCase({ summary: "Rear-ended yesterday" });
+    const text = await (await api.downloadPacket(c.id)).text();
+    expect(text).toContain("CLAIM REQUEST PACKET");
+    expect(text).toContain("Amount:         not known yet");
+    expect(text).toContain("Subject: Claim request with AAA claims line");
+    expect(text).not.toContain("[amount missing]");
   });
 });
 
@@ -244,8 +295,13 @@ describe("fixture: packet", () => {
 
 describe("inferScenario", () => {
   it.each([
-    ["File an insurance claim for the water damage", "insurance_claim"],
+    ["File an insurance claim for my car", "insurance_claim"],
     ["My claim for the duplicate charge", "insurance_claim"],
+    ["A car accident, and I lost the photos", "insurance_claim"],
+    ["I was REAR-ENDED yesterday", "insurance_claim"],
+    ["A rear end collision on the freeway", "insurance_claim"],
+    ["Call AAA to confirm", "insurance_claim"],
+    ["Call Triple A about the duplicate tow charge", "insurance_claim"],
     ["Duplicate charge at Ridgeline", "duplicate_charge"],
     ["DUPLICATE in capitals", "duplicate_charge"],
     ["Charged twice and I have no receipt", "needs_evidence"],

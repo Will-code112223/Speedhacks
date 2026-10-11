@@ -27,7 +27,8 @@ export interface CaseAttachments {
 
 const NONE: CaseAttachments = { files: [], names: [], prefill: {}, notice: null };
 
-const INSURANCE_WORDS = /\b(insur\w*|claims?|polic(?:y|ies)|coverage|covered|deductibles?|adjusters?|premiums?|copays?)\b/i;
+const INSURANCE_WORDS =
+  /\b(insur\w*|claims?|polic(?:y|ies)|coverage|covered|deductibles?|adjusters?|premiums?|copays?|accidents?|collisions?|rear[- ]ended)\b/i;
 
 /** Words too common in plan and insurer names to identify one. */
 const GENERIC_WORDS = new Set([

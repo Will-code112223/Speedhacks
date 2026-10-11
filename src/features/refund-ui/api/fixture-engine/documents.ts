@@ -9,24 +9,25 @@ import { iso } from "./time";
 
 /** Null until every required fact is present, like the server. */
 export function buildDraft(kind: RequestKind, facts: Facts, evidence: readonly EvidenceRecord[]): CaseV1["draft"] {
-  const f = freeze(facts);
+  const f = freeze(facts, kind);
   if (f === null) return null;
-  const amount = formatMoney(f.amountMinor, f.currency);
+  // Only a claim filed before any estimate has no amount; a refund always has one.
+  const amount = f.amountMinor === null ? null : formatMoney(f.amountMinor, f.currency);
   const contact = f.customerEmail ? ` (${f.customerEmail})` : "";
   const evidenceLines =
     evidence.length > 0 ? evidence.map((e, i) => `  ${i + 1}. ${e.name} (${e.mimeType})`).join("\n") : "  (none attached)";
   const wording =
     kind === "claim"
       ? {
-          subject: `Claim request: ${amount} with ${f.merchantName}`,
+          subject: amount === null ? `Claim request with ${f.merchantName}` : `Claim request: ${amount} with ${f.merchantName}`,
           greeting: `Hello ${f.merchantName},`,
-          ask: `I am filing a claim for ${amount}.`,
+          ask: amount === null ? "I am filing a claim. The amount is not known yet." : `I am filing a claim for ${amount}.`,
           close: "Please open the claim and provide a claim number and the next steps.",
         }
       : {
-          subject: `Refund request: duplicate charge of ${amount} at ${f.merchantName}`,
+          subject: `Refund request: duplicate charge${amount === null ? "" : ` of ${amount}`} at ${f.merchantName}`,
           greeting: `Hello ${f.merchantName} support,`,
-          ask: `I am requesting a refund of ${amount} for a duplicate charge.`,
+          ask: `I am requesting a refund${amount === null ? "" : ` of ${amount}`} for a duplicate charge.`,
           close: "Please confirm the refund and provide a reference number.",
         };
   const body = [
@@ -56,7 +57,9 @@ export function buildPacket(
   evidence: readonly EvidenceRecord[],
   generatedAtMs: number,
 ): string {
-  const amount = c.amountMinor === null ? "[amount missing]" : formatMoney(c.amountMinor, c.currency);
+  // A null amount that is not missing is a claim filed before any estimate.
+  const noAmount = c.missingFields.includes("amountMinor") ? "[amount missing]" : "not known yet";
+  const amount = c.amountMinor === null ? noAmount : formatMoney(c.amountMinor, c.currency);
   const lines: string[] = [
     kind === "claim" ? "CLAIM REQUEST PACKET" : "REFUND REQUEST PACKET",
     "=".repeat(60),

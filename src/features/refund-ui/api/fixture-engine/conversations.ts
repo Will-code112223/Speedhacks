@@ -13,8 +13,8 @@ export interface CallContext {
   customerName: string;
   merchantName: string;
   phone: string;
-  /** The authorized amount, formatted. */
-  amount: string;
+  /** The authorized amount, formatted; null for a claim filed before any estimate. */
+  amount: string | null;
 }
 
 export interface Resolution {
@@ -107,12 +107,18 @@ const QUICK_PACE: RefundPace = {
   endAt: 12_000,
 };
 
+/** A refund always has an authorized amount: the engine never authorizes one without it. */
+function refundAmount(ctx: CallContext): string {
+  if (ctx.amount === null) throw new Error("A refund call needs an authorized amount.");
+  return ctx.amount;
+}
+
 function refundCall(pace: RefundPace): Conversation {
   const turns = (ctx: CallContext): ScriptTurn[] => refundTurns(pace, ctx);
   return {
     plan: (ctx) => [
       { id: "reach", title: "Reach the billing team", detail: "Dialing, phone menu and hold." },
-      { id: "explain", title: "Explain the duplicate charge", detail: `Two charges of ${ctx.amount} on the same day.` },
+      { id: "explain", title: "Explain the duplicate charge", detail: `Two charges of ${refundAmount(ctx)} on the same day.` },
       { id: "ask", title: "Ask for the refund", detail: "Refund the second charge to the original card." },
       { id: "confirm", title: "Confirm the reference number", detail: "Read back the amount and reference." },
       { id: "record", title: "Record the outcome", detail: "Save the reference and next step to the case." },
@@ -135,7 +141,7 @@ function refundCall(pace: RefundPace): Conversation {
           {
             at: pace.explainAt,
             step: "ask",
-            note: `Explained the duplicate ${ctx.amount} charge and asked for a refund of the second one.`,
+            note: `Explained the duplicate ${refundAmount(ctx)} charge and asked for a refund of the second one.`,
           },
           { at: pace.issuedAt, step: "confirm", note: `The rep issued the refund. Reference ${REFUND_REFERENCE}.` },
           { at: pace.readBackAt, note: "Read back the amount and reference. The rep confirmed." },
@@ -160,14 +166,15 @@ function refundCall(pace: RefundPace): Conversation {
 function refundTurns(pace: RefundPace, ctx: CallContext): ScriptTurn[] {
   const talk = (fraction: number): number => lerp(pace.answerAt, pace.explainAt, fraction);
   const confirm = (fraction: number): number => lerp(pace.issuedAt, pace.readBackAt, fraction);
+  const amount = refundAmount(ctx);
   return [
     { at: talk(0.125), speaker: "support", text: `${ctx.merchantName}, this is Sam. How can I help?` },
     {
       at: talk(0.375),
       speaker: "agent",
-      text: `Hi Sam. I'm an AI assistant calling for ${ctx.customerName} about a duplicate charge of ${ctx.amount}.`,
+      text: `Hi Sam. I'm an AI assistant calling for ${ctx.customerName} about a duplicate charge of ${amount}.`,
     },
-    { at: talk(0.75), speaker: "support", text: `I can see two charges of ${ctx.amount} on the same day.` },
+    { at: talk(0.75), speaker: "support", text: `I can see two charges of ${amount} on the same day.` },
     {
       at: pace.explainAt,
       speaker: "agent",
@@ -177,7 +184,7 @@ function refundTurns(pace: RefundPace, ctx: CallContext): ScriptTurn[] {
     {
       at: confirm(0.5),
       speaker: "agent",
-      text: `To confirm: a ${ctx.amount} refund to the original card, reference ${REFUND_REFERENCE}.`,
+      text: `To confirm: a ${amount} refund to the original card, reference ${REFUND_REFERENCE}.`,
     },
     { at: confirm(0.8), speaker: "support", text: "That's right. It should post in 5 to 7 business days." },
     { at: lerp(pace.readBackAt, pace.endAt, 0.5), speaker: "agent", text: "Thank you. Goodbye." },
@@ -185,83 +192,114 @@ function refundTurns(pace: RefundPace, ctx: CallContext): ScriptTurn[] {
 }
 
 function refundQuote(ctx: CallContext): string {
-  return `I've issued the refund of ${ctx.amount} to the original card, reference ${REFUND_REFERENCE}`;
+  return `I've issued the refund of ${refundAmount(ctx)} to the original card, reference ${REFUND_REFERENCE}`;
 }
 
 export const refundCallStandard = refundCall(STANDARD_PACE);
 export const refundCallQuick = refundCall(QUICK_PACE);
 
 // ---------------------------------------------------------------------------
-// Insurance claim: an automated claims line opens the claim and asks for a
-// decision outside the authorization (an adjuster visit time).
+// Insurance claim: the policyholder was rear-ended, and the agent calls AAA to
+// file a collision claim. A phone menu and an automated assistant route it; a
+// claims rep verifies the policy, takes the loss report and opens the claim,
+// then offers a direct repair shop. Choosing a shop is outside the
+// authorization, so the agent asks the user before answering.
 // ---------------------------------------------------------------------------
 
-export const CLAIM_REFERENCE = "NWM-2026-48213";
-export const ADJUSTER_QUESTION =
-  "The claims line can open the claim now but asks to schedule an adjuster visit on Tuesday 10 to 12. Accept?";
-export const ADJUSTER_OPTIONS: readonly DecisionOption[] = [
-  { id: "accept", label: "Accept Tuesday 10 to 12", tone: "primary" },
-  { id: "ask_for_other_times", label: "Ask for other times", tone: "neutral" },
-  { id: "decline", label: "Decline the visit", tone: "danger" },
-];
-export const ADJUSTER_DEFAULT = "ask_for_other_times";
-export const DECISION_AT = 24_000;
+/** Facts the agent reads from the declarations page and the photos; not editable case facts. */
+const POLICY_ENDING = "4471";
+const VEHICLE = "red 2021 Toyota Camry";
+const OTHER_PLATE = "8UFJ426";
+
+export const CLAIM_REFERENCE = "1002-48-7731";
+export const SHOP_DEFAULT = "decide_later";
+export const DECISION_AT = 45_000;
 export const DECISION_TIMEOUT_MS = 20_000;
 
+/** The insurer as people say it: "AAA claims line" is "AAA". */
+function insurerName(ctx: CallContext): string {
+  return ctx.merchantName.replace(/\s+claims?\s+line$/i, "").trim() || ctx.merchantName;
+}
+
+/** How the rep refers to the policyholder once introduced: "Jordan Avery" is "Jordan". */
+function firstName(ctx: CallContext): string {
+  return ctx.customerName.trim().split(/\s+/)[0] ?? ctx.customerName;
+}
+
+function shopQuestion(ctx: CallContext): string {
+  const insurer = insurerName(ctx);
+  return `${insurer} can book one of its direct repair shops near you, with the work guaranteed while you own the car. Use ${insurer}'s shop?`;
+}
+
+function shopOptions(ctx: CallContext): DecisionOption[] {
+  return [
+    { id: "accept", label: `Use ${insurerName(ctx)}'s shop`, tone: "primary" },
+    { id: "own_shop", label: "Choose my own shop", tone: "neutral" },
+    { id: SHOP_DEFAULT, label: "Decide with the adjuster", tone: "neutral" },
+  ];
+}
+
+/** What the rep says when the claim opens; the outcome quotes it. */
+function claimQuote(ctx: CallContext): string {
+  return `I've opened the claim. Your claim number is ${CLAIM_REFERENCE}. An adjuster will be assigned and will call ${firstName(ctx)} within one business day.`;
+}
+
 interface ClaimBranch {
-  /** Live note once the claims line acts on the choice. */
+  /** Live note once the rep acts on the choice. */
   note: string;
   /** What the agent says when the user chose this option. */
   agentLine: (ctx: CallContext) => string;
   /** What the agent says when this option applied because nobody answered. */
   agentLineByDefault?: (ctx: CallContext) => string;
-  supportLine: string;
-  readBack: string;
-  closing: string;
+  supportLine: (ctx: CallContext) => string;
+  /** The repair shop, as the agent's read-back states it. */
+  shopReadBack: (ctx: CallContext) => string;
   nextAction: string;
 }
 
+const PHOTOS_BEFORE_ADJUSTER = `Upload the damage and plate photos to claim ${CLAIM_REFERENCE} before the adjuster calls within one business day`;
+
 const CLAIM_BRANCHES: Record<string, ClaimBranch> = {
   accept: {
-    note: `Claim ${CLAIM_REFERENCE} opened. Adjuster visit booked for Tuesday 10 to 12.`,
-    agentLine: (ctx) => `${ctx.customerName} accepts Tuesday from 10 to 12.`,
-    supportLine: `Your claim ${CLAIM_REFERENCE} is open and an adjuster visit is scheduled.`,
-    readBack: `To confirm: claim ${CLAIM_REFERENCE}, adjuster visit Tuesday 10 to 12.`,
-    closing: "Correct. Please upload photos of the damage before the visit.",
-    nextAction: "Adjuster visit Tuesday 10-12; upload photos of the damage before then",
+    note: "The rep booked a direct repair shop near your home. The shop will call to schedule the repair.",
+    agentLine: (ctx) => `${firstName(ctx)} would like one of your direct repair shops.`,
+    supportLine: (ctx) =>
+      `Great. I've assigned a direct repair shop near ${firstName(ctx)}'s home, and they'll call to schedule the repair.`,
+    shopReadBack: () => "the repair at your direct repair shop",
+    nextAction: `${PHOTOS_BEFORE_ADJUSTER}; the direct repair shop will call to schedule the repair`,
   },
-  ask_for_other_times: {
-    note: `Claim ${CLAIM_REFERENCE} opened. A scheduler will call you to book the adjuster visit.`,
-    agentLine: (ctx) => `${ctx.customerName} would like other times. What else is available?`,
+  own_shop: {
+    note: "You will choose the repair shop. It sends its estimate to the adjuster.",
+    agentLine: (ctx) => `${firstName(ctx)} will choose a repair shop.`,
+    supportLine: () => "That's fine. Once a shop is chosen, have them send their estimate to the adjuster.",
+    shopReadBack: (ctx) => `${firstName(ctx)}'s own shop sending its estimate to the adjuster`,
+    nextAction: `${PHOTOS_BEFORE_ADJUSTER}; have your shop send its estimate to the adjuster`,
+  },
+  decide_later: {
+    note: "The shop choice waits for the adjuster's call.",
+    agentLine: (ctx) => `${firstName(ctx)} would like to decide on the shop with the adjuster.`,
     agentLineByDefault: (ctx) =>
-      `I could not confirm Tuesday with ${ctx.customerName} in time. What other times are available?`,
-    supportLine: `Your claim ${CLAIM_REFERENCE} is open. A scheduler will call to book the adjuster visit.`,
-    readBack: `To confirm: claim ${CLAIM_REFERENCE}, and a scheduler will call about the visit.`,
-    closing: "Correct. Please upload photos of the damage before the visit.",
-    nextAction: "A scheduler will call to book the adjuster visit; upload photos of the damage before then",
-  },
-  decline: {
-    note: `Claim ${CLAIM_REFERENCE} opened without a visit. An adjuster will review photos instead.`,
-    agentLine: (ctx) => `${ctx.customerName} declines the visit for now.`,
-    supportLine: `Your claim ${CLAIM_REFERENCE} is open without a visit. An adjuster will review photos instead.`,
-    readBack: `To confirm: claim ${CLAIM_REFERENCE}, reviewed from photos.`,
-    closing: "Correct. Please upload photos of the damage this week.",
-    nextAction: "Upload photos of the damage so an adjuster can review the claim remotely",
+      `I couldn't reach ${firstName(ctx)} in time, so ${firstName(ctx)} will decide on the shop with the adjuster.`,
+    supportLine: () => "No problem. The adjuster can set up the shop on that call.",
+    shopReadBack: () => "the shop chosen on the adjuster's call",
+    nextAction: `${PHOTOS_BEFORE_ADJUSTER}; choose the repair shop on that call`,
   },
 };
 
 function claimBranch(resolution: Resolution | null): ClaimBranch {
-  const branch = CLAIM_BRANCHES[resolution?.optionId ?? ADJUSTER_DEFAULT] ?? CLAIM_BRANCHES[ADJUSTER_DEFAULT];
-  if (branch === undefined) throw new Error("The adjuster decision has no default branch.");
+  const branch = CLAIM_BRANCHES[resolution?.optionId ?? SHOP_DEFAULT] ?? CLAIM_BRANCHES[SHOP_DEFAULT];
+  if (branch === undefined) throw new Error("The repair shop decision has no default branch.");
   return branch;
 }
 
 function afterDecision(branch: ClaimBranch, ctx: CallContext, resolution: Resolution): ScriptStep[] {
   return withTurns(
     [
-      { at: 31_000, step: "confirm", note: branch.note },
-      { at: 38_000, note: `Read back claim ${CLAIM_REFERENCE}. The claims line confirmed.` },
-      { at: 45_000, phase: "ended", step: "record", note: "Call ended." },
+      { at: 48_000, note: branch.note },
+      { at: 52_000, note: "Rental covered at $40 a day for up to 30 days." },
+      { at: 56_500, note: "The $500 deductible may be waived once the other driver's insurer accepts liability." },
+      { at: 70_500, note: `Read back claim ${CLAIM_REFERENCE} and the next steps. The rep confirmed.` },
+      { at: 75_500, phase: "ended", note: "Call ended." },
     ],
     claimTurns(ctx, resolution).filter((t) => t.at > DECISION_AT),
   );
@@ -282,62 +320,125 @@ function claimTurns(ctx: CallContext, resolution: Resolution | null): ScriptTurn
   const branch = claimBranch(resolution);
   const agentLine =
     resolution?.by === "default" && branch.agentLineByDefault ? branch.agentLineByDefault(ctx) : branch.agentLine(ctx);
+  const insurer = insurerName(ctx);
+  const first = firstName(ctx);
   return [
-    { at: 3_500, speaker: "support", text: `Thank you for calling ${ctx.merchantName}. For existing claims, press 2.` },
-    { at: 9_500, speaker: "support", text: "Please hold for the next available claims agent." },
-    { at: 17_000, speaker: "support", text: "This is the automated claims assistant. How can I help?" },
     {
-      at: 20_000,
-      speaker: "agent",
-      text: `I'm an AI assistant calling for ${ctx.customerName} about a claim for ${ctx.amount}. The details and photos are on file.`,
-    },
-    {
-      at: DECISION_AT - 1_500,
+      at: 3_000,
       speaker: "support",
-      text: "I can open the claim now. An adjuster needs to visit, and the first opening is Tuesday from 10 to 12. Does that work?",
+      text: `Thank you for calling ${insurer} claims. To report a new claim, press 1. For an existing claim, press 2.`,
     },
-    { at: DECISION_AT, speaker: "agent", text: `One moment while I check with ${ctx.customerName}.` },
+    { at: 7_000, speaker: "support", text: "This is the automated claims assistant. Please enter the policy number, then press pound." },
+    { at: 9_500, speaker: "support", text: "Thank you. Please hold for the next available claims representative." },
+    { at: 15_500, speaker: "support", text: `${insurer} claims, this is Dana. Who am I speaking with?` },
+    {
+      at: 17_500,
+      speaker: "agent",
+      text: `Hi Dana. I'm an AI assistant calling on behalf of ${ctx.customerName} to report an accident.`,
+    },
+    {
+      at: 21_000,
+      speaker: "support",
+      text: "Okay. I see the policy number you entered. Can you confirm the named insured and the vehicle?",
+    },
+    { at: 23_500, speaker: "agent", text: `${ctx.customerName}, policy ending ${POLICY_ENDING}, for a ${VEHICLE}.` },
+    { at: 26_500, speaker: "support", text: "Thank you, that matches. What happened?" },
+    {
+      at: 29_000,
+      speaker: "agent",
+      text: `Yesterday, October 10, in San Francisco, a silver sedan rear-ended the car while it was stopped in traffic. The rear bumper and trunk are damaged. The sedan's California plate is ${OTHER_PLATE}.`,
+    },
+    {
+      at: 33_500,
+      speaker: "support",
+      text: `I'm sorry to hear that. Plate ${OTHER_PLATE}, got it. Was anyone injured, and are there photos?`,
+    },
+    {
+      at: 35_500,
+      speaker: "agent",
+      text: `No one was injured. ${first} photographed the damage and the other car's plate, and the photos are on file. ${first} was not at fault.`,
+    },
+    { at: 39_500, speaker: "support", text: claimQuote(ctx) },
+    {
+      at: 43_000,
+      speaker: "support",
+      text: `For the repair, we can book one of our direct repair shops near ${first}'s home, guaranteed for as long as they own the car, or they can choose any shop. Which would they prefer?`,
+    },
+    { at: DECISION_AT, speaker: "agent", text: `One moment while I check with ${first}.` },
     { at: DECISION_AT + 500, speaker: "agent", text: agentLine },
-    { at: 30_000, speaker: "support", text: branch.supportLine },
-    { at: 36_000, speaker: "agent", text: branch.readBack },
-    { at: 37_500, speaker: "support", text: branch.closing },
-    { at: 42_000, speaker: "agent", text: "Thank you. Goodbye." },
+    { at: 48_000, speaker: "support", text: branch.supportLine(ctx) },
+    {
+      at: 52_000,
+      speaker: "support",
+      text: `${first}'s policy has rental reimbursement at $40 a day, for up to 30 days while the car is being repaired.`,
+    },
+    {
+      at: 56_500,
+      speaker: "support",
+      text: `And since the other driver hit ${first} from behind, we'll pursue their insurer. Once they accept liability, the $500 collision deductible may be waived.`,
+    },
+    { at: 61_500, speaker: "support", text: `I'm also texting ${first} a link to upload the photos to the claim.` },
+    {
+      at: 64_000,
+      speaker: "agent",
+      text: `To confirm: claim ${CLAIM_REFERENCE}, an adjuster call within one business day, ${branch.shopReadBack(ctx)}, and rental at $40 a day. The $500 deductible may be waived once the other insurer accepts liability.`,
+    },
+    {
+      at: 70_500,
+      speaker: "support",
+      text: `That's all correct. I'm glad no one was hurt. Thank you for calling ${insurer}.`,
+    },
+    { at: 73_500, speaker: "agent", text: "Thank you, Dana. Goodbye." },
   ];
 }
 
 export const insuranceClaimCall: Conversation = {
   plan: (ctx) => [
-    { id: "reach", title: "Reach the claims line", detail: "Dialing, phone menu and hold." },
-    { id: "state", title: "State the claim with the evidence", detail: `A claim for ${ctx.amount}, with the evidence on file.` },
-    { id: "decide", title: "Check the adjuster visit with you", detail: "Anything outside your authorization waits for your answer." },
-    { id: "confirm", title: "Confirm the claim reference", detail: "Read back the claim reference." },
-    { id: "record", title: "Record the outcome", detail: "Save the reference and next step to the case." },
+    { id: "reach", title: `Reach ${insurerName(ctx)} claims`, detail: "Phone menu, then hold for a claims rep." },
+    { id: "verify", title: "Verify the policy", detail: `${ctx.customerName}, policy ending ${POLICY_ENDING}, from the declarations page.` },
+    { id: "report", title: "Report the loss", detail: `Oct 10 rear-end, plate ${OTHER_PLATE}, photos on file, no injuries.` },
+    { id: "claim", title: "Get a claim number and adjuster", detail: "A claim number now, an adjuster within one business day." },
+    { id: "next", title: "Confirm next steps", detail: "Repair shop, rental car and the deductible." },
   ],
   turns: claimTurns,
   script: (ctx) => ({
     steps: withTurns(
       [
         { at: 0, phase: "dialing", step: "reach", note: `Dialing ${ctx.merchantName}.` },
-        { at: 3_000, phase: "navigating_menu", note: "The phone menu answered." },
-        { at: 5_000, note: "Pressed 2 for existing claims" },
-        { at: 9_000, phase: "on_hold", note: "On hold for the claims team." },
+        { at: 1_000, phase: "ringing" },
+        { at: 2_500, phase: "navigating_menu", note: "The phone menu answered." },
+        { at: 5_500, note: "Pressed 1 to report a new claim." },
         {
-          at: 17_000,
+          at: 6_500,
           phase: "talking",
-          step: "state",
           counterpart: { who: "agent", confidence: 0.9 },
           note: "Automated claims assistant answered. Switching to concise mode.",
         },
-        { at: 20_000, note: `Stated the claim for ${ctx.customerName}: ${ctx.amount}, with the evidence on file.` },
-        { at: DECISION_AT, step: "decide", note: "The claims line asked to book an adjuster visit. Asking you." },
+        { at: 9_000, note: "Keyed in the policy number from your declarations page." },
+        { at: 10_500, phase: "on_hold", note: "On hold for a claims representative." },
+        {
+          at: 15_000,
+          phase: "talking",
+          step: "verify",
+          counterpart: { who: "human", confidence: 0.85 },
+          note: "A claims representative answered. Back to a conversational tone.",
+        },
+        { at: 26_500, step: "report", note: `Policy ending ${POLICY_ENDING} verified.` },
+        {
+          at: 37_500,
+          note: `Reported the October 10 rear-end collision: plate ${OTHER_PLATE}, photos on file, no injuries.`,
+        },
+        { at: 39_500, step: "claim", note: `Claim ${CLAIM_REFERENCE} opened. An adjuster will call within one business day.` },
+        { at: 43_000, step: "next" },
+        { at: DECISION_AT, note: `${insurerName(ctx)} offered a direct repair shop. Asking you.` },
       ],
       claimTurns(ctx, null).filter((t) => t.at <= DECISION_AT),
     ),
     gate: {
       at: DECISION_AT,
-      question: ADJUSTER_QUESTION,
-      options: ADJUSTER_OPTIONS.map((o) => ({ ...o })),
-      defaultOptionId: ADJUSTER_DEFAULT,
+      question: shopQuestion(ctx),
+      options: shopOptions(ctx),
+      defaultOptionId: SHOP_DEFAULT,
       timeoutMs: DECISION_TIMEOUT_MS,
       after: afterDecisions(ctx, "user"),
       afterByDefault: afterDecisions(ctx, "default"),
@@ -345,14 +446,11 @@ export const insuranceClaimCall: Conversation = {
   }),
   transcript: (ctx, resolution) => transcriptFromTurns(claimTurns(ctx, resolution)),
   // Opening a claim is a request, not a decision on it; nothing is paid yet.
-  outcome: (_ctx, resolution) => {
-    const branch = claimBranch(resolution);
-    return {
-      decision: "requested",
-      referenceNumber: CLAIM_REFERENCE,
-      nextAction: branch.nextAction,
-      paymentStatus: "unverified",
-      supportingQuote: branch.supportLine,
-    };
-  },
+  outcome: (ctx, resolution) => ({
+    decision: "requested",
+    referenceNumber: CLAIM_REFERENCE,
+    nextAction: claimBranch(resolution).nextAction,
+    paymentStatus: "unverified",
+    supportingQuote: claimQuote(ctx),
+  }),
 };

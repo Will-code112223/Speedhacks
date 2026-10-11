@@ -34,7 +34,7 @@ describe("provider knowledge loading and selection", () => {
     await resource.load();
     expect(resource.getSnapshot().list).toMatchObject({ status: "error", items: [] });
     const html = renderToStaticMarkup(<ProviderKnowledgeView state={resource.getSnapshot()} onReload={() => {}} onSelect={() => {}} />);
-    expect(html).toContain("Provider directory unavailable"); expect(html).toContain("Retry"); expect(html).not.toContain("Northwind");
+    expect(html).toContain("Provider directory unavailable"); expect(html).toContain("Retry"); expect(html).not.toContain("Harborline"); expect(html).not.toContain("CSAA");
   });
 
   it("keeps unknown and unavailable providers distinct without retaining old guidance", async () => {

@@ -3,68 +3,85 @@ import { randomUuid } from "../uuid";
 import { isCaseV1, isLiveCallV2 } from "../validate";
 import { failureOf, iso, noteTexts, startedCall, T0 } from "./support";
 
-const DEFAULT_LABEL = "Ask for other times";
+const DEFAULT_LABEL = "Decide with the adjuster";
+const CLAIM_QUOTE =
+  "I've opened the claim. Your claim number is 1002-48-7731. An adjuster will be assigned and will call Jordan within one business day.";
 
 describe("insurance_claim call", () => {
-  it("plays dialing, menu, hold and the automated agent, then applies the default when nobody answers", async () => {
+  it("plays the menu, the automated assistant, hold and the rep, then applies the default when nobody answers", async () => {
     const { api, caseId, live, caseAt } = await startedCall("insurance_claim");
 
-    expect(await live(0)).toMatchObject({ phase: "dialing", counterpart: "unknown", startedAt: iso(T0), endedAt: null });
+    expect(await live(0)).toMatchObject({
+      phase: "dialing",
+      counterpart: "unknown",
+      calling: { name: "AAA claims line", phone: "+19495200007" },
+      startedAt: iso(T0),
+      endedAt: null,
+    });
     expect((await caseAt(0)).calls[0]?.state).toBe("queued");
+    expect((await live(1)).phase).toBe("ringing");
 
-    expect((await live(4)).phase).toBe("navigating_menu");
-    expect(noteTexts(await live(5))).toContain("Pressed 2 for existing claims");
+    expect((await live(3)).phase).toBe("navigating_menu");
+    expect(noteTexts(await live(6))).toContain("Pressed 1 to report a new claim.");
+
+    const assistant = await live(7);
+    expect(assistant).toMatchObject({ phase: "talking", counterpart: "agent", counterpartConfidence: 0.9, holdSeconds: 4 });
+    expect(noteTexts(assistant).at(-1)).toBe("Automated claims assistant answered. Switching to concise mode.");
+    expect((await caseAt(7)).calls[0]?.state).toBe("in_progress");
 
     const holding = await live(12);
     expect(holding.phase).toBe("on_hold");
-    expect(holding.holdSeconds).toBe(9);
-    expect((await live(13)).holdSeconds).toBe(10);
-    expect((await caseAt(12)).calls[0]?.state).toBe("in_progress");
+    expect(holding.holdSeconds).toBe(5);
+    expect((await live(13)).holdSeconds).toBe(6);
 
-    const answered = await live(17);
-    expect(answered).toMatchObject({ phase: "talking", counterpart: "agent", counterpartConfidence: 0.9, holdSeconds: 14 });
-    expect(noteTexts(answered).at(-1)).toBe("Automated claims assistant answered. Switching to concise mode.");
+    const rep = await live(15);
+    expect(rep).toMatchObject({ phase: "talking", counterpart: "human", counterpartConfidence: 0.85, holdSeconds: 8 });
+    expect(noteTexts(rep).at(-1)).toBe("A claims representative answered. Back to a conversational tone.");
 
-    const asking = await live(24);
+    const asking = await live(45);
     expect(isLiveCallV2(asking)).toBe(true);
     expect(asking.phase).toBe("waiting_for_user");
     expect(asking.pendingDecision).toMatchObject({
       question:
-        "The claims line can open the claim now but asks to schedule an adjuster visit on Tuesday 10 to 12. Accept?",
-      defaultOptionId: "ask_for_other_times",
-      expiresAt: iso(T0 + 44_000),
+        "AAA can book one of its direct repair shops near you, with the work guaranteed while you own the car. Use AAA's shop?",
+      defaultOptionId: "decide_later",
+      expiresAt: iso(T0 + 65_000),
     });
     expect(asking.pendingDecision?.options).toEqual([
-      { id: "accept", label: "Accept Tuesday 10 to 12", tone: "primary" },
-      { id: "ask_for_other_times", label: DEFAULT_LABEL, tone: "neutral" },
-      { id: "decline", label: "Decline the visit", tone: "danger" },
+      { id: "accept", label: "Use AAA's shop", tone: "primary" },
+      { id: "own_shop", label: "Choose my own shop", tone: "neutral" },
+      { id: "decide_later", label: DEFAULT_LABEL, tone: "neutral" },
     ]);
 
     // The script waits for the user: nothing moves until the prompt expires.
-    expect((await live(43)).phase).toBe("waiting_for_user");
-    const defaulted = await live(44);
+    expect((await live(64)).phase).toBe("waiting_for_user");
+    const defaulted = await live(65);
     expect(defaulted).toMatchObject({ phase: "talking", pendingDecision: null });
     expect(noteTexts(defaulted).at(-1)).toBe(`No answer before the deadline. Went with the default: "${DEFAULT_LABEL}".`);
 
-    // 45 s of script plus the 20 s spent waiting.
-    expect((await live(64)).phase).toBe("talking");
-    const ended = await live(65);
-    expect(ended).toMatchObject({ phase: "ended", endedAt: iso(T0 + 65_000), userJoined: false });
+    // 75.5 s of script plus the 20 s spent waiting.
+    expect((await live(95.4)).phase).toBe("talking");
+    const ended = await live(95.5);
+    expect(ended).toMatchObject({ phase: "ended", endedAt: iso(T0 + 95_500), userJoined: false });
 
-    const c = await caseAt(65);
+    const c = await caseAt(95.5);
     expect(isCaseV1(c)).toBe(true);
     expect(c.status).toBe("awaiting_response");
     expect(c.outcome).toEqual({
       decision: "requested",
-      referenceNumber: "NWM-2026-48213",
-      nextAction: "A scheduler will call to book the adjuster visit; upload photos of the damage before then",
+      referenceNumber: "1002-48-7731",
+      nextAction:
+        "Upload the damage and plate photos to claim 1002-48-7731 before the adjuster calls within one business day; choose the repair shop on that call",
       paymentStatus: "unverified",
-      supportingQuote: "Your claim NWM-2026-48213 is open. A scheduler will call to book the adjuster visit.",
+      supportingQuote: CLAIM_QUOTE,
     });
     const call = c.calls[0];
     expect(call?.state).toBe("completed");
     expect(call?.transcript?.split("\n")[0]).toBe("[SIMULATED] Fixture conversation. No phone call was placed.");
-    expect(call?.transcript).toContain("Agent: I could not confirm Tuesday with Jordan Avery in time.");
+    expect(call?.transcript).toContain(`Support: ${CLAIM_QUOTE}`);
+    expect(call?.transcript).toContain(
+      "Agent: I couldn't reach Jordan in time, so Jordan will decide on the shop with the adjuster.",
+    );
     expect(c.timeline.map((t) => t.type)).toEqual([
       "case_created",
       "facts_extracted",
@@ -74,46 +91,72 @@ describe("insurance_claim call", () => {
       "call_dispatched",
       "call_in_progress",
       "counterpart_detected",
+      "counterpart_detected",
       "decision_requested",
       "decision_defaulted",
       "call_completed",
       "outcome_published",
     ]);
-    expect(c.timeline.find((t) => t.type === "call_completed")?.message).toBe("Call completed (65s, simulated).");
+    expect(c.timeline.filter((t) => t.type === "counterpart_detected").map((t) => t.message)).toEqual([
+      "Talking to an automated agent (confidence 90%).",
+      "Talking to a person (confidence 85%).",
+    ]);
+    expect(c.timeline.find((t) => t.type === "call_completed")?.message).toBe("Call completed (96s, simulated).");
     expect(await api.getCase(caseId)).toEqual(c);
+  });
+
+  it("tells the AAA story: policy ending 4471, the October 10 rear-end, plate 8UFJ426, the claim number and next steps", async () => {
+    const { live, caseAt } = await startedCall("insurance_claim");
+    await live(100);
+    const transcript = (await caseAt(100)).calls[0]?.transcript ?? "";
+    for (const line of [
+      "Support: Thank you for calling AAA claims. To report a new claim, press 1. For an existing claim, press 2.",
+      "Support: AAA claims, this is Dana. Who am I speaking with?",
+      "Agent: Jordan Avery, policy ending 4471, for a red 2021 Toyota Camry.",
+      "Agent: Yesterday, October 10, in San Francisco, a silver sedan rear-ended the car while it was stopped in traffic. The rear bumper and trunk are damaged. The sedan's California plate is 8UFJ426.",
+      "Agent: No one was injured. Jordan photographed the damage and the other car's plate, and the photos are on file. Jordan was not at fault.",
+      `Support: ${CLAIM_QUOTE}`,
+      "Support: Jordan's policy has rental reimbursement at $40 a day, for up to 30 days while the car is being repaired.",
+      "Support: And since the other driver hit Jordan from behind, we'll pursue their insurer. Once they accept liability, the $500 collision deductible may be waived.",
+      "Support: I'm also texting Jordan a link to upload the photos to the claim.",
+    ]) {
+      expect(transcript.split("\n")).toContain(line);
+    }
   });
 
   it("relays the user's answer and publishes the outcome that answer supports", async () => {
     const { api, caseId, callId, live, caseAt } = await startedCall("insurance_claim");
-    const decision = (await live(26)).pendingDecision;
-    if (decision === null) throw new Error("Expected a pending decision at 26 s.");
+    const decision = (await live(46)).pendingDecision;
+    if (decision === null) throw new Error("Expected a pending decision at 46 s.");
 
     const answered = await api.answerDecision(caseId, callId, decision.id, "accept");
     expect(answered).toMatchObject({ phase: "talking", pendingDecision: null });
-    expect(noteTexts(answered).at(-1)).toBe('You chose "Accept Tuesday 10 to 12".');
+    expect(noteTexts(answered).at(-1)).toBe('You chose "Use AAA\'s shop".');
 
-    // Script time resumes at 24 s when answered at 26 s, so the call ends 21 s later.
-    expect((await live(46.9)).phase).toBe("talking");
-    expect((await live(47)).phase).toBe("ended");
-    const c = await caseAt(47);
+    // Script time resumes at 45 s when answered at 46 s, so the call ends 30.5 s later.
+    expect((await live(76.4)).phase).toBe("talking");
+    expect((await live(76.5)).phase).toBe("ended");
+    const c = await caseAt(76.5);
     expect(c.status).toBe("awaiting_response");
     expect(c.outcome).toEqual({
       decision: "requested",
-      referenceNumber: "NWM-2026-48213",
-      nextAction: "Adjuster visit Tuesday 10-12; upload photos of the damage before then",
+      referenceNumber: "1002-48-7731",
+      nextAction:
+        "Upload the damage and plate photos to claim 1002-48-7731 before the adjuster calls within one business day; the direct repair shop will call to schedule the repair",
       paymentStatus: "unverified",
-      supportingQuote: "Your claim NWM-2026-48213 is open and an adjuster visit is scheduled.",
+      supportingQuote: CLAIM_QUOTE,
     });
-    expect(c.timeline.find((t) => t.type === "decision_answered")?.message).toBe(
-      "You answered: Accept Tuesday 10 to 12.",
+    expect(c.timeline.find((t) => t.type === "decision_answered")?.message).toBe("You answered: Use AAA's shop.");
+    expect(c.calls[0]?.transcript).toContain("Agent: Jordan would like one of your direct repair shops.");
+    expect(c.calls[0]?.transcript).toContain(
+      "Agent: To confirm: claim 1002-48-7731, an adjuster call within one business day, the repair at your direct repair shop, and rental at $40 a day. The $500 deductible may be waived once the other insurer accepts liability.",
     );
-    expect(c.calls[0]?.transcript).toContain("Agent: Jordan Avery accepts Tuesday from 10 to 12.");
   });
 
   it("rejects unknown, invalid and repeated answers", async () => {
     const { api, caseId, callId, live } = await startedCall("insurance_claim");
-    const decision = (await live(25)).pendingDecision;
-    if (decision === null) throw new Error("Expected a pending decision at 25 s.");
+    const decision = (await live(46)).pendingDecision;
+    if (decision === null) throw new Error("Expected a pending decision at 46 s.");
 
     expect(await failureOf(api.answerDecision(caseId, callId, randomUuid(), "accept"))).toMatchObject({
       status: 404,
@@ -123,7 +166,7 @@ describe("insurance_claim call", () => {
       status: 400,
       fields: ["optionId"],
     });
-    await api.answerDecision(caseId, callId, decision.id, "decline");
+    await api.answerDecision(caseId, callId, decision.id, "own_shop");
     expect(await failureOf(api.answerDecision(caseId, callId, decision.id, "accept"))).toMatchObject({
       status: 409,
       code: "DECISION_RESOLVED",
@@ -132,9 +175,9 @@ describe("insurance_claim call", () => {
 
   it("rejects an answer that arrives after the default applied", async () => {
     const { api, caseId, callId, live } = await startedCall("insurance_claim");
-    const decision = (await live(30)).pendingDecision;
-    if (decision === null) throw new Error("Expected a pending decision at 30 s.");
-    await live(44.5);
+    const decision = (await live(50)).pendingDecision;
+    if (decision === null) throw new Error("Expected a pending decision at 50 s.");
+    await live(65.5);
     expect(await failureOf(api.answerDecision(caseId, callId, decision.id, "accept"))).toMatchObject({
       status: 409,
       code: "DECISION_RESOLVED",
@@ -144,7 +187,7 @@ describe("insurance_claim call", () => {
   it("keeps derived timeline ids stable between polls", async () => {
     const { caseAt } = await startedCall("insurance_claim");
     const early = await caseAt(20);
-    const late = await caseAt(65);
+    const late = await caseAt(95.5);
     expect(late.timeline.slice(0, early.timeline.length)).toEqual(early.timeline);
     expect(new Set(late.timeline.map((t) => t.id)).size).toBe(late.timeline.length);
     const times = late.timeline.map((t) => Date.parse(t.at));
@@ -153,14 +196,14 @@ describe("insurance_claim call", () => {
 
   it("scales every scripted duration by speed", async () => {
     const { live, caseAt } = await startedCall("insurance_claim", { speed: 4 });
-    expect(await live(4.25)).toMatchObject({ phase: "talking", holdSeconds: 3 });
-    expect(await live(6)).toMatchObject({
+    expect(await live(3.75)).toMatchObject({ phase: "talking", counterpart: "human", holdSeconds: 2 });
+    expect(await live(11.25)).toMatchObject({
       phase: "waiting_for_user",
-      pendingDecision: { expiresAt: iso(T0 + 11_000) },
+      pendingDecision: { expiresAt: iso(T0 + 16_250) },
     });
-    expect((await live(11)).phase).toBe("talking");
-    expect((await live(16.25)).phase).toBe("ended");
-    expect((await caseAt(16.25)).status).toBe("awaiting_response");
+    expect((await live(16.25)).phase).toBe("talking");
+    expect((await live(23.875)).phase).toBe("ended");
+    expect((await caseAt(23.875)).status).toBe("awaiting_response");
   });
 });
 
@@ -229,21 +272,18 @@ describe("stepping into a call", () => {
 
   it("hands the call back to the agent when the user answers a pending decision", async () => {
     const { api, caseId, callId, live, clock } = await startedCall("insurance_claim");
-    clock.at(25);
+    clock.at(46);
     const joined = await api.stepIn(caseId, callId);
     expect(joined).toMatchObject({ phase: "user_joined", userJoined: true });
     const decision = joined.pendingDecision;
     if (decision === null) throw new Error("The decision should stay pending while the user is on the call.");
 
-    clock.at(27);
+    clock.at(48);
     const answered = await api.answerDecision(caseId, callId, decision.id, "accept");
     expect(answered).toMatchObject({ phase: "talking", userJoined: false, pendingDecision: null });
-    expect(noteTexts(answered).slice(-2)).toEqual([
-      'You chose "Accept Tuesday 10 to 12".',
-      LEAVE_TEXT,
-    ]);
-    expect((await live(47.9)).phase).toBe("talking");
-    expect((await live(48)).phase).toBe("ended");
+    expect(noteTexts(answered).slice(-2)).toEqual(['You chose "Use AAA\'s shop".', LEAVE_TEXT]);
+    expect((await live(78.4)).phase).toBe("talking");
+    expect((await live(78.5)).phase).toBe("ended");
   });
 });
 
@@ -281,15 +321,27 @@ describe("the call plan", () => {
     expect(statuses((await live(35)).progress)).toEqual(["reach:done", "explain:done", "ask:current", "confirm:upcoming", "record:upcoming"]);
   });
 
-  it("checks the adjuster visit with the user as its own step of the claim plan", async () => {
+  it("moves through the five-step AAA claim plan and asks about the shop within its last step", async () => {
     const { live } = await startedCall("insurance_claim");
-    expect(statuses((await live(18)).progress)).toEqual(["reach:done", "state:current", "decide:upcoming", "confirm:upcoming", "record:upcoming"]);
-    const asking = await live(24);
+    const start = await live(0);
+    expect(start.progress?.steps.map((s) => [s.title, s.detail])).toEqual([
+      ["Reach AAA claims", "Phone menu, then hold for a claims rep."],
+      ["Verify the policy", "Jordan Avery, policy ending 4471, from the declarations page."],
+      ["Report the loss", "Oct 10 rear-end, plate 8UFJ426, photos on file, no injuries."],
+      ["Get a claim number and adjuster", "A claim number now, an adjuster within one business day."],
+      ["Confirm next steps", "Repair shop, rental car and the deductible."],
+    ]);
+    expect(statuses(start.progress)).toEqual(["reach:current", "verify:upcoming", "report:upcoming", "claim:upcoming", "next:upcoming"]);
+    // The menu, the automated assistant and the hold all belong to reaching the claims line.
+    expect(statuses((await live(12)).progress)).toEqual(["reach:current", "verify:upcoming", "report:upcoming", "claim:upcoming", "next:upcoming"]);
+    expect(statuses((await live(15)).progress)).toEqual(["reach:done", "verify:current", "report:upcoming", "claim:upcoming", "next:upcoming"]);
+    expect(statuses((await live(27)).progress)).toEqual(["reach:done", "verify:done", "report:current", "claim:upcoming", "next:upcoming"]);
+    expect(statuses((await live(40)).progress)).toEqual(["reach:done", "verify:done", "report:done", "claim:current", "next:upcoming"]);
+    const asking = await live(45);
     expect(asking.phase).toBe("waiting_for_user");
-    expect(statuses(asking.progress)).toEqual(["reach:done", "state:done", "decide:current", "confirm:upcoming", "record:upcoming"]);
-    // The default applies at 44 s; the claims line acts on it 7 s of script later.
-    expect(statuses((await live(51)).progress)).toEqual(["reach:done", "state:done", "decide:done", "confirm:current", "record:upcoming"]);
-    expect(statuses((await live(65)).progress)).toEqual(["reach:done", "state:done", "decide:done", "confirm:done", "record:done"]);
+    expect(statuses(asking.progress)).toEqual(["reach:done", "verify:done", "report:done", "claim:done", "next:current"]);
+    expect(statuses((await live(80)).progress)).toEqual(["reach:done", "verify:done", "report:done", "claim:done", "next:current"]);
+    expect(statuses((await live(95.5)).progress)).toEqual(["reach:done", "verify:done", "report:done", "claim:done", "next:done"]);
   });
 
   it("reports no live record and so no plan while a dispatch result is unknown", async () => {
@@ -374,7 +426,10 @@ describe("V1-only mode", () => {
       status: 501,
       code: "NOT_SUPPORTED",
     });
-    expect(await caseAt(65)).toMatchObject({ status: "awaiting_response", outcome: { decision: "requested" } });
+    expect(await caseAt(95.5)).toMatchObject({
+      status: "awaiting_response",
+      outcome: { decision: "requested", referenceNumber: "1002-48-7731" },
+    });
   });
 });
 
@@ -399,26 +454,31 @@ describe("the live transcript", () => {
     expect((await caseAt(30)).calls[0]?.transcript).toBe([MARKER, ...asLines(ended.turns)].join("\n"));
   });
 
-  it("speaks the answer the user chose, then the claim confirmation, matching the final transcript", async () => {
+  it("speaks the answer the user chose, then the next steps, matching the final transcript", async () => {
     const { api, caseId, callId, live, caseAt } = await startedCall("insurance_claim");
-    const before = await live(18);
-    expect(asLines(before.turns).at(-1)).toBe("Support: This is the automated claims assistant. How can I help?");
-    const decision = (await live(26)).pendingDecision;
-    if (decision === null) throw new Error("Expected a pending decision at 26 s.");
-    await api.answerDecision(caseId, callId, decision.id, "decline");
-    expect(asLines((await live(27)).turns).at(-1)).toBe("Agent: Jordan Avery declines the visit for now.");
-    const ended = await live(47);
-    expect(ended.phase).toBe("ended");
-    expect((await caseAt(47)).calls[0]?.transcript).toBe([MARKER, ...asLines(ended.turns)].join("\n"));
-  });
-
-  it("says it could not confirm in time when the default applied", async () => {
-    const { live, caseAt } = await startedCall("insurance_claim");
-    const ended = await live(70);
+    expect(asLines((await live(8)).turns).at(-1)).toBe(
+      "Support: This is the automated claims assistant. Please enter the policy number, then press pound.",
+    );
+    expect(asLines((await live(16)).turns).at(-1)).toBe("Support: AAA claims, this is Dana. Who am I speaking with?");
+    const decision = (await live(46)).pendingDecision;
+    if (decision === null) throw new Error("Expected a pending decision at 46 s.");
+    await api.answerDecision(caseId, callId, decision.id, "own_shop");
+    expect(asLines((await live(47)).turns).at(-1)).toBe("Agent: Jordan will choose a repair shop.");
+    const ended = await live(76.5);
     expect(ended.phase).toBe("ended");
     expect(asLines(ended.turns)).toContain(
-      "Agent: I could not confirm Tuesday with Jordan Avery in time. What other times are available?",
+      "Support: That's fine. Once a shop is chosen, have them send their estimate to the adjuster.",
     );
-    expect((await caseAt(70)).calls[0]?.transcript).toBe([MARKER, ...asLines(ended.turns)].join("\n"));
+    expect((await caseAt(76.5)).calls[0]?.transcript).toBe([MARKER, ...asLines(ended.turns)].join("\n"));
+  });
+
+  it("says it could not reach the user in time when the default applied", async () => {
+    const { live, caseAt } = await startedCall("insurance_claim");
+    const ended = await live(100);
+    expect(ended.phase).toBe("ended");
+    expect(asLines(ended.turns)).toContain(
+      "Agent: I couldn't reach Jordan in time, so Jordan will decide on the shop with the adjuster.",
+    );
+    expect((await caseAt(100)).calls[0]?.transcript).toBe([MARKER, ...asLines(ended.turns)].join("\n"));
   });
 });
