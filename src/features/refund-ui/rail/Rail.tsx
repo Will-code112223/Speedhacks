@@ -74,7 +74,7 @@ export default function Rail(props: RailProps) {
           <h2 id={casesHeadingId} className={styles.heading}>
             Cases
           </h2>
-          <span className={styles.count}>{sessions.length.toString().padStart(2, "0")}</span>
+          <span className={styles.count}>{sessions.length}</span>
         </div>
         {sessions.length === 0 ? (
           <p className={styles.empty}>No cases</p>

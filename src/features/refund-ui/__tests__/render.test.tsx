@@ -257,7 +257,7 @@ describe("server render of each stage", () => {
     expect(html).not.toContain('data-testid="approve-button"');
   });
 
-  it("renders the live call at each phase, with the decision on top while it waits", async () => {
+  it("renders the live call at each phase, with the decision below the timer while it waits", async () => {
     const s = stage("insurance_claim");
     s.begin("insurance claim");
     await s.create("insurance claim");
@@ -269,13 +269,23 @@ describe("server render of each stage", () => {
     expect(html).toContain('data-testid="call-screen"');
     expect(html).toContain('data-testid="call-timer"');
     expect(html).toContain("Dialing");
-    expect(html).toContain('data-testid="step-in-button"');
-    expect(html).toContain("Available once someone answers");
+    // Step in at any time: enabled while dialing, with the hint about the agent pausing.
+    const stepIn = html.match(/<button[^>]*data-testid="step-in-button"[^>]*>/)?.[0];
+    expect(stepIn).toBeDefined();
+    expect(stepIn).not.toMatch(/\sdisabled(=|\s|>)/);
+    expect(html).toContain("Step in at any point. The agent pauses while you are on the line and resumes when you hand back.");
+    expect(html).not.toContain("Available once someone answers");
+    // The plan dashboard and map, asserted by structure rather than step titles.
+    expect(html).toContain('data-testid="call-plan"');
+    expect(html).toContain('data-testid="call-plan-step"');
+    expect(html).toContain("Step 1 of");
+    expect(html).toContain('aria-current="step"');
+    expect(html).toContain('aria-label="Call plan"');
 
     s.seconds(18);
     await s.live();
     html = callScreen(s.controller());
-    expect(html).toContain("Automated agent");
+    expect(html).toContain("Talking to: an automated agent");
     expect(html).toContain('data-testid="call-notes"');
     expect(html).toContain("On hold");
 
@@ -284,6 +294,7 @@ describe("server render of each stage", () => {
     const controller = s.controller();
     html = callScreen(controller);
     expect(html).toContain('data-testid="decision-card"');
+    expect(html.indexOf('data-testid="call-timer"')).toBeLessThan(html.indexOf('data-testid="decision-card"'));
     expect(html).toContain('data-testid="decision-option-accept"');
     expect(html).toContain('data-testid="decision-countdown"');
     expect(html).toContain("Waiting for you");
@@ -300,6 +311,28 @@ describe("server render of each stage", () => {
       <CallBar caseData={controller.active!.caseData!} call={controller.call!} live={controller.live} needsAnswer onOpen={noop} />,
     );
     expect(bar).toContain("Needs your answer");
+    expect(bar).toContain('data-testid="call-bar-step"');
+  });
+
+  it("pauses the plan while the user is on the call and offers to hand back", async () => {
+    const s = stage("insurance_claim");
+    s.begin("insurance claim");
+    await s.create("insurance claim");
+    await s.approve();
+    s.seconds(18);
+    const before = await s.live();
+    expect(before).not.toBeNull();
+
+    const joined = await s.api.stepIn(s.session().caseId!, before!.callId);
+    s.run({ type: "live/received", key: KEY, live: joined, at: new Date().toISOString() });
+    const html = callScreen(s.controller());
+    expect(html).toContain("You are on the call. The agent is paused.");
+    expect(html).toContain('data-testid="leave-call-button"');
+    expect(html).toContain("Hand back to the agent");
+    expect(html).not.toContain('data-testid="step-in-button"');
+    expect(html).toContain('data-testid="call-plan"');
+    expect(html).toContain("Paused - you are on the line");
+    expect(html).toContain('aria-current="step"');
   });
 
   it("renders the outcome with approval and payment kept apart", async () => {

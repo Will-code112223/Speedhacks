@@ -115,7 +115,59 @@ describe("runCall: decision gate", () => {
   });
 });
 
+const TAGGED: CallScript = {
+  steps: [
+    { at: 0, phase: "dialing" },
+    { at: 1_000, phase: "ringing", step: "reach" },
+    { at: 3_000, phase: "talking", step: "explain" },
+    { at: 4_000, note: "Asked.", step: "ask" },
+    { at: 6_000, phase: "ended", step: "record" },
+  ],
+  gate: null,
+};
+
+describe("runCall: plan steps", () => {
+  it("tracks the plan step the script entered last", () => {
+    expect(runCall(TAGGED, [], 500).stepId).toBeNull();
+    expect(runCall(TAGGED, [], 1_000).stepId).toBe("reach");
+    expect(runCall(TAGGED, [], 3_500).stepId).toBe("explain");
+    expect(runCall(TAGGED, [], 4_000).stepId).toBe("ask");
+    expect(runCall(TAGGED, [], 6_000)).toMatchObject({ phase: "ended", stepId: "record" });
+  });
+
+  it("keeps the step while the user is on the line and moves on after they hand back", () => {
+    const join: Intervention[] = [{ kind: "join", at: 3_500 }];
+    expect(runCall(TAGGED, join, 10_000)).toMatchObject({ phase: "user_joined", stepId: "explain" });
+    expect(runCall(TAGGED, join, 23_999).stepId).toBe("explain");
+    expect(runCall(TAGGED, join, 24_000)).toMatchObject({ phase: "talking", stepId: "ask" });
+  });
+});
+
 describe("runCall: stepping in", () => {
+  it("lets the user step in while dialing and resumes the script where it stopped", () => {
+    const join: Intervention[] = [{ kind: "join", at: 500 }];
+    const joined = runCall(BASIC, join, 500);
+    expect(joined).toMatchObject({ phase: "user_joined", joined: true });
+    expect(notes(joined).at(-1)).toBe(`500 ${JOIN_NOTE}`);
+    expect(runCall(BASIC, join, 20_499)).toMatchObject({ phase: "user_joined", joined: true });
+    // Nothing in the script moved on while the user was on the line.
+    expect(phases(runCall(BASIC, join, 20_499))).toEqual([]);
+
+    const back = runCall(BASIC, join, 20_500);
+    expect(back).toMatchObject({ phase: "dialing", joined: false });
+    expect(notes(back).at(-1)).toBe(`20500 ${LEAVE_NOTE}`);
+    // Half a second of dialing was left when the user stepped in.
+    expect(runCall(BASIC, join, 20_999).phase).toBe("dialing");
+    expect(runCall(BASIC, join, 21_000).phase).toBe("ringing");
+    expect(runCall(BASIC, join, 28_000)).toMatchObject({ phase: "ended", endedAt: 28_000 });
+  });
+
+  it("lets the user step in while ringing", () => {
+    const run = runCall(BASIC, [{ kind: "join", at: 1_500 }], 2_000);
+    expect(run).toMatchObject({ phase: "user_joined", joined: true });
+    expect(runCall(BASIC, [{ kind: "join", at: 1_500 }], 22_000).phase).toBe("navigating_menu");
+  });
+
   it("pauses the script while the user is on the line, then hands back to the agent", () => {
     expect(JOIN_WINDOW_MS).toBe(20_000);
     const join: Intervention[] = [{ kind: "join", at: 6_000 }];

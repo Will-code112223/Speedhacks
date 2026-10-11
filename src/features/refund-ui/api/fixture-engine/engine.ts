@@ -15,6 +15,8 @@ import {
   type FixtureOptions,
   type FixtureScenario,
   type LiveCallV2,
+  type SummaryDelivery,
+  type SummaryDestination,
   type StartCallInput,
 } from "../types";
 import { assertNever } from "../assert-never";
@@ -318,11 +320,11 @@ class FixtureCaseApi implements CaseApi {
           "CALL_ENDED",
           live.startedAt === null ? "This call attempt ended without connecting." : "The call has ended.",
         );
-      case "dialing":
-      case "ringing":
-        return fail(409, "CALL_NOT_CONNECTED", "The call has not connected yet.");
       case "user_joined":
         return live;
+      // The user can step in at any live phase, before the call connects too; the script pauses until they hand back.
+      case "dialing":
+      case "ringing":
       case "navigating_menu":
       case "on_hold":
       case "talking":
@@ -356,6 +358,13 @@ class FixtureCaseApi implements CaseApi {
     }
     call.interventions.push({ kind: "answer", at: toVirtual(call.startedAtMs, now, this.speed), optionId });
     return this.liveView(record, call, now);
+  };
+
+  readonly sendSummary = async (caseId: string, destination: SummaryDestination): Promise<SummaryDelivery> => {
+    await this.respond();
+    this.find(caseId);
+    void destination;
+    return fail(501, "NOT_SUPPORTED", "Sending the summary is not implemented yet.");
   };
 
   private find(caseId: string): CaseRecord {

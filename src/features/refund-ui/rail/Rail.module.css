@@ -8,10 +8,8 @@
 }
 
 .workspace { display: grid; gap: 7px; }
-.workspaceLabel { color: var(--rc-ink-3); text-transform: uppercase; letter-spacing: .09em; font: 10px var(--rc-mono); }
 .workspaceTitle { font-size: 20px; font-weight: 550; letter-spacing: -.04em; }
-.count { color: var(--rc-ink-3); font: 11px var(--rc-mono); }
-.controlNote { color: var(--rc-ink); font-size: 12px; font-weight: 500; margin: 16px 0 6px; }
+.count { color: var(--rc-ink-3); font-size: 12px; font-variant-numeric: tabular-nums; }
 .localNote { color: var(--rc-ink-3); font-size: 11px; line-height: 1.7; margin: 0; }
 
 .rail .newCase {
@@ -38,9 +36,9 @@
 
 .heading {
   margin: 0;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 500;
-  letter-spacing: 0.09em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--rc-ink-3);
 }
@@ -87,7 +85,7 @@
 }
 
 .row:hover {
-  background: var(--rc-surface);
+  background: var(--rc-hover);
 }
 
 /* Selected: the tint, the accent edge and heavier text together, never the tint alone. */

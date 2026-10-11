@@ -21,6 +21,11 @@ import type {
   LiveCallNote,
   LiveCallPhase,
   LiveCallV2,
+  LiveCallTurn,
+  TranscriptSpeaker,
+  CallPlan,
+  CallPlanStep,
+  CallPlanStepStatus,
   PendingDecision,
 } from "./types";
 
@@ -185,6 +190,28 @@ function isNote(v: unknown): v is LiveCallNote {
   return isRecord(v) && isString(v.at) && isString(v.text);
 }
 
+const PLAN_STEP_STATUSES: Record<CallPlanStepStatus, true> = { done: true, current: true, paused: true, upcoming: true };
+
+function isPlanStep(v: unknown): v is CallPlanStep {
+  return (
+    isRecord(v) &&
+    isString(v.id) &&
+    isString(v.title) &&
+    (v.detail === undefined || isString(v.detail)) &&
+    oneOf(PLAN_STEP_STATUSES, v.status)
+  );
+}
+
+function isPlan(v: unknown): v is CallPlan {
+  return isRecord(v) && isArrayOf(v.steps, isPlanStep);
+}
+
+const SPEAKERS: Record<TranscriptSpeaker, true> = { support: true, agent: true, user: true };
+
+function isTurn(v: unknown): v is LiveCallTurn {
+  return isRecord(v) && isString(v.at) && oneOf(SPEAKERS, v.speaker) && isString(v.text);
+}
+
 export function isLiveCallV2(v: unknown): v is LiveCallV2 {
   return (
     isRecord(v) &&
@@ -202,6 +229,8 @@ export function isLiveCallV2(v: unknown): v is LiveCallV2 {
     isArrayOf(v.notes, isNote) &&
     (v.pendingDecision === null || isPendingDecision(v.pendingDecision)) &&
     isBoolean(v.userJoined) &&
+    (v.progress === undefined || v.progress === null || isPlan(v.progress)) &&
+    (v.turns === undefined || isArrayOf(v.turns, isTurn)) &&
     isString(v.updatedAt)
   );
 }

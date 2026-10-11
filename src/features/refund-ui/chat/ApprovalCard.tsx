@@ -47,6 +47,14 @@ function errorBody(error: UiError) {
   return error.message;
 }
 
+const CLAIM_WORDS = /\bclaims?\b/i;
+
+/** What the call asks the merchant for, stated from the case's own reason and amount. */
+function askingFor(reason: string, amount: string | null): string | null {
+  if (CLAIM_WORDS.test(reason)) return "Claim filed and a reference number";
+  return amount ? `Refund of ${amount} and a reference number` : null;
+}
+
 export default function ApprovalCard(props: ApprovalCardProps) {
   const { caseData, placedCall, current, busy, stage, error, blockedReason, onApprove, onStartNewCase } = props;
   const checkboxId = useId();
@@ -101,8 +109,11 @@ export default function ApprovalCard(props: ApprovalCardProps) {
 
       <KeyValueList
         items={[
+          { key: "On behalf of", value: caseData.customer.name },
           { key: "Amount", value: amount ? <Mono>{amount}</Mono> : null },
+          { key: "Asking for", value: askingFor(caseData.reason, amount) },
           { key: "Reason", value: caseData.reason },
+          { key: "Facts", value: `Revision ${caseData.revision}` },
         ]}
       />
 

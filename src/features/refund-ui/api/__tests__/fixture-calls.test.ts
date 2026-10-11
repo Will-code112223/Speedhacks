@@ -164,20 +164,46 @@ describe("insurance_claim call", () => {
   });
 });
 
+const JOIN_TEXT = "You stepped in. The agent is paused and takes over again when you hand back.";
+const LEAVE_TEXT = "You handed back. The agent took over the call again.";
+
 describe("stepping into a call", () => {
+  it("lets the user step in while dialing and pauses the script until they hand back", async () => {
+    const { api, caseId, callId, live, clock } = await startedCall("duplicate_charge");
+
+    clock.at(1);
+    const joined = await api.stepIn(caseId, callId);
+    expect(joined).toMatchObject({ phase: "user_joined", userJoined: true });
+    expect(noteTexts(joined).at(-1)).toBe(JOIN_TEXT);
+    expect(joined.progress?.steps.map((s) => s.status)).toEqual(["paused", "upcoming", "upcoming", "upcoming", "upcoming"]);
+
+    // The script stopped at 1 s: ringing (2 s of script) does not start while the user is on the line.
+    expect((await live(20.9)).phase).toBe("user_joined");
+    const resumed = await live(21);
+    expect(resumed).toMatchObject({ phase: "dialing", userJoined: false });
+    expect(noteTexts(resumed).at(-1)).toBe(LEAVE_TEXT);
+    expect(resumed.progress?.steps[0]?.status).toBe("current");
+    expect((await live(21.9)).phase).toBe("dialing");
+    expect((await live(22)).phase).toBe("ringing");
+    expect((await live(49.9)).phase).toBe("talking");
+    expect((await live(50)).phase).toBe("ended");
+  });
+
   it("pauses the script while the user is on the line and resumes after the join window", async () => {
     const { api, caseId, callId, live, caseAt, clock } = await startedCall("duplicate_charge");
     const explained = "Explained the duplicate $49.99 charge and asked for a refund of the second one.";
 
-    clock.at(1);
-    expect(await failureOf(api.stepIn(caseId, callId))).toMatchObject({ status: 409, code: "CALL_NOT_CONNECTED" });
-
     clock.at(12);
     const joined = await api.stepIn(caseId, callId);
     expect(joined).toMatchObject({ phase: "user_joined", userJoined: true });
-    expect(noteTexts(joined).at(-1)).toBe(
-      "You joined the call. The agent is listening and will take over again when you leave.",
-    );
+    expect(noteTexts(joined).at(-1)).toBe(JOIN_TEXT);
+    expect(joined.progress?.steps.map((s) => [s.id, s.status])).toEqual([
+      ["reach", "done"],
+      ["explain", "paused"],
+      ["ask", "upcoming"],
+      ["confirm", "upcoming"],
+      ["record", "upcoming"],
+    ]);
     expect((await api.stepIn(caseId, callId)).notes).toEqual(joined.notes);
 
     const stillJoined = await live(31.9);
@@ -186,7 +212,8 @@ describe("stepping into a call", () => {
 
     const resumed = await live(32);
     expect(resumed).toMatchObject({ phase: "talking", userJoined: false });
-    expect(noteTexts(resumed).at(-1)).toBe("The agent took over the call again.");
+    expect(noteTexts(resumed).at(-1)).toBe(LEAVE_TEXT);
+    expect(resumed.progress?.steps[1]).toMatchObject({ id: "explain", status: "current" });
     // The script picks up at 12 s, so the 14 s note lands at 34 s and the 30 s end at 50 s.
     expect(noteTexts(await live(33.9))).not.toContain(explained);
     expect(noteTexts(await live(34))).toContain(explained);
@@ -213,10 +240,61 @@ describe("stepping into a call", () => {
     expect(answered).toMatchObject({ phase: "talking", userJoined: false, pendingDecision: null });
     expect(noteTexts(answered).slice(-2)).toEqual([
       'You chose "Accept Tuesday 10 to 12".',
-      "The agent took over the call again.",
+      LEAVE_TEXT,
     ]);
     expect((await live(47.9)).phase).toBe("talking");
     expect((await live(48)).phase).toBe("ended");
+  });
+});
+
+describe("the call plan", () => {
+  const statuses = (plan: { steps: { id: string; status: string }[] } | null | undefined): string[] =>
+    (plan?.steps ?? []).map((s) => `${s.id}:${s.status}`);
+
+  it("moves through the duplicate charge plan as the script enters each step", async () => {
+    const { live } = await startedCall("duplicate_charge");
+    const start = await live(0);
+    expect(isLiveCallV2(start)).toBe(true);
+    expect(start.progress?.steps.map((s) => s.title)).toEqual([
+      "Reach the billing team",
+      "Explain the duplicate charge",
+      "Ask for the refund",
+      "Confirm the reference number",
+      "Record the outcome",
+    ]);
+    expect(statuses(start.progress)).toEqual(["reach:current", "explain:upcoming", "ask:upcoming", "confirm:upcoming", "record:upcoming"]);
+    expect(statuses((await live(12)).progress)).toEqual(["reach:done", "explain:current", "ask:upcoming", "confirm:upcoming", "record:upcoming"]);
+    // The explanation note at 14 s is where the agent moves on to asking for the refund.
+    expect(statuses((await live(15)).progress)).toEqual(["reach:done", "explain:done", "ask:current", "confirm:upcoming", "record:upcoming"]);
+    expect(statuses((await live(22)).progress)).toEqual(["reach:done", "explain:done", "ask:done", "confirm:current", "record:upcoming"]);
+    const ended = await live(30);
+    expect(ended.phase).toBe("ended");
+    expect(statuses(ended.progress)).toEqual(["reach:done", "explain:done", "ask:done", "confirm:done", "record:done"]);
+  });
+
+  it("marks the current step paused while the user is on the call and current again after", async () => {
+    const { api, caseId, callId, live, clock } = await startedCall("duplicate_charge");
+    clock.at(15);
+    const joined = await api.stepIn(caseId, callId);
+    expect(isLiveCallV2(joined)).toBe(true);
+    expect(statuses(joined.progress)).toEqual(["reach:done", "explain:done", "ask:paused", "confirm:upcoming", "record:upcoming"]);
+    expect(statuses((await live(35)).progress)).toEqual(["reach:done", "explain:done", "ask:current", "confirm:upcoming", "record:upcoming"]);
+  });
+
+  it("checks the adjuster visit with the user as its own step of the claim plan", async () => {
+    const { live } = await startedCall("insurance_claim");
+    expect(statuses((await live(18)).progress)).toEqual(["reach:done", "state:current", "decide:upcoming", "confirm:upcoming", "record:upcoming"]);
+    const asking = await live(24);
+    expect(asking.phase).toBe("waiting_for_user");
+    expect(statuses(asking.progress)).toEqual(["reach:done", "state:done", "decide:current", "confirm:upcoming", "record:upcoming"]);
+    // The default applies at 44 s; the claims line acts on it 7 s of script later.
+    expect(statuses((await live(51)).progress)).toEqual(["reach:done", "state:done", "decide:done", "confirm:current", "record:upcoming"]);
+    expect(statuses((await live(65)).progress)).toEqual(["reach:done", "state:done", "decide:done", "confirm:done", "record:done"]);
+  });
+
+  it("reports no live record and so no plan while a dispatch result is unknown", async () => {
+    const { api, caseId, callId } = await startedCall("uncertain_dispatch");
+    expect(await api.getLiveCall(caseId, callId)).toBeNull();
   });
 });
 

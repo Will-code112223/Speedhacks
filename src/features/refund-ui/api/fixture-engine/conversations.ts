@@ -22,8 +22,17 @@ export interface Resolution {
   by: "user" | "default";
 }
 
+/** One step of the agent's plan for the call, in order. Script steps enter it by id. */
+export interface PlanStepDefinition {
+  id: string;
+  title: string;
+  detail?: string;
+}
+
 export interface Conversation {
   script(ctx: CallContext): CallScript;
+  /** What the agent intends to do on the call. Intent only: progress comes from the script's tagged steps. */
+  plan(ctx: CallContext): PlanStepDefinition[];
   /** Speaker-labelled lines after a first line that marks the transcript as simulated. */
   transcript(ctx: CallContext, resolution: Resolution | null): string;
   outcome(ctx: CallContext, resolution: Resolution | null): CaseOutcome;
@@ -69,22 +78,30 @@ const QUICK_PACE: RefundPace = {
 
 function refundCall(pace: RefundPace): Conversation {
   return {
+    plan: (ctx) => [
+      { id: "reach", title: "Reach the billing team", detail: "Dialing, phone menu and hold." },
+      { id: "explain", title: "Explain the duplicate charge", detail: `Two charges of ${ctx.amount} on the same day.` },
+      { id: "ask", title: "Ask for the refund", detail: "Refund the second charge to the original card." },
+      { id: "confirm", title: "Confirm the reference number", detail: "Read back the amount and reference." },
+      { id: "record", title: "Record the outcome", detail: "Save the reference and next step to the case." },
+    ],
     script: (ctx) => ({
       gate: null,
       steps: [
-        { at: 0, phase: "dialing", note: `Dialing ${ctx.merchantName}.` },
+        { at: 0, phase: "dialing", step: "reach", note: `Dialing ${ctx.merchantName}.` },
         { at: pace.ringAt, phase: "ringing" },
         { at: pace.holdAt, phase: "on_hold", note: "On hold for the billing team." },
         {
           at: pace.answerAt,
           phase: "talking",
+          step: "explain",
           counterpart: { who: "human", confidence: 0.8 },
           note: "A person answered.",
         },
-        { at: pace.explainAt, note: `Explained the duplicate ${ctx.amount} charge and asked for a refund of the second one.` },
-        { at: pace.issuedAt, note: `The rep issued the refund. Reference ${REFUND_REFERENCE}.` },
+        { at: pace.explainAt, step: "ask", note: `Explained the duplicate ${ctx.amount} charge and asked for a refund of the second one.` },
+        { at: pace.issuedAt, step: "confirm", note: `The rep issued the refund. Reference ${REFUND_REFERENCE}.` },
         { at: pace.readBackAt, note: "Read back the amount and reference. The rep confirmed." },
-        { at: pace.endAt, phase: "ended", note: "Call ended." },
+        { at: pace.endAt, phase: "ended", step: "record", note: "Call ended." },
       ],
     }),
     transcript: (ctx) =>
@@ -184,27 +201,35 @@ function claimBranch(resolution: Resolution | null): ClaimBranch {
 
 function afterDecision(branch: ClaimBranch): ScriptStep[] {
   return [
-    { at: 31_000, note: branch.note },
+    { at: 31_000, step: "confirm", note: branch.note },
     { at: 38_000, note: `Read back claim ${CLAIM_REFERENCE}. The claims line confirmed.` },
-    { at: 45_000, phase: "ended", note: "Call ended." },
+    { at: 45_000, phase: "ended", step: "record", note: "Call ended." },
   ];
 }
 
 export const insuranceClaimCall: Conversation = {
+  plan: (ctx) => [
+    { id: "reach", title: "Reach the claims line", detail: "Dialing, phone menu and hold." },
+    { id: "state", title: "State the claim with the evidence", detail: `A claim for ${ctx.amount}, with the evidence on file.` },
+    { id: "decide", title: "Check the adjuster visit with you", detail: "Anything outside your authorization waits for your answer." },
+    { id: "confirm", title: "Confirm the claim reference", detail: "Read back the claim reference." },
+    { id: "record", title: "Record the outcome", detail: "Save the reference and next step to the case." },
+  ],
   script: (ctx) => ({
     steps: [
-      { at: 0, phase: "dialing", note: `Dialing ${ctx.merchantName}.` },
+      { at: 0, phase: "dialing", step: "reach", note: `Dialing ${ctx.merchantName}.` },
       { at: 3_000, phase: "navigating_menu", note: "The phone menu answered." },
       { at: 5_000, note: "Pressed 2 for existing claims" },
       { at: 9_000, phase: "on_hold", note: "On hold for the claims team." },
       {
         at: 17_000,
         phase: "talking",
+        step: "state",
         counterpart: { who: "agent", confidence: 0.9 },
         note: "Automated claims assistant answered. Switching to concise mode.",
       },
       { at: 20_000, note: `Stated the claim for ${ctx.customerName}: ${ctx.amount}, with the evidence on file.` },
-      { at: DECISION_AT, note: "The claims line asked to book an adjuster visit. Asking you." },
+      { at: DECISION_AT, step: "decide", note: "The claims line asked to book an adjuster visit. Asking you." },
     ],
     gate: {
       at: DECISION_AT,

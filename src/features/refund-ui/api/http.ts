@@ -152,6 +152,11 @@ export function createHttpCaseApi(options: HttpCaseApiOptions = {}): CaseApi {
       return envelope(res, "liveCall", isLiveCallV2);
     },
 
+    async sendSummary(caseId, destination) {
+      void caseId;
+      void destination;
+      throw notSupported("Sending the summary");
+    },
     async answerDecision(caseId, callId, decisionId, optionId) {
       if (!(await capabilities()).decisions) throw notSupported("Answering a decision");
       const path = `${callPath(caseId, callId)}/decisions/${encodeURIComponent(decisionId)}`;
