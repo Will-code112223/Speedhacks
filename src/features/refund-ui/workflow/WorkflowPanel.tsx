@@ -6,6 +6,7 @@ import type { WorkflowAction } from "../../../contracts/workflow";
 import { Button } from "../ui/primitives";
 import { workflowBriefUrl } from "./client";
 import type { WorkflowController } from "./session";
+import PreparationPreview from "../browser/PreparationPreview";
 import styles from "./WorkflowPanel.module.css";
 
 /** Only http(s) contact links are navigable; contact prose is never executable. */
@@ -41,6 +42,7 @@ export default function WorkflowPanel({ controller, evidence = [], onAction, onR
           <p>Case brief and {evidence.length} saved {evidence.length === 1 ? "attachment" : "attachments"} prepared. Review before provider upload.</p>
           <p className={styles.note}>Provider requirements still need confirmation. This packet remains in Recourse; no files have been sent to the insurer.</p>
         </section> : null}
+        {workflow.kind === "auto_insurance" ? <PreparationPreview key={workflow.caseId} caseId={workflow.caseId} caseRevision={workflow.caseRevision} ready={packetReady} /> : null}
         {workflow.kind === "auto_insurance" ? <p className={styles.note}>Add requested photos or estimates below to update this packet. Prepared for your review; not submitted to an insurer.</p> : null}
       </section>
       {workflow.contacts.length ? <section className={styles.section} aria-labelledby={`${headingId}-contacts`}><h3 id={`${headingId}-contacts`}>Contacts</h3><ul className={styles.contacts}>{workflow.contacts.map(contact => <li key={contact.id}><strong>{contact.name}</strong><span>{contact.role.replaceAll("_", " ")}{contact.phone ? ` · ${contact.phone}` : ""}</span>{publicContactUrl(contact.url) ? <a href={publicContactUrl(contact.url)!} target="_blank" rel="noopener noreferrer">Open provider website</a> : null}{publicContactUrl(contact.sourceUrl) ? <a href={publicContactUrl(contact.sourceUrl)!} target="_blank" rel="noopener noreferrer">Contact source</a> : null}{contact.requiresConfirmation ? <small className={styles.note}>Confirm this is the right contact before using it.</small> : null}</li>)}</ul></section> : null}

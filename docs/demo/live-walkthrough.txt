@@ -42,7 +42,12 @@ Recording sequence (you operate the website)
    files using Evidence, then Upload evidence. Wait for the
    real analysis to finish. Show the updated brief's evidence index and download
    the updated preparation document. No second call is needed or automatic.
-6. Open the AAA public-site action separately if desired. The side browser can
+6. Under the prepared insurance packet, click Prepare in browser. Watch the
+   real Chromium view fill the saved case facts and attach the uploaded photo
+   and estimate. It stops at Ready for review — not submitted. This is the
+   Recourse preparation form, not AAA's website. Refreshing the page recovers
+   the same run; it does not start a second browser task.
+7. Open the AAA public-site action separately if desired. The side browser can
    show the actual public page. With this sample case, keep it read-only: do not
    log in, enter policy details, fill claim fields, upload files or submit.
    Finish by showing the packet in Recourse, ready for the user's review.
@@ -67,6 +72,8 @@ Acceptance before saying the rehearsal passed
 [ ] Actual call results and transcript appear in this same case.
 [ ] Recipient's document request is visibly attributed to the recipient.
 [ ] Both evidence files appear once; updated brief survives reopening the case.
+[ ] Prepare in browser fills the saved facts and attaches both actual files.
+[ ] Mini browser ends at local review; no insurer request or submission occurs.
 [ ] Claim/payment outcome remains unknown/unverified; nothing is submitted.
 [ ] AAA public page is shown separately; no sample data reaches its forms.
 

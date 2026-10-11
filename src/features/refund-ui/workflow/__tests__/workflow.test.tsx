@@ -1,6 +1,8 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import type { WorkflowResponse } from "../../../../contracts/workflow";
+import type { BrowserRun } from "../../../../contracts/browser";
+import { parseSavedPreparation, startPreparation } from "../../browser/PreparationPreview";
 import { createFixtureCaseApi } from "../../api/fixture";
 import { ApiRequestError, ApiUnreachableError } from "../../api/types";
 import { createWorkflowApi, type WorkflowApi } from "../client";
@@ -148,7 +150,9 @@ describe("workflow evidence and action UI", () => {
     if (state === "ready") {
       expect(html).toContain("Packet prepared for AAA"); expect(html).toContain("Not uploaded");
       expect(html).toContain("2 saved attachments"); expect(html).toContain("no files have been sent to the insurer");
-    } else expect(html).not.toContain('aria-label="Provider upload review"');
+      expect(html).toContain("Prepare in browser"); expect(html).toContain("Recourse preparation — not an insurer website");
+      expect(html).not.toContain("Packet ready for review · Not submitted");
+    } else { expect(html).not.toContain('aria-label="Provider upload review"'); expect(html).not.toContain("Prepare in browser"); }
     expect(html).not.toContain("Upload complete"); expect(html).not.toContain("Approved by AAA");
   });
   it("keeps an insurance case out of the legacy refund facts and approval form", async () => {
@@ -194,5 +198,41 @@ describe("workflow evidence and action UI", () => {
   it("rejects executable and credential-bearing contact URLs", () => {
     expect(publicContactUrl("javascript:alert(1)")).toBeNull(); expect(publicContactUrl("https://user:pass@example.com")).toBeNull();
     expect(publicContactUrl("https://www.geico.com/claims/")).toBe("https://www.geico.com/claims/");
+  });
+});
+
+describe("preparation browser boundary", () => {
+  const request = { expectedRevision: 4, requestId: "preparation-request" };
+  const run: BrowserRun = {
+    id: "browser-one", caseId: "case-owned", requestId: request.requestId, caseRevision: 4,
+    task: "Prepare local packet", startUrl: "https://recourse.invalid/preparation", allowedHosts: [],
+    currentUrl: null, pageTitle: null, status: "running", pendingAction: null,
+    frameAvailable: false, events: [], artifacts: [], message: "Opening preparation form",
+    createdAt: "2026-10-11T12:00:00Z", updatedAt: "2026-10-11T12:00:00Z",
+  };
+  it("sends a scoped preparation request and preserves a lost response identity on explicit retry", async () => {
+    const fetcher = vi.fn().mockRejectedValueOnce(new Error("connection lost")).mockResolvedValueOnce(new Response(JSON.stringify({ run })));
+    await expect(startPreparation("case-owned", request, fetcher)).rejects.toMatchObject({ status: null });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(await startPreparation("case-owned", request, fetcher)).toEqual(run);
+    for (const call of fetcher.mock.calls) {
+      expect(call[0]).toBe("/api/cases/case-owned/preparation");
+      expect(call[1]).toMatchObject({ method: "POST", credentials: "same-origin", cache: "no-store", body: JSON.stringify(request) });
+    }
+  });
+  it.each([{ caseId: "someone-else" }, { caseRevision: 5 }, { requestId: "other-request" }, { status: "pretend_success" }])("rejects unrelated or invalid preparation run data: %j", async changed => {
+    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({ run: { ...run, ...changed } })));
+    await expect(startPreparation("case-owned", request, fetcher)).rejects.toMatchObject({ status: null });
+  });
+  it("distinguishes a definite revision rejection from an ambiguous transport failure", async () => {
+    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: { message: "Refresh the case revision first." } }), { status: 409 }));
+    await expect(startPreparation("case-owned", request, fetcher)).rejects.toMatchObject({ status: 409, message: "Refresh the case revision first." });
+  });
+  it("recovers only preparation identity, dropping unrelated saved properties", () => {
+    expect(parseSavedPreparation(JSON.stringify({ request: { ...request, facts: "must not be copied" }, runId: "browser-one", documents: "must not be copied" }))).toEqual({ request, runId: "browser-one" });
+    expect(parseSavedPreparation(JSON.stringify({ request, runId: null }))).toEqual({ request, runId: null });
+  });
+  it.each(["not-json", "{}", JSON.stringify({ request: { ...request, expectedRevision: -1 }, runId: null }), JSON.stringify({ request, runId: {} })])("rejects invalid saved preparation identity: %s", raw => {
+    expect(() => parseSavedPreparation(raw)).toThrow();
   });
 });

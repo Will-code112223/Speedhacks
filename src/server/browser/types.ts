@@ -29,6 +29,7 @@ export interface Planner {
   next(input: { run: BrowserRun; observation: Observation; draft: string; signal: AbortSignal }): Promise<PlannedStep>;
 }
 export interface StoredRun {
+  preparationFields?: Array<{ key: string; label: string; value: string }>;
   owner: string; requestHash: string; run: BrowserRun; draft: string;
   pending: { step: PlannedStep; fingerprint: string } | null;
   executing: boolean; steps: number;

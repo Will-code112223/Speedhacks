@@ -27,6 +27,15 @@ export function getBrowserService(): BrowserService {
     planner: new OpenAIPlanner({ model: config.llm.model ?? "", apiKey: config.llm.apiKey ?? "", baseUrl: config.llm.baseUrl }),
     loadCase: async (owner, id) => owned(owner, id),
     executionPolicy: async (owner, id) => isSampleInsurance(getWorkflowService().get(owner, id).workflow) ? "inspect_only" : "review_each_action",
+    preparationFields: async (owner, id) => {
+      const { workflow, case: c } = getWorkflowService().get(owner, id);
+      if (workflow.kind !== "auto_insurance" || workflow.analysisStatus !== "complete" || workflow.conflicts.length ||
+        workflow.questions.some(q => q.required) || !c.evidence.length) {
+        throw new ApiHttpError(409, "WORKFLOW_REVIEW_REQUIRED", "Complete the insurance facts and attach evidence before preparing the local form.");
+      }
+      const keys = ["customerName", "insuranceProvider", "claimantRole", "vehicle", "lossDate", "lossLocation", "incidentDescription", "desiredOutcome"] as const;
+      return keys.map(key => ({ key, label: workflow.facts[key]?.label ?? key, value: workflow.facts[key]?.value ?? "Unknown — needs review" }));
+    },
     preparation: async (owner, id, revision) => {
       const response = getWorkflowService().get(owner, id);
       if (response.case.revision !== revision || response.workflow.caseRevision !== revision) {
