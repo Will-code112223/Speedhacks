@@ -1,54 +1,74 @@
 /**
- * Server-renders the landing page so a missing claim, link or demo region fails here, without a browser.
+ * Server-renders the landing page so a missing claim, link or rolling region fails here, without a browser.
  */
 
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import LandingPage, { EXPLANATION, HEADLINE } from "../LandingPage";
-import { INITIAL_STATE, LINES, LOOP_MS, PLAN_STEPS, TIMELINE, stateAt, typedChars } from "../demo";
+import LandingPage from "../LandingPage";
+import { BAND_ROWS, EXPLANATION, FOOTER, HEADLINE, ROLLING_WORDS, bandSentence } from "../content";
+import { BAND_COPIES, wrap } from "../rolling";
 
 const html = renderToStaticMarkup(<LandingPage />);
+const text = html.replace(/<[^>]+>/g, "");
 
 describe("landing page", () => {
-  it("states what Recourse is in a headline and two sentences", () => {
-    expect(HEADLINE.split(" ").length).toBeLessThanOrEqual(7);
-    expect(html.replace(/<[^>]+>/g, "")).toContain(HEADLINE);
+  it("states the headline with the first rolling word as one sentence", () => {
+    expect(HEADLINE).toBe("Get your money back from duplicate charges.");
     expect(html).toContain("<h1");
-    expect(EXPLANATION).toHaveLength(2);
-    for (const sentence of EXPLANATION) expect(html).toContain(sentence);
+    expect(text).toContain(HEADLINE);
   });
 
-  it("links the primary action to the app's first page", () => {
+  it("rolls through the five kinds of money owed, starting with the first two", () => {
+    expect(ROLLING_WORDS).toEqual(["duplicate charges", "denied claims", "subscription traps", "cancelled bookings", "overbilling"]);
+    expect(html).toContain('data-testid="landing-morph"');
+    expect(text).toContain(ROLLING_WORDS[0]);
+    expect(text).toContain(ROLLING_WORDS[1]);
+  });
+
+  it("explains the product in both sentences", () => {
+    expect(EXPLANATION).toEqual([
+      "Recourse is an AI agent that phones the merchant or insurer and gets your money back.",
+      "You approve before anything is dialed, you can step in at any time, and every outcome comes with a transcript.",
+    ]);
+    expect(text).toContain(EXPLANATION.join(" "));
+  });
+
+  it("rolls both band sentences, with one readable copy and the repeats hidden", () => {
+    expect(html).toContain('data-testid="landing-band"');
+    expect(BAND_ROWS.map(bandSentence)).toEqual([
+      "You approve. Recourse makes the call.",
+      "Step in at any time. Every outcome keeps its transcript.",
+    ]);
+    for (const row of BAND_ROWS) {
+      expect(html).toContain(`>${bandSentence(row)}</span>`);
+      expect(html.split(`>${row.accent}</span>`).length - 1).toBe(BAND_COPIES);
+    }
+    expect(BAND_ROWS[0]!.velocity).toBe(-BAND_ROWS[1]!.velocity);
+  });
+
+  it("links the actions to the app", () => {
     expect(html).toMatch(/<a [^>]*href="\/"[^>]*>Start a case<\/a>/);
-    expect(html).toMatch(/<a [^>]*href="\/\?api=fixture"[^>]*>See a demo case<\/a>/);
+    expect(html).toMatch(/<a [^>]*href="\/\?api=fixture"[^>]*>See a demo case<svg/);
+    expect(html).toMatch(/<a [^>]*href="\/"[^>]*>Open the app<\/a>/);
   });
 
-  it("renders the demo call as decoration with a described alternative", () => {
-    expect(html).toContain('data-testid="landing-demo"');
-    expect(html).toMatch(/aria-hidden="true" inert=""/);
-    expect(html).toContain("A sample call, simulated");
-    expect(html).toContain("Demo calls are simulated.");
+  it("keeps the proof and footer honest about the simulation", () => {
+    expect(text).toContain("Simulated outcome: Approved, $49.99 refund, reference and transcript kept with the case.");
+    expect(text).toContain(FOOTER);
+    expect(FOOTER).toContain("Demo calls are simulated.");
   });
 
-  it("uses no em dashes", () => {
+  it("names no merchant and uses no em dashes", () => {
+    expect(html).not.toContain("Ridgeline");
     expect(html).not.toContain("\u2014");
   });
 });
 
-describe("demo timeline", () => {
-  it("is in time order and ends inside the loop", () => {
-    const times = TIMELINE.map((beat) => beat.atMs);
-    expect(times).toEqual([...times].sort((a, b) => a - b));
-    expect(times.at(-1)).toBeLessThan(LOOP_MS);
-  });
-
-  it("starts dialing and finishes with every step done and every line typed", () => {
-    expect(stateAt(0)).toEqual(INITIAL_STATE);
-    const end = stateAt(LOOP_MS);
-    expect(end.phase).toBe("Call ended");
-    expect(end.step).toBe(PLAN_STEPS.length);
-    expect(end.counterpart).toBe(true);
-    expect(end.lineStarts).toHaveLength(LINES.length);
-    LINES.forEach((line, i) => expect(typedChars(end, i, LOOP_MS)).toBe(line.text.length));
+describe("velocity wrap", () => {
+  it("keeps the offset inside one copy, as framer-motion's wrap does", () => {
+    expect(wrap(-12.5, 0, 0)).toBe(-12.5);
+    expect(wrap(-12.5, 0, 3)).toBeCloseTo(-9.5);
+    expect(wrap(-12.5, 0, -15)).toBeCloseTo(-2.5);
+    expect(wrap(-12.5, 0, 40)).toBeCloseTo(-10);
   });
 });

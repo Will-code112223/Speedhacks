@@ -14,22 +14,20 @@
   --rc-on-accent: #ffffff;
   --rc-success: #15803d;
   --rc-success-tint: #ecfdf3;
-  --rc-warning: #b45309;
-  --rc-warning-tint: #fff7e6;
   --rc-font: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
   --rc-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   --rc-fast: 120ms;
-  --rc-default: 200ms;
   --rc-ease: cubic-bezier(0.2, 0, 0, 1);
+  --rc-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --rc-radius: 4px;
-  --rc-radius-panel: 6px;
-  --cell: 26px;
-  --cell-w: 16px;
+  --rc-radius-control: 6px;
+  --gutter: 24px;
 
   min-height: 100vh;
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
+  overflow-x: clip;
   background: var(--rc-canvas);
   color: var(--rc-ink);
   font-family: var(--rc-font);
@@ -41,17 +39,23 @@
 
 .page :focus-visible { outline: 2px solid var(--rc-accent); outline-offset: 2px; }
 
+.container {
+  width: 100%;
+  max-width: calc(1120px + 2 * var(--gutter));
+  margin: 0 auto;
+  padding: 0 var(--gutter);
+  box-sizing: border-box;
+}
+
 /* Header and footer ------------------------------------------------------- */
 .header { border-bottom: 1px solid var(--rc-border); }
-.headerInner,
-.main,
-.footerInner { width: 100%; max-width: 1120px; margin: 0 auto; padding: 0 24px; box-sizing: border-box; }
 .headerInner { display: flex; align-items: center; justify-content: space-between; height: 68px; }
 .home { color: var(--rc-ink); text-decoration: none; border-radius: var(--rc-radius); }
 .brand { display: flex; align-items: center; gap: 10px; }
 .brandMark { width: 28px; height: 28px; }
 .wordmark { font-size: 21px; font-weight: 600; letter-spacing: -0.055em; }
-.textLink {
+.textLink,
+.demoLink {
   color: var(--rc-accent);
   font-size: 15px;
   font-weight: 500;
@@ -61,31 +65,55 @@
   border-radius: 2px;
   transition: color var(--rc-fast) var(--rc-ease);
 }
-.textLink:hover { color: var(--rc-accent-hover); }
+.textLink:hover,
+.demoLink:hover { color: var(--rc-accent-hover); }
 .footer { margin-top: auto; border-top: 1px solid var(--rc-border); }
-.footerInner { padding-top: 24px; padding-bottom: 24px; font-size: 12px; color: var(--rc-ink-3); }
+.footerInner { margin-top: 0; margin-bottom: 0; padding-top: 24px; padding-bottom: 24px; font-size: 12px; color: var(--rc-ink-3); }
 
 /* Hero -------------------------------------------------------------------- */
 .main { padding-bottom: 96px; }
-.hero { display: grid; gap: 48px; padding-top: 96px; align-items: center; }
-.copy { display: flex; flex-direction: column; align-items: flex-start; }
-.headline > span { display: block; }
+.hero { padding-top: 120px; }
 .headline {
   margin: 0;
-  font-size: 56px;
+  font-size: clamp(31px, 7vw, 92px);
   font-weight: 600;
-  line-height: 1.04;
-  letter-spacing: -0.04em;
+  line-height: 1.02;
+  letter-spacing: -0.03em;
   text-wrap: balance;
 }
-.explanation { max-width: 60ch; margin: 24px 0 0; font-size: 18px; line-height: 1.5; color: var(--rc-ink-2); }
-.actions { display: flex; align-items: center; flex-wrap: wrap; gap: 24px; margin-top: 40px; }
+.leadLine { display: block; }
+
+/* Kinetic reveal, once on load: each word rises out of a blur. */
+.reveal {
+  display: inline-block;
+  animation: reveal 720ms var(--rc-ease-out) both;
+  animation-delay: var(--reveal-delay, 0ms);
+}
+@keyframes reveal {
+  from { opacity: 0; transform: translateY(20px); filter: blur(6px); }
+}
+
+/* The rolling slot: a stage that animates its width, two stacked layers, the period attached. */
+.slotLine { position: relative; display: flex; align-items: flex-start; color: var(--rc-accent); }
+.filterDefs { position: absolute; width: 0; height: 0; overflow: hidden; pointer-events: none; }
+.stage { position: relative; display: block; flex: none; max-width: 100%; user-select: none; }
+.layer {
+  display: block;
+  width: max-content;
+  white-space: pre;
+  transform-origin: left center;
+}
+.layerNext { position: absolute; top: 0; left: 0; opacity: 0; filter: blur(12px); transform: scale(0.992); }
+.period { flex: none; }
+
+.explanation { max-width: 56ch; margin: 32px 0 0; font-size: 20px; line-height: 1.5; color: var(--rc-ink-2); text-wrap: pretty; }
+.actions { display: flex; align-items: center; flex-wrap: wrap; gap: 16px 28px; margin-top: 40px; }
 .primary {
   display: inline-flex;
   align-items: center;
   min-height: 44px;
   padding: 0 20px;
-  border-radius: var(--rc-radius);
+  border-radius: var(--rc-radius-control);
   background: var(--rc-ink);
   color: var(--rc-canvas);
   font-size: 15px;
@@ -95,8 +123,36 @@
 }
 .primary:hover { background: #3c4843; }
 .primary:active { transform: translateY(1px); }
+.demoLink { display: inline-flex; align-items: center; gap: 4px; }
+.demoLink svg { flex: none; transition: transform var(--rc-fast) var(--rc-ease); }
+.demoLink:hover svg { transform: translateX(2px); }
 
-/* Three steps and the trust line ------------------------------------------ */
+/* Velocity band ------------------------------------------------------------ */
+.band {
+  display: grid;
+  gap: 12px;
+  margin-top: 96px;
+  padding: 24px 0;
+  border-top: 1px solid var(--rc-border);
+  border-bottom: 1px solid var(--rc-border);
+  overflow: hidden;
+}
+.row { position: relative; }
+.track { display: flex; width: max-content; will-change: transform; }
+.copy {
+  flex: none;
+  white-space: nowrap;
+  font-size: clamp(40px, 6.5vw, 88px);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  color: var(--rc-ink);
+}
+.accent { color: var(--rc-accent); }
+.sep { display: inline-block; width: 0.6em; height: 0.6em; margin: 0 0.5em; color: var(--rc-accent); vertical-align: 0.02em; }
+.sep svg { display: block; width: 100%; height: 100%; stroke-width: 2; }
+
+/* Steps and proof ---------------------------------------------------------- */
 .steps {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -109,175 +165,46 @@
 .step:first-child { padding-left: 0; border-left: 0; }
 .stepNumber { margin-bottom: 8px; font-family: var(--rc-mono); font-size: 12px; color: var(--rc-ink-3); font-variant-numeric: tabular-nums; }
 .stepTitle { font-size: 16px; font-weight: 600; letter-spacing: -0.01em; }
-.stepBody { color: var(--rc-ink-2); max-width: 32ch; }
-.trust { margin: 64px 0 0; font-size: 16px; font-weight: 500; text-wrap: balance; }
-
-/* The call replica --------------------------------------------------------- */
-.demoWrap { position: relative; width: 100%; max-width: 400px; justify-self: end; }
-.demo {
-  border: 1px solid var(--rc-border);
-  border-radius: 8px;
-  background: var(--rc-canvas);
-  overflow: hidden;
-  user-select: none;
-}
-.demo > div + div { border-top: 1px solid var(--rc-border); }
-.identity { padding: 16px 20px; }
-.identityTop { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
-.eyebrow { margin: 0; font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--rc-ink-2); }
-.simTag { padding: 1px 6px; border: 1px solid var(--rc-border); border-radius: var(--rc-radius); font-size: 11px; color: var(--rc-ink-2); }
-.name { margin: 0; font-size: 22px; font-weight: 600; line-height: 1.2; letter-spacing: -0.03em; }
-.status { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 14px; font-weight: 600; }
-.statusWord { animation: rise var(--rc-default) var(--rc-ease) both; }
-.dot { position: relative; width: 8px; height: 8px; border-radius: 50%; background: var(--rc-ink-3); }
-.dotLive { background: var(--rc-ink); }
-.dotHold { background: var(--rc-warning); }
-.dotEnded { background: var(--rc-ink-3); }
-.dotLive::after,
-.dotHold::after { content: ""; position: absolute; inset: 0; border-radius: 50%; background: inherit; animation: ping 1.2s var(--rc-ease) infinite; }
-
-.clock { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 20px; }
-.timer { font-family: var(--rc-mono); font-size: 36px; font-weight: 500; line-height: 1.2; letter-spacing: -0.045em; font-variant-numeric: tabular-nums; }
-.timerEnded { color: var(--rc-ink-2); }
-.badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 24px;
-  padding: 0 10px;
-  border: 1px solid var(--rc-border-strong);
-  border-radius: var(--rc-radius);
-  font-size: 12px;
-  font-weight: 500;
-  white-space: nowrap;
-  opacity: 0;
-  transform: translateY(4px);
-  transition: opacity var(--rc-default) var(--rc-ease), transform var(--rc-default) var(--rc-ease);
-}
-.badgeIn { opacity: 1; transform: none; }
-.badgeDot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
-
-.plan { display: flex; flex-direction: column; gap: 12px; padding: 16px 20px; }
-.planNow { margin: 0; font-size: 15px; font-weight: 600; line-height: 1.4; }
-.planBar { display: flex; gap: 2px; height: 4px; }
-.segment { position: relative; flex: 1; overflow: hidden; border-radius: 2px; background: var(--rc-border); }
-.segment::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: var(--rc-ink);
-  transform: scaleX(0);
-  transform-origin: left;
-  transition: transform 320ms var(--rc-ease), background-color var(--rc-default) var(--rc-ease);
-}
-.segmentNow::after { background: var(--rc-accent); transform: scaleX(1); }
-.segmentDone::after { transform: scaleX(1); }
-.planList { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 0; padding: 0; list-style: none; }
-.planItem { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 8px; font-size: 14px; line-height: 20px; color: var(--rc-ink-3); transition: color var(--rc-default) var(--rc-ease); }
-.planMark { position: relative; display: grid; place-items: center start; height: 20px; }
-.planNumber,
-.planTick { grid-area: 1 / 1; transition: opacity var(--rc-default) var(--rc-ease), transform var(--rc-default) var(--rc-ease); }
-.planNumber { font-family: var(--rc-mono); font-size: 12px; font-variant-numeric: tabular-nums; }
-.planTick { display: flex; color: var(--rc-ink-2); opacity: 0; transform: scale(0.6); }
-.planNowItem { color: var(--rc-ink); font-weight: 500; }
-.planNowItem .planNumber { color: var(--rc-accent); }
-.planDone { color: var(--rc-ink-2); }
-.planDone .planNumber { opacity: 0; transform: scale(0.6); }
-.planDone .planTick { opacity: 1; transform: none; }
-
-.transcript { display: flex; flex-direction: column; gap: 12px; padding: 16px 20px; }
-.lines { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; }
-.line {
-  display: grid;
-  grid-template-columns: 56px minmax(0, 1fr);
-  gap: 8px;
-  font-size: 13px;
-  line-height: 1.5;
-  opacity: 0;
-  transform: translateY(4px);
-  transition: opacity var(--rc-default) var(--rc-ease), transform var(--rc-default) var(--rc-ease);
-}
-.lineIn { opacity: 1; transform: none; }
-.speaker { font-size: 12px; font-weight: 600; color: var(--rc-ink-3); line-height: 19.5px; }
-.lineText { position: relative; color: var(--rc-ink); }
-.untyped { color: transparent; }
-.cursor { position: relative; display: inline-block; width: 0; height: 1em; vertical-align: -0.12em; }
-.cursor::after { content: ""; position: absolute; left: 1px; top: 0; bottom: 0; width: 2px; background: var(--rc-accent); animation: blink 1s steps(1, end) infinite; }
-
-.foot { display: grid; padding: 12px 20px; background: var(--rc-surface); }
-.footLayer {
-  grid-area: 1 / 1;
+.stepBody { max-width: 32ch; color: var(--rc-ink-2); }
+.proof {
   display: flex;
-  flex-direction: column;
   align-items: flex-start;
-  justify-content: center;
   gap: 8px;
-  opacity: 0;
-  transform: translateY(6px);
-  transition: opacity var(--rc-default) var(--rc-ease), transform var(--rc-default) var(--rc-ease);
+  margin: 56px 0 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--rc-ink-3);
 }
-.footLayer:first-child { flex-direction: row; align-items: center; justify-content: flex-start; gap: 12px; }
-.footLayerIn { opacity: 1; transform: none; }
-.footNote { margin: 0; font-size: 12px; color: var(--rc-ink-2); }
-.outcome { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600; color: var(--rc-success); white-space: nowrap; }
-.flap { display: inline-flex; gap: 2px; font-family: var(--rc-mono); font-size: 18px; font-weight: 500; }
-.flapPlaceholder { height: var(--cell); }
-.flapSpace { width: 6px; }
-.flapCell { position: relative; isolation: isolate; width: var(--cell-w); height: var(--cell); overflow: hidden; border-radius: 3px; background: var(--rc-canvas); box-shadow: inset 0 0 0 1px rgb(21 128 61 / 0.16); text-align: center; }
-/* The split of the flap sits behind the glyph so it never cuts a letter. */
-.flapCell::after { content: ""; position: absolute; z-index: -1; left: 0; right: 0; top: 50%; height: 1px; background: rgb(21 128 61 / 0.16); }
-.flapStrip { display: flex; flex-direction: column; transform: translateY(calc((1 - var(--n)) * var(--cell))); }
-.flapStrip > span { height: var(--cell); line-height: var(--cell); }
+.proofIcon { display: inline-flex; flex: none; margin-top: 2px; color: var(--rc-success); }
 
-/* Motion: entrance once, then the call. Only transform, opacity, color. ---- */
-@media (prefers-reduced-motion: no-preference) {
-  .headline,
-  .explanation,
-  .actions { animation: rise 480ms var(--rc-ease) both; }
-  .explanation { animation-delay: 80ms; }
-  .actions { animation-delay: 160ms; }
-  .demo { animation: lift 640ms var(--rc-ease) 200ms both; }
-  .flapStrip { animation: flap calc((var(--n) - 1) * 70ms) steps(4, end) calc(var(--i) * 45ms) both; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .page *,
-  .page *::after { animation: none !important; transition: none !important; }
-}
-
-@keyframes rise { from { opacity: 0; transform: translateY(8px); } }
-@keyframes lift { from { opacity: 0; transform: translateY(16px) scale(0.985); } }
-@keyframes ping { 0% { opacity: 0.6; transform: scale(1); } 100% { opacity: 0; transform: scale(2.6); } }
-@keyframes blink { 50% { opacity: 0; } }
-@keyframes flap { from { transform: translateY(0); } }
-
-/* Layout ------------------------------------------------------------------ */
-@media (min-width: 1024px) {
-  .hero { grid-template-columns: minmax(0, 1fr) 400px; }
-}
-
-@media (max-width: 1023px) {
-  .demoWrap { justify-self: start; }
-}
-
+/* Phones ------------------------------------------------------------------- */
 @media (max-width: 767px) {
-  .headerInner,
-  .main,
-  .footerInner { padding-left: 16px; padding-right: 16px; }
-  .headerInner { height: 56px; }
-  .brandMark { width: 22px; height: 22px; }
-  .wordmark { font-size: 18px; }
-  .hero { padding-top: 48px; gap: 40px; }
-  /* Two clean lines from 320px up: "Recourse makes the call." is about 10.2em wide. */
-  .headline { font-size: clamp(28px, calc((100vw - 32px) / 10.6), 36px); }
-  .explanation { font-size: 17px; }
-  .actions { margin-top: 32px; }
+  .page { --gutter: 16px; }
+  .main { padding-bottom: 64px; }
+  .hero { padding-top: 64px; }
+  .explanation { font-size: 18px; }
+  .band { margin-top: 64px; }
   .steps { grid-template-columns: minmax(0, 1fr); margin-top: 64px; }
+  .proof { margin-top: 32px; }
   .step,
   .step:first-child { padding: 20px 0; border-left: 0; }
   .step + .step { border-top: 1px solid var(--rc-border); }
-  .trust { margin-top: 32px; }
-  .demo { --cell: 24px; --cell-w: 13px; }
-  .flap { gap: 1px; font-size: 15px; }
-  .main { padding-bottom: 64px; }
+}
+
+/* Reduced motion: the finished state. First word, still band showing each sentence once. */
+@media (prefers-reduced-motion: reduce) {
+  .page { --rc-fast: 0ms; }
+  .reveal { animation: none; }
+  .track {
+    display: block;
+    width: auto;
+    max-width: calc(1120px + 2 * var(--gutter));
+    margin: 0 auto;
+    padding: 0 var(--gutter);
+    box-sizing: border-box;
+    transform: none !important;
+  }
+  .copy { white-space: normal; text-wrap: balance; }
+  .copy:not(:first-child),
+  .sep { display: none; }
 }
