@@ -19,7 +19,7 @@ import {
   type CaseV1,
   type CreateCaseInput,
 } from "./types";
-import { isCallV1, isCaseV1, isLiveCallV2, isRecord, readApiError, readCapabilities } from "./validate";
+import { isCallV1, isCaseV1, isLiveCallV2, isRecord, isSummaryDelivery, readApiError, readCapabilities } from "./validate";
 
 export interface HttpCaseApiOptions {
   /** Origin or path prefix for the API. Defaults to the page's own origin. */
@@ -159,13 +159,20 @@ export function createHttpCaseApi(options: HttpCaseApiOptions = {}): CaseApi {
     // No summary route yet (proposed in docs/handoffs/frontend.txt): compose from the
     // case here and return it unsent (sentAt null), so the person sends it from their own app.
     async sendSummary(caseId, destination) {
-      const caseData = await getCase(caseId);
-      const call = completedCallFor(caseData);
-      if (call === null) throw new ApiRequestError(409, "CALL_NOT_COMPLETE", CALL_NOT_COMPLETE_MESSAGE);
       if (!isValidDestination(destination)) {
         throw new ApiRequestError(400, "BAD_REQUEST", `${DESTINATION_MESSAGE}.`, ["to"]);
       }
-      return composeSummary(caseData, call, destination);
+      // The server summarizes the provider's transcript and sends it. A backend
+      // without the route (Next's HTML 404, or 501) gets the message composed
+      // here with sentAt null, so the UI offers the person's own Mail or Messages.
+      const res = await send("POST", `${casePath(caseId)}/summary`, { json: destination });
+      if (res.status === 501 || (res.status === 404 && !(await hasApiError(res)))) {
+        const caseData = await getCase(caseId);
+        const call = completedCallFor(caseData);
+        if (call === null) throw new ApiRequestError(409, "CALL_NOT_COMPLETE", CALL_NOT_COMPLETE_MESSAGE);
+        return composeSummary(caseData, call, destination);
+      }
+      return envelope(res, "delivery", isSummaryDelivery, CASE_NOT_FOUND_MESSAGE);
     },
     async answerDecision(caseId, callId, decisionId, optionId) {
       if (!(await capabilities()).decisions) throw notSupported("Answering a decision");
@@ -228,6 +235,19 @@ async function readBody(res: Response): Promise<unknown> {
     return JSON.parse(text);
   } catch (cause) {
     throw unreachable(`The server answered HTTP ${res.status} with a response that is not JSON.`, cause);
+  }
+}
+
+/**
+ * Whether a non-2xx response carries the contract's error envelope. A route the
+ * backend lacks answers with Next's HTML page instead, which is not an answer
+ * about the case. Reads the body once on a clone so the caller can still use it.
+ */
+async function hasApiError(res: Response): Promise<boolean> {
+  try {
+    return readApiError(JSON.parse(await res.clone().text())) !== null;
+  } catch {
+    return false;
   }
 }
 

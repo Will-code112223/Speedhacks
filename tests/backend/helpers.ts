@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import type { CaseV1 } from "@/contracts/case";
-import { CaseService } from "@/server/cases/service";
+import { CaseService, type ServiceDeps } from "@/server/cases/service";
 import { createSimulatedVoiceAdapter } from "@/server/cases/simulated-voice";
 import { loadConfig, type AppConfig } from "@/server/config";
 import { HeuristicExtractor } from "@/server/documents/extractor";
@@ -24,7 +24,9 @@ export interface Harness {
 }
 
 /** Fresh SQLite + uploads dir per harness; fake clock drives the simulated call lifecycle. */
-export function makeHarness(overrides: { voice?: VoiceAdapter; mode?: "simulated" | "live"; env?: Record<string, string> } = {}): Harness {
+export function makeHarness(
+  overrides: { voice?: VoiceAdapter; mode?: "simulated" | "live"; env?: Record<string, string>; summary?: ServiceDeps["summary"] } = {},
+): Harness {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "refund-test-"));
   closeDatabase();
   const config = loadConfig({
@@ -53,6 +55,7 @@ export function makeHarness(overrides: { voice?: VoiceAdapter; mode?: "simulated
     extractor: new HeuristicExtractor(),
     voice: () => voice,
     now: () => new Date(clock.now),
+    summary: overrides.summary,
   });
   return {
     config,

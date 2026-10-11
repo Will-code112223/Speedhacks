@@ -13,6 +13,24 @@ export interface CaseDoc {
   authorization: CaseV1["authorization"];
   outcome: CaseV1["outcome"];
   timeline: CaseV1["timeline"];
+  /** Post-call summaries (POST /api/cases/:id/summary). Absent on rows written before the summary route. */
+  summaries?: StoredSummary[];
+}
+
+/** One stored summary delivery; (callId, channel, destinationKey) is the idempotency key. */
+export interface StoredSummary {
+  callId: string;
+  channel: "email" | "sms";
+  /** Normalized destination: E.164 for sms, lowercased address for email. */
+  destinationKey: string;
+  to: string;
+  subject: string | null;
+  summary: string[];
+  transcript: string;
+  sentAt: string | null;
+  source: "llm" | "composed";
+  providerMessageId: string | null;
+  createdAt: string;
 }
 
 export interface CaseRow {

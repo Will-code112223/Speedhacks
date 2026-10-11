@@ -130,3 +130,11 @@ KNOWN LIMITS AND REQUESTS
   each send adds a timeline entry type "summary_sent". Until the route exists the http client
   composes the message in the browser (src/features/refund-ui/api/summary.ts) with sentAt null and
   the UI opens it in the person's own Mail or Messages app; nothing claims it was sent.
+  Implemented (T2, Oct 11): src/app/api/cases/[id]/summary/route.ts and CaseService.sendSummary
+  (src/server/summary/). Text messages go out through Dial POST /api/v1/messages from
+  DIAL_FROM_NUMBER (simulated mode uses a stub and never sends); the number is normalized to E.164
+  and returned that way in delivery.to. Email is composed only (sentAt null, timeline
+  "summary_composed") until a mail provider exists. Summary lines come from the stored outcome
+  analysis, or from the LLM in live mode when configured, falling back to the composed lines.
+  A Dial refusal is 502 PROVIDER_ERROR with a "summary_failed" timeline entry; a case created in
+  the other mode is 409 MODE_MISMATCH. Tests: tests/backend/summary.test.ts.
