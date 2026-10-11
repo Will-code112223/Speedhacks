@@ -18,6 +18,7 @@ import { caseFacts, FACT_KEYS, FACT_LABELS, initialKind } from "./facts";
 import { parseWorkflowExtraction, WorkflowModelError, type WorkflowExtractor, type WorkflowExtraction } from "./extractor";
 import { nextAssistantMessage, rebuildWorkflow } from "./planning";
 import { WorkflowStore, type WorkflowOperation } from "./store";
+import { isRetailerButton, productIdentity, reviewedConflicts } from "./review";
 
 export interface WorkflowDependencies {
   config: AppConfig; db: Db; repo: CaseRepository; cases: CaseService; extractor: WorkflowExtractor;
@@ -108,6 +109,10 @@ export class WorkflowService {
       workflow.analysisStatus = "not_started";
       workflow.messages.push({ id: randomUUID(), role: "assistant", createdAt: this.now(), content: "The case changed outside this interview. I refreshed the canonical facts; analyze the saved information to review the preparation again." });
       workflow = this.plan(workflow, this.assembled(c));
+    }
+    const conflicts = reviewedConflicts(workflow);
+    if (conflicts.length !== workflow.conflicts.length) {
+      workflow = this.plan({ ...workflow, conflicts }, this.assembled(c));
     }
     this.store.save(owner, workflow);
     return { case: this.assembled(c), workflow: structuredClone(workflow) };
@@ -235,10 +240,14 @@ export class WorkflowService {
       // A bare dollar sign does not distinguish USD, CAD, AUD, etc. It cannot
       // establish a currency or contradict an explicitly supplied currency code.
       if (candidate.key === "currency" && candidate.value.trim() === "$") continue;
+      // A merchant's available actions are not evidence of the customer's intent.
+      if (candidate.key === "desiredOutcome" && (source.source !== "user" || isRetailerButton(candidate.value))) continue;
       const existing = next.facts[candidate.key];
       const proposed: WorkflowFact = { label: FACT_LABELS[candidate.key], value: candidate.value, source: source.source, sourceRefs: [candidate.sourceId] };
       if (!existing?.value) { next.facts[candidate.key] = proposed; continue; }
-      const same = normal(existing.value) === normal(candidate.value) || (candidate.key === "amount" && amountMinor(existing.value) !== null && amountMinor(existing.value) === amountMinor(candidate.value));
+      const same = normal(existing.value) === normal(candidate.value) ||
+        (candidate.key === "product" && productIdentity(existing.value) === productIdentity(candidate.value)) ||
+        (candidate.key === "amount" && amountMinor(existing.value) !== null && amountMinor(existing.value) === amountMinor(candidate.value));
       const explicitIntent = candidate.key === "desiredOutcome" && source.source === "user" && candidate.sourceId === latestUserId && /\b(?:want|need|request|seek|please|help|get|prepare)\b/i.test(source.text ?? "");
       const explicitCorrection = source.source === "user" && candidate.sourceId === latestUserId && candidate.resolvesConflict &&
         (/\b(?:actually|correction|correct|instead|meant|previous|replace|not)\b/i.test(source.text ?? "") || workflow.conflicts.some(c => c.startsWith(`${candidate.key}:`)));
