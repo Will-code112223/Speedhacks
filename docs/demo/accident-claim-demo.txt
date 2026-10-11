@@ -1,0 +1,35 @@
+Recourse: accident claim demo (AAA, real call to a consenting participant)
+
+Before the demo
+1. Start the live server from the repo root with: npm run dev:live
+   It reads ~/.config/speedhacks/dial.env (REFUND_MODE=live plus the OpenAI and Dial settings).
+   Open http://localhost:3001/ (or whichever port you passed). Do not add ?api=fixture.
+   GET /api/runtime must answer mode "live" with extraction and calls ready.
+2. Have two files ready: the accident photo and the AAA policy declarations page.
+   docs/demo/samples/aaa-auto-policy-declarations.txt is a labeled sample whose claims line is the demo number +1 (949) 520-0007.
+   A presenter's own AAA plan works the same way; the claims line it names is the number offered for the call.
+3. The phone at +1 949 520 0007 belongs to the person playing the AAA claims representative. Put it on speaker for the room.
+
+During the demo
+1. Click New case. Attach both files with Evidence. Type the request and press Enter:
+   I was rear-ended yesterday, October 10, 2026, in San Francisco by a silver sedan, California plate 8UFJ426.
+   My red 2021 Toyota Camry has rear bumper and trunk damage; no injuries.
+   I am the policyholder, insured with AAA (policy on the attached declarations page), and the damage photo is attached.
+   Build a plan to file the collision claim with AAA and call the AAA claims line to open the claim and get a claim number.
+2. Within about 10 seconds the case facts show AAA Insurance (CSAA Insurance Group) and the claims line read from the plan.
+   Within about a minute the case brief fills in: recorded facts with their sources, the evidence index, unknowns, and the action list.
+   Measured on 2026-10-11: case created in 7.3 s, analysis complete about 50 s after sending, no clarification round needed.
+3. On the action "Review insurer information call" click Review call.
+   Pick the AAA contact, set Maximum duration (180 seconds is plenty), tick the consent box, then Authorize call.
+   Review the frozen brief, then Place live call. Only that last button dials.
+4. The representative answers and plays AAA claims: verify the policy, take the loss report (date, rear-end collision, plate 8UFJ426, photos on file, no injuries), issue a claim number, assign an adjuster, explain next steps (photos to the claim, repair shop, rental, deductible).
+5. After the call, Refresh reconciles the result and transcript (a late transcript can take another poll).
+   Then send the summary by text from the outcome card.
+
+If the live server cannot be used
+Open http://localhost:3001/?api=fixture. The fixture plays the same AAA accident claim with the call plan dashboard, the live transcript, a claim number and the texted summary, with no real call.
+
+Good to know
+- The live workflow's insurer call is an information call by design: the agent asks what documents and process apply and does not itself open the claim. The roleplay representative can still issue a claim number on the call.
+- Equivalent facts worded two ways (the same phone number in two formats, AAA and its legal name, the policyholder called "insured") no longer count as conflicts since 2026-10-11.
+- Cases are owner-cookie scoped in local SQLite; a new browser profile starts empty.
