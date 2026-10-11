@@ -9,6 +9,8 @@ next-env.d.ts
 
 # runtime data (hackathon local persistence: SQLite db + private uploads)
 data/
+# keewano:demo-cases runs its own next dev against this directory
+data-demo/
 
 # secrets
 .env

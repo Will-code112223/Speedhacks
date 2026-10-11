@@ -16,7 +16,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "keewano:seed": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --env-file-if-exists=.env.local src/integrations/keewano/seed.mts",
-    "keewano:sql": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --env-file-if-exists=.env.local src/integrations/keewano/sql.mts"
+    "keewano:sql": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --env-file-if-exists=.env.local src/integrations/keewano/sql.mts",
+    "keewano:demo-cases": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --env-file-if-exists=.env.local src/integrations/keewano/demo-cases.mts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.1",
