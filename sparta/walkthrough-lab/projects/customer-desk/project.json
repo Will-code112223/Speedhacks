@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "name": "Customer Desk",
+  "templateId": "customer-desk",
+  "seed": "seed.json",
+  "missions": "missions.json",
+  "checks": "checks.json",
+  "agent": {
+    "command": [
+      "node",
+      "--env-file-if-exists=.env",
+      "real-agent.mjs"
+    ],
+    "timeoutSec": 180
+  }
+}

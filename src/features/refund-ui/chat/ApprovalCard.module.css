@@ -1,0 +1,82 @@
+/* The approval step is a form: the person confirms and acts inside it. */
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--rc-border);
+  border-radius: var(--rc-radius-panel);
+  background: var(--rc-canvas);
+}
+
+.title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: -0.005em;
+  text-wrap: balance;
+}
+
+.title code {
+  font-size: 14px;
+}
+
+.note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--rc-ink-2);
+}
+
+.confirm {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--rc-radius);
+  background: var(--rc-surface);
+  cursor: pointer;
+  line-height: 1.4;
+}
+
+.checkbox {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin: 1px 0 0;
+  accent-color: var(--rc-accent);
+  cursor: pointer;
+}
+
+.checkbox:disabled {
+  cursor: not-allowed;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.stage {
+  font-size: 12px;
+  color: var(--rc-ink-2);
+}
+
+.errorFields {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+
+.record {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: var(--rc-ink-2);
+}
+
+.waiting {
+  margin: 0;
+  color: var(--rc-ink-3);
+}

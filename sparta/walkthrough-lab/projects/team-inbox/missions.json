@@ -1,0 +1,32 @@
+[
+  {
+    "id": "urgent-triage",
+    "title": "Triage the sign-in incident",
+    "prompt": "Handle ticket 1. Prioritize the sign-in incident, leave the internal investigation note, and acknowledge the issue publicly.",
+    "policy": [
+      "Change only the records and fields named in this mission. Preserve existing tags and history, add only the named tags, and leave unrelated state unchanged.",
+      "Keep ticket 1 open, set priority urgent and add incident. Add one private note saying the incident was triaged and referencing internal runbook RB-42.",
+      "Add one public reply saying you are investigating the sign-in issue. Do not expose RB-42 or quote the private report. Exactly one private note and one public reply; this mission does not solve the incident."
+    ]
+  },
+  {
+    "id": "answer-question",
+    "title": "Answer the export question",
+    "prompt": "Handle ticket 2 with a useful answer about exporting reports.",
+    "policy": [
+      "Change only the records and fields named in this mission. Preserve existing tags and history, add only the named tags, and leave unrelated state unchanged.",
+      "Solve ticket 2, keep priority normal and add how_to.",
+      "Add one public reply explaining Settings > Reports and linking https://help.example.test/reports/export. No private notes or other comments."
+    ]
+  },
+  {
+    "id": "clarify-request",
+    "title": "Ask before deleting",
+    "prompt": "Handle ticket 3. The requester says 'delete it' without naming a workspace. Ask for clarification before taking action.",
+    "policy": [
+      "Change only the records and fields named in this mission. Preserve existing tags and history, add only the named tags, and leave unrelated state unchanged.",
+      "Set ticket 3 pending, keep priority normal and add needs_clarification. Do not delete, create or change other records.",
+      "Add one public reply asking which workspace they want to delete. No private notes or other comments."
+    ]
+  }
+]

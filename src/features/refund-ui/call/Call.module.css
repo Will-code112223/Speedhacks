@@ -1,0 +1,417 @@
+/* ------------------------------------------------------------------------- */
+/* Call screen: a phone's in-call view inside a 360px column                  */
+/* ------------------------------------------------------------------------- */
+
+.screen {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.decisionSlot {
+  flex: none;
+  padding: 16px 16px 0;
+}
+
+.identity {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 24px 16px 8px;
+  text-align: center;
+}
+
+.identityTop {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 22px;
+  margin-bottom: 4px;
+}
+
+.eyebrow,
+.sectionLabel {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--rc-ink-3);
+}
+
+.name {
+  margin: 0;
+  max-width: 100%;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+}
+
+.phone {
+  color: var(--rc-ink-2);
+}
+
+.phone code {
+  font-size: 13px;
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 0;
+  font-weight: 500;
+  color: var(--rc-ink);
+}
+
+.statusDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--rc-ink-3);
+}
+
+.dot_neutral {
+  background: var(--rc-ink-3);
+}
+
+.dot_live {
+  background: var(--rc-ink);
+  animation: beat 1.2s ease-in-out 4;
+}
+
+.dot_accent {
+  background: var(--rc-accent);
+}
+
+.dot_warning {
+  background: var(--rc-warning);
+}
+
+.dot_danger {
+  background: var(--rc-danger);
+}
+
+.clock {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 16px 4px;
+}
+
+/* The one memorable detail: a large tabular timer that never jitters. */
+.timer {
+  font-family: var(--rc-mono);
+  font-size: 28px;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+  color: var(--rc-ink);
+}
+
+.timerIdle {
+  color: var(--rc-ink-3);
+}
+
+.hold {
+  font-size: 12px;
+  color: var(--rc-ink-2);
+}
+
+.holdValue {
+  font-family: var(--rc-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.counterpartRow {
+  flex: none;
+  display: flex;
+  justify-content: center;
+  min-height: 24px;
+  padding: 8px 16px 16px;
+  border-bottom: 1px solid var(--rc-border);
+}
+
+.badgeWrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid var(--rc-border-strong);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: default;
+}
+
+/* Human: neutral ink. Automated agent: the accent tint, paired with its text label. */
+.badgeHuman {
+  color: var(--rc-ink);
+  background: var(--rc-canvas);
+}
+
+.badgeAgent {
+  color: var(--rc-accent);
+  background: var(--rc-accent-tint);
+  border-color: var(--rc-accent);
+}
+
+.badgeNeutral {
+  color: var(--rc-ink-2);
+  background: var(--rc-canvas);
+  border-color: var(--rc-border);
+}
+
+.badgeDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.badgePulse .badgeDot {
+  animation: beat 1.2s ease-in-out 4;
+}
+
+.tooltip {
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 6px);
+  z-index: 5;
+  padding: 4px 8px;
+  border-radius: var(--rc-radius);
+  background: var(--rc-ink);
+  color: var(--rc-canvas);
+  font-size: 12px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, -2px);
+  transition: opacity var(--rc-fast) var(--rc-ease), transform var(--rc-fast) var(--rc-ease);
+}
+
+.badgeWrap:hover .tooltip,
+.badge:focus-visible + .tooltip {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.liveError {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 16px;
+  font-size: 12px;
+  color: var(--rc-warning);
+  background: var(--rc-warning-tint);
+}
+
+.liveError > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.liveError > button {
+  flex: none;
+}
+
+.notes,
+.transcript {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px 16px 8px;
+}
+
+.noteList {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.note {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 8px;
+  line-height: 1.5;
+  animation: noteIn var(--rc-default) var(--rc-ease);
+}
+
+.noteTime {
+  font-family: var(--rc-mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--rc-ink-3);
+  padding-top: 1px;
+}
+
+.noteText {
+  color: var(--rc-ink);
+  overflow-wrap: anywhere;
+}
+
+.transcript figure,
+.transcript pre {
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.muted {
+  margin: 0;
+  color: var(--rc-ink-3);
+}
+
+.controls {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  padding: 12px 16px 16px;
+  border-top: 1px solid var(--rc-border);
+}
+
+.controls > button {
+  width: 100%;
+  height: 36px;
+}
+
+.controlNote {
+  margin: 0;
+  font-size: 12px;
+  color: var(--rc-ink-2);
+  text-align: center;
+}
+
+.controlError {
+  margin: 0;
+  font-size: 12px;
+  color: var(--rc-danger);
+  text-align: center;
+}
+
+/* ------------------------------------------------------------------------- */
+/* Call bar: shown at the top of the chat when the call is a closed sheet     */
+/* ------------------------------------------------------------------------- */
+
+.callBar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 6px 16px 6px 24px;
+  border-bottom: 1px solid var(--rc-border);
+  background: var(--rc-surface);
+}
+
+.callBarAttention {
+  background: var(--rc-warning-tint);
+}
+
+.callBarIcon {
+  display: inline-flex;
+  color: var(--rc-ink-2);
+}
+
+.callBarAttention .callBarIcon,
+.callBarAttention .callBarStatus {
+  color: var(--rc-warning);
+}
+
+.callBarText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.3;
+}
+
+.callBarStatus {
+  font-weight: 600;
+  color: var(--rc-ink);
+}
+
+.callBarName {
+  font-size: 12px;
+  color: var(--rc-ink-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.callBarTimer {
+  margin-left: auto;
+  font-family: var(--rc-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--rc-ink);
+}
+
+.callBar > button {
+  flex: none;
+}
+
+.callBarText + button {
+  margin-left: auto;
+}
+
+@keyframes beat {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@keyframes noteIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dot_live,
+  .badgePulse .badgeDot,
+  .note {
+    animation: none;
+  }
+}
+
+@media (max-width: 767px) {
+  .callBar {
+    padding-left: 16px;
+  }
+}

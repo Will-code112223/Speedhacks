@@ -1,0 +1,7 @@
+.env
+.env.*
+!.env.example
+node_modules/
+.worlds/
+.worlds-dashboard/
+/.worlds-dashboard/

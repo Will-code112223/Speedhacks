@@ -1,0 +1,308 @@
+.column {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.scroller {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* The column fills its grid track; messages and cards keep a 720px reading width inside it. */
+.thread {
+  box-sizing: content-box;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 24px 24px 20px;
+}
+
+.jump {
+  position: sticky;
+  bottom: 12px;
+  height: 0;
+  display: flex;
+  justify-content: center;
+}
+
+.jump > button {
+  transform: translateY(-100%);
+}
+
+/* ------------------------------------------------------------------------- */
+/* Thread                                                                     */
+/* ------------------------------------------------------------------------- */
+
+.items {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+}
+
+.items > li {
+  margin-top: 20px;
+  min-width: 0;
+  animation: itemIn var(--rc-default) var(--rc-ease);
+}
+
+.items > li:first-child {
+  margin-top: 0;
+}
+
+/* Call lines sit close together; consecutive assistant blocks read as one reply. */
+.items > .event + .event,
+.items > .event + .decision,
+.items > .decision + .event,
+.items > .grouped {
+  margin-top: 8px;
+}
+
+.items > .grouped {
+  margin-top: 12px;
+}
+
+.meta {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.who {
+  font-weight: 600;
+  color: var(--rc-ink);
+}
+
+.time {
+  font-family: var(--rc-mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--rc-ink-3);
+  white-space: nowrap;
+}
+
+.user {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.bubble {
+  max-width: min(85%, 560px);
+  padding: 8px 12px;
+  border-radius: var(--rc-radius-panel);
+  background: var(--rc-surface);
+  color: var(--rc-ink);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.attachments {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px 12px;
+  max-width: 85%;
+  font-size: 12px;
+  color: var(--rc-ink-2);
+}
+
+.attachments li {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.attachments li span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 220px;
+}
+
+.assistant {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.text {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.event {
+  min-width: 0;
+}
+
+.eventLine {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 20px;
+  font-size: 12px;
+  color: var(--rc-ink-2);
+}
+
+.eventText {
+  min-width: 0;
+}
+
+.eventLine .time {
+  margin-left: auto;
+}
+
+.dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--rc-ink-3);
+}
+
+.dotNeutral {
+  background: var(--rc-ink-3);
+}
+
+.dotAccent {
+  background: var(--rc-accent);
+}
+
+.dotWarning {
+  background: var(--rc-warning);
+}
+
+.dotDanger {
+  background: var(--rc-danger);
+}
+
+.decision {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ------------------------------------------------------------------------- */
+/* Empty state                                                                */
+/* ------------------------------------------------------------------------- */
+
+.empty {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 40px 0 16px;
+}
+
+.emptyTitle {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  line-height: 1.25;
+  text-wrap: balance;
+}
+
+.emptyText {
+  margin: 8px 0 0;
+  color: var(--rc-ink-2);
+  text-wrap: pretty;
+}
+
+.emptyNote {
+  margin: 12px 0 0;
+  font-size: 12px;
+  color: var(--rc-ink-3);
+}
+
+.examples {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--rc-border);
+}
+
+.examplesLabel {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--rc-ink-3);
+}
+
+.exampleList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+}
+
+.example {
+  appearance: none;
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--rc-border);
+  border-radius: var(--rc-radius);
+  background: var(--rc-canvas);
+  color: var(--rc-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--rc-fast) var(--rc-ease), background-color var(--rc-fast) var(--rc-ease);
+}
+
+.example:hover {
+  border-color: var(--rc-ink-3);
+  background: var(--rc-surface);
+}
+
+@keyframes itemIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .items > li {
+    animation: none;
+  }
+}
+
+@media (max-width: 767px) {
+  .thread {
+    padding: 16px 16px 16px;
+  }
+  .empty {
+    padding-top: 24px;
+  }
+  .bubble {
+    max-width: 92%;
+  }
+}

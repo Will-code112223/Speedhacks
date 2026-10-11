@@ -1,0 +1,191 @@
+{
+  "name": "starter-customer-desk",
+  "version": 1,
+  "epoch": 1789516800,
+  "clock_mode": "manual",
+  "auto_tick_seconds": 1,
+  "data": {
+    "customers": [
+      {
+        "id": "cus_desk_ada",
+        "name": "Ada Lin",
+        "email": "ada@example.test",
+        "description": null,
+        "phone": null,
+        "balance": 0,
+        "metadata": {},
+        "created_offset": 0
+      },
+      {
+        "id": "cus_desk_jules",
+        "name": "Jules Rivera",
+        "email": "jules@example.test",
+        "description": null,
+        "phone": null,
+        "balance": 0,
+        "metadata": {},
+        "created_offset": 0
+      },
+      {
+        "id": "cus_desk_alex_personal",
+        "name": "Alex Personal",
+        "email": "alex@example.test",
+        "description": null,
+        "phone": null,
+        "balance": 0,
+        "metadata": {},
+        "created_offset": 0
+      },
+      {
+        "id": "cus_desk_alex_studio",
+        "name": "Alex Studio",
+        "email": "alex@example.test",
+        "description": null,
+        "phone": null,
+        "balance": 0,
+        "metadata": {},
+        "created_offset": 0
+      }
+    ],
+    "products": [
+      {
+        "id": "prod_desk_monthly",
+        "name": "Workspace monthly",
+        "description": null,
+        "active": true,
+        "metadata": {}
+      }
+    ],
+    "prices": [
+      {
+        "id": "price_desk_monthly",
+        "product": "prod_desk_monthly",
+        "unit_amount": 2900,
+        "currency": "usd",
+        "nickname": null,
+        "recurring": {
+          "interval": "month",
+          "interval_count": 1
+        },
+        "active": true,
+        "metadata": {}
+      }
+    ],
+    "invoices": [
+      {
+        "id": "in_desk_ada",
+        "customer": "cus_desk_ada",
+        "currency": "usd",
+        "status": "paid",
+        "lines": [
+          {
+            "description": "Workspace monthly",
+            "amount": 2900,
+            "quantity": 1,
+            "price": "price_desk_monthly"
+          }
+        ],
+        "charges": [
+          {
+            "id": "ch_desk_original",
+            "status": "succeeded"
+          },
+          {
+            "id": "ch_desk_duplicate",
+            "status": "succeeded"
+          }
+        ],
+        "created_offset": 0,
+        "metadata": {}
+      },
+      {
+        "id": "in_desk_jules",
+        "customer": "cus_desk_jules",
+        "currency": "usd",
+        "status": "paid",
+        "lines": [
+          {
+            "description": "Workspace monthly",
+            "amount": 2900,
+            "quantity": 1,
+            "price": "price_desk_monthly"
+          }
+        ],
+        "charges": [
+          {
+            "id": "ch_desk_jules",
+            "status": "succeeded"
+          }
+        ],
+        "created_offset": 0,
+        "metadata": {}
+      }
+    ],
+    "subscriptions": [
+      {
+        "id": "sub_desk_ada",
+        "customer": "cus_desk_ada",
+        "price": "price_desk_monthly",
+        "quantity": 1,
+        "status": "active",
+        "cancel_at_period_end": false,
+        "created_offset": 0,
+        "metadata": {}
+      },
+      {
+        "id": "sub_desk_jules",
+        "customer": "cus_desk_jules",
+        "price": "price_desk_monthly",
+        "quantity": 1,
+        "status": "active",
+        "cancel_at_period_end": false,
+        "created_offset": 0,
+        "metadata": {}
+      }
+    ],
+    "tickets": [
+      {
+        "subject": "Two receipts for one month",
+        "body": "I paid invoice in_desk_ada once but have two receipts: ch_desk_original and the extra ch_desk_duplicate. Please return the extra $29.00.",
+        "status": "open",
+        "priority": "normal",
+        "requester": {
+          "name": "Ada Lin",
+          "email": "ada@example.test"
+        },
+        "tags": [
+          "billing"
+        ],
+        "created_offset": 0
+      },
+      {
+        "subject": "Stop my next renewal",
+        "body": "Please cancel sub_desk_jules at renewal. I still need the rest of the period I paid for, and I am not asking for a refund.",
+        "status": "open",
+        "priority": "normal",
+        "requester": {
+          "name": "Jules Rivera",
+          "email": "jules@example.test"
+        },
+        "tags": [
+          "billing"
+        ],
+        "created_offset": 0
+      },
+      {
+        "subject": "Refund my last payment",
+        "body": "Please refund my last payment. My email is alex@example.test. I do not have an invoice number with me.",
+        "status": "open",
+        "priority": "normal",
+        "requester": {
+          "name": "Alex",
+          "email": "alex@example.test"
+        },
+        "tags": [
+          "billing"
+        ],
+        "created_offset": 0
+      }
+    ]
+  }
+}

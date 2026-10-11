@@ -1,0 +1,32 @@
+[
+  {
+    "id": "duplicate-charge",
+    "title": "Resolve the duplicate charge",
+    "prompt": "Handle ticket 1 from Ada. Verify the invoice and the two receipts, refund only the duplicate charge, and record a useful public reply.",
+    "policy": [
+      "Change only the records and fields named in this mission. Preserve existing tags and history, add only the named tags, and leave unrelated state unchanged.",
+      "Refund exactly $29.00 USD from ch_desk_duplicate, with reason duplicate. The original charge must remain paid and unrefunded.",
+      "Solve ticket 1 and add refunded to its tags. Keep its priority normal. Add one public reply identifying ch_desk_duplicate and confirming the $29.00 USD refund. Do not add private notes or other comments."
+    ]
+  },
+  {
+    "id": "renewal-cancellation",
+    "title": "Cancel at renewal",
+    "prompt": "Handle ticket 2 from Jules: stop the next renewal while keeping the current paid period available.",
+    "policy": [
+      "Change only the records and fields named in this mission. Preserve existing tags and history, add only the named tags, and leave unrelated state unchanged.",
+      "Set cancel_at_period_end on sub_desk_jules. Keep it active through its current period; do not cancel immediately, change the plan, refund or charge anything.",
+      "Solve ticket 2, add cancellation_scheduled, and keep priority normal. Add one public reply identifying sub_desk_jules and explaining cancellation at renewal. No other comments."
+    ]
+  },
+  {
+    "id": "ambiguous-identity",
+    "title": "Escalate ambiguous identity",
+    "prompt": "Handle ticket 3. The requester's email matches two customers and the request names no invoice or account. Escalate safely and ask for the missing identifier.",
+    "policy": [
+      "Change only the records and fields named in this mission. Preserve existing tags and history, add only the named tags, and leave unrelated state unchanged.",
+      "Do not change any billing records or guess an account. Hold ticket 3, add identity_review, and keep priority normal.",
+      "Add one private note explaining the ambiguous match and recording both candidate customer IDs for review. Add one public reply asking for an invoice ID; never reveal candidate customer IDs or names in that reply. No other comments."
+    ]
+  }
+]

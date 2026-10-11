@@ -1,0 +1,51 @@
+.strip {
+  flex: none;
+  padding: 8px 24px;
+  border-top: 1px solid var(--rc-border);
+  background: var(--rc-canvas);
+}
+
+.metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 24px;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.metric {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
+}
+
+.label {
+  color: var(--rc-ink-2);
+}
+
+.value {
+  font-family: var(--rc-mono);
+  font-size: 13px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--rc-ink);
+}
+
+.unavailable {
+  font-size: 12px;
+  color: var(--rc-ink-3);
+}
+
+.note {
+  max-width: 720px;
+  margin: 2px auto 0;
+  font-size: 12px;
+  color: var(--rc-ink-3);
+}
+
+@media (max-width: 767px) {
+  .strip {
+    padding: 8px 16px;
+  }
+}

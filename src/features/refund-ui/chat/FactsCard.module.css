@@ -1,0 +1,187 @@
+/* The facts card is an interactive container: the person edits inside it. */
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 16px 12px;
+  border: 1px solid var(--rc-border);
+  border-radius: var(--rc-radius-panel);
+  background: var(--rc-canvas);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 22px;
+}
+
+.headerMeta {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.eyebrow {
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--rc-ink-3);
+}
+
+.revision {
+  font-size: 12px;
+  color: var(--rc-ink-3);
+  white-space: nowrap;
+}
+
+.missing {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: var(--rc-radius);
+  background: var(--rc-warning-tint);
+  color: var(--rc-warning);
+}
+
+.missingTitle {
+  font-weight: 600;
+}
+
+.missingItems {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  color: var(--rc-ink);
+}
+
+.missingItems li::before {
+  content: "";
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  margin: 0 6px 2px 0;
+  border-radius: 50%;
+  background: var(--rc-warning);
+  vertical-align: middle;
+}
+
+.missingNote {
+  font-size: 12px;
+  color: var(--rc-ink-2);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 16px;
+}
+
+.wide {
+  grid-column: 1 / -1;
+}
+
+.numeric input {
+  font-variant-numeric: tabular-nums;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--rc-border);
+}
+
+.saveStatus {
+  margin-right: auto;
+  font-size: 12px;
+  color: var(--rc-ink-3);
+}
+
+.locked {
+  margin: 0;
+  font-size: 12px;
+  color: var(--rc-ink-3);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 10px;
+  border-top: 1px solid var(--rc-border);
+}
+
+.evidence {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 4px;
+}
+
+.evidence li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.evidenceName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.evidenceKind {
+  flex: none;
+  font-size: 12px;
+  color: var(--rc-ink-3);
+}
+
+.draft {
+  padding: 12px 14px;
+  border-radius: var(--rc-radius);
+  background: var(--rc-surface);
+  border: 1px solid var(--rc-border);
+}
+
+.draftSubject {
+  margin: 0 0 8px;
+  font-weight: 600;
+}
+
+.draftBody {
+  margin: 0;
+  white-space: pre-wrap;
+  line-height: 1.6;
+  color: var(--rc-ink);
+}
+
+.muted {
+  margin: 0;
+  color: var(--rc-ink-3);
+}
+
+@media (max-width: 560px) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .card {
+    padding: 12px;
+  }
+}

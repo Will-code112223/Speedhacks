@@ -1,0 +1,100 @@
+FRONTEND HANDOFF — teammate 1 (Recourse UI)
+Branch: codex/frontend
+Base: db5f311 (T2 scaffold and contracts). No teammate branch is merged into this branch.
+Commit: see git log -1 --format=%H -- src/features/refund-ui docs/handoffs/frontend.txt
+
+WHAT IT IS
+A chat-first assistant. The user uploads insurance plans once, types a request in plain
+language, approves the call in one confirmation step, then watches a phone-call screen:
+who is being called, elapsed and hold time, whether the agent is talking to a person or
+an automated agent, a step-in control, and approval prompts that arrive during the call.
+The outcome card shows decision, reference, next action and quote, with approval and
+payment as separate rows. No tool registry, mandate card or handshake receipt on screen.
+
+MOUNT (T2, one line already applied on this branch in src/app/page.tsx)
+  import RefundApp from "@/features/refund-ui/RefundApp";
+  export default function Page() {
+    const mode = process.env.REFUND_MODE === "live" ? "live" : "simulated";
+    return <RefundApp serverMode={mode} />;
+  }
+RefundApp is "use client" and self-contained: CSS modules only, tokens on its own wrapper,
+no global CSS edits, no new dependencies. It reads only `serverMode`.
+
+API MODE
+Default is the real backend over same-origin fetch with credentials: "same-origin".
+Fixture mode is explicit: open /?api=fixture. It is labelled "Fixture" in the header and
+every case and call it produces has mode "simulated". A failed network request never
+substitutes fixture data; it shows an error with a retry.
+Fixture scenarios: insurance_claim (default), duplicate_charge ($49.99), needs_evidence,
+uncertain_dispatch, call_complete_unconfirmed. Pick one in the header or let the chat
+infer it from the message ("claim", "duplicate", "no receipt", "uncertain", "confirm").
+
+CONTRACT V1 USAGE
+POST /api/cases multipart (summary, files, optional text fields) -> facts card.
+PATCH /api/cases/:id {expectedRevision, changes} on every edit; 409 REVISION_CONFLICT
+shows a banner and reloads, never overwrites.
+POST /api/cases/:id/authorize {expectedRevision}, then POST /api/cases/:id/calls
+{authorizationId, requestId}; requestId is a UUID kept in sessionStorage per
+case+authorization so a retry reuses it; the button is disabled while in flight.
+GET /api/cases/:id polled every 2.5 s only while status is calling or a call is active
+or dispatch_unknown; stops on terminal state and unmount. Server state wins.
+GET /api/cases/:id/packet downloaded as a blob.
+Errors by code: 400, 401/403 unauthorized, 404, 409 (revision, authorization, call in
+progress), 422 lists fields, 503 live configuration missing, network unreachable.
+dispatch_unknown renders an explicit warning and never offers a redial.
+
+V2 PROPOSAL (additive, feature detected; nothing in V1 changes)
+The call screen needs data V1 does not carry. The http client probes GET /api/capabilities
+once; absent (404) means all false and the UI degrades to V1 state plus transcript.
+  GET  /api/capabilities -> { liveCall, stepIn, decisions }
+  GET  /api/cases/:id/calls/:callId/live -> LiveCallV2
+  POST /api/cases/:id/calls/:callId/join -> LiveCallV2 (userJoined true)
+  POST /api/cases/:id/calls/:callId/decisions/:decisionId  body { optionId } -> LiveCallV2
+LiveCallV2: callId, caseId, calling{name,phone}, phase (dialing | ringing |
+navigating_menu | on_hold | talking | waiting_for_user | user_joined | ended),
+counterpart (human | agent | unknown), counterpartConfidence 0..1, startedAt, endedAt,
+holdSeconds, notes[{at,text}], pendingDecision {id, question, defaultOptionId,
+options[{id,label,tone}], expiresAt} | null, userJoined, updatedAt.
+Exact TypeScript: src/features/refund-ui/api/types.ts. Suggested source on the backend:
+Context MCP tools the voice agent calls mid-call (set_counterpart, report_progress,
+request_user_decision), see docs/SPEC.md section 6 and T3's context-mcp-design.txt.
+
+METRICS
+Active user time is measured in the browser: seconds the document is focused with a
+pointer or key event in the last 10 s. Agent phone time is the live call timer. They are
+shown side by side; no savings figure is computed anywhere.
+
+RUN
+  npm install && npm run dev        # http://localhost:3000/?api=fixture for the fixture flow
+  npx vitest run src/features/refund-ui
+  npx tsc --noEmit -p tsconfig.json 2>&1 | grep src/features/refund-ui   # expect no lines
+
+TESTS
+(filled in below after the build)
+
+KNOWN LIMITS AND REQUESTS
+- Request for T2: vitest.config.ts on codex/case-engine includes only tests/**/*.test.ts; add
+  "src/**/*.test.ts" (or "src/**/__tests__/**/*.test.ts") so the frontend's api tests run.
+- Observation for T2 (not edited, please verify): src/server/cases/service.ts deriveStatus
+  appears to count completed calls from any authorization, so after an edit and a fresh
+  authorization a case can show the previous decision instead of "authorized". The frontend
+  fixture counts only calls under the current authorization.
+- No chat endpoint in V1: follow-up messages after a case exists stay local with a
+  canned acknowledgement. Proposal for later: POST /api/cases/:id/messages.
+- No plan endpoint in V1: plans live in the browser (IndexedDB) and are attached as
+  files on case creation. Proposal: POST /api/plans.
+- Dependency/env requests: none.
+- Insurer knowledge base route (T2; pushed on codex/case-engine 1a0f523 and codex/voice
+  f8a65a4, Oct 11): GET /api/insurers -> { insurers: InsurerSummary[] }; GET
+  /api/insurers?name=<text> -> { insurer: InsurerLookup }, 404 NOT_FOUND when unknown or
+  ambiguous, 400 BAD_REQUEST over 200 chars. Reference data, no session cookie. The route is not
+  on this branch; run the frontend against codex/voice to exercise it. The fixture uses the
+  fictional Northwind Mutual so no real line is ever shown or dialed in fixture mode.
+- Integration branch (T2 and T3 note in Alike, Oct 11 20:24Z): codex/voice carries T2 backend
+  43d099d plus the T3 Dial adapter; no live call and no main merge has happened. Nothing from
+  codex/voice is merged into codex/frontend.
+- Verified against the fixture mode only. The http client is written to contract V1 and
+  handles the backend's newer codes (MODE_MISMATCH 409, PAYLOAD_TOO_LARGE 413) generically;
+  an end-to-end run against codex/case-engine is the first integration step for T2.
+- Repo-level additions on this branch: .agents/skills/refero-design (design craft
+  references used for the UI), .claude/skills symlink, skills-lock.json, docs/SPEC.md.

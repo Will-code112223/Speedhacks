@@ -1,0 +1,20 @@
+{
+  "duplicate-charge": {
+    "builtin": {
+      "templateId": "customer-desk",
+      "missionId": "duplicate-charge"
+    }
+  },
+  "renewal-cancellation": {
+    "builtin": {
+      "templateId": "customer-desk",
+      "missionId": "renewal-cancellation"
+    }
+  },
+  "ambiguous-identity": {
+    "builtin": {
+      "templateId": "customer-desk",
+      "missionId": "ambiguous-identity"
+    }
+  }
+}

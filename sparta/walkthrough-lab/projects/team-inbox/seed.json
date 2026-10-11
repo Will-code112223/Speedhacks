@@ -1,0 +1,59 @@
+{
+  "name": "starter-team-inbox",
+  "version": 1,
+  "epoch": 1789516800,
+  "clock_mode": "manual",
+  "auto_tick_seconds": 1,
+  "data": {
+    "customers": [],
+    "products": [],
+    "prices": [],
+    "invoices": [],
+    "subscriptions": [],
+    "tickets": [
+      {
+        "subject": "Sign-in incident report",
+        "first_comment_public": false,
+        "body": "Private report: customers cannot sign in. Internal runbook code RB-42. Triage first; engineering has not confirmed the cause.",
+        "status": "open",
+        "priority": "normal",
+        "requester": {
+          "name": "Support Team",
+          "email": "support@example.test"
+        },
+        "tags": [
+          "inbound"
+        ],
+        "created_offset": 0
+      },
+      {
+        "subject": "Where is report export?",
+        "body": "Where can I export my reports? I need the steps and the help page.",
+        "status": "open",
+        "priority": "normal",
+        "requester": {
+          "name": "Morgan",
+          "email": "morgan@example.test"
+        },
+        "tags": [
+          "question"
+        ],
+        "created_offset": 0
+      },
+      {
+        "subject": "Please delete it",
+        "body": "Can you delete it for me?",
+        "status": "open",
+        "priority": "normal",
+        "requester": {
+          "name": "Casey",
+          "email": "casey@example.test"
+        },
+        "tags": [
+          "inbound"
+        ],
+        "created_offset": 0
+      }
+    ]
+  }
+}

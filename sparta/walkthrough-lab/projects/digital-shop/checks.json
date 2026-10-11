@@ -1,0 +1,20 @@
+{
+  "design-kit": {
+    "builtin": {
+      "templateId": "digital-shop",
+      "missionId": "design-kit"
+    }
+  },
+  "team-licenses": {
+    "builtin": {
+      "templateId": "digital-shop",
+      "missionId": "team-licenses"
+    }
+  },
+  "audio-bundle": {
+    "builtin": {
+      "templateId": "digital-shop",
+      "missionId": "audio-bundle"
+    }
+  }
+}

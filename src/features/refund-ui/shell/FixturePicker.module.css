@@ -1,0 +1,93 @@
+.picker {
+  display: flex;
+  min-width: 0;
+}
+
+.inline {
+  align-items: center;
+  gap: 12px;
+}
+
+.stacked {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.title {
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--rc-ink-3);
+}
+
+.inline .select {
+  width: 188px;
+}
+
+.stacked .select {
+  display: flex;
+  width: 100%;
+}
+
+.toggles {
+  display: flex;
+  gap: 4px 12px;
+}
+
+.stacked .toggles {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 4px;
+  margin: 0 -4px;
+  border-radius: 4px;
+  font-size: 12px;
+  color: var(--rc-ink-2);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color var(--rc-fast) var(--rc-ease);
+}
+
+.toggle:hover {
+  color: var(--rc-ink);
+}
+
+.toggle input {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  accent-color: var(--rc-accent);
+  cursor: pointer;
+}
+
+/* The ring wraps the label, so the 14px box is not covered by it. */
+.toggle input:focus-visible {
+  outline: none;
+}
+
+.toggle:has(input:focus-visible) {
+  outline: 2px solid var(--rc-accent);
+  outline-offset: 0;
+}
+
+.note {
+  font-size: 12px;
+  color: var(--rc-ink-3);
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}

@@ -1,0 +1,35 @@
+[
+  {
+    "id": "design-kit",
+    "title": "Build a design kit",
+    "prompt": "Mira (cus_shop_mira) wants one Vector Icons pack and one Slide Templates pack for a presentation, with a $35.00 USD budget. No audio or other goods.",
+    "policy": [
+      "Change only the records and fields named in this mission. Preserve existing tags and history, add only the named tags, and leave unrelated state unchanged.",
+      "Read the catalog and select active, existing one-time prices matching the requested goods. Use USD and the requested quantities; do not create products or prices, or use bare amount items.",
+      "Select everything before writing. Create one invoice item per selected price, then create exactly one draft invoice for cus_shop_mira collecting all selected items. Leave it unpaid and unfinalized; do not attempt charges, payment intents, finalization or payment, even if rejected. No pending items or other mutations.",
+      "This API does not edit draft invoices or invoice items. Reset the world before making another proposal."
+    ]
+  },
+  {
+    "id": "team-licenses",
+    "title": "Equip three teammates",
+    "prompt": "Mira (cus_shop_mira) wants three individual licenses for Design Tools, with a $50.00 USD budget. Choose the one-time license, with no other goods or recurring plan.",
+    "policy": [
+      "Change only the records and fields named in this mission. Preserve existing tags and history, add only the named tags, and leave unrelated state unchanged.",
+      "Read the catalog and select active, existing one-time prices matching the requested goods. Use USD and the requested quantities; do not create products or prices, or use bare amount items.",
+      "Select everything before writing. Create one invoice item per selected price, then create exactly one draft invoice for cus_shop_mira collecting all selected items. Leave it unpaid and unfinalized; do not attempt charges, payment intents, finalization or payment, even if rejected. No pending items or other mutations.",
+      "This API does not edit draft invoices or invoice items. Reset the world before making another proposal."
+    ]
+  },
+  {
+    "id": "audio-bundle",
+    "title": "Pick a soundtrack bundle",
+    "prompt": "Mira (cus_shop_mira) wants one Sound Effects pack and one Music Loops pack, with a $30.00 USD budget. No visual assets or other goods.",
+    "policy": [
+      "Change only the records and fields named in this mission. Preserve existing tags and history, add only the named tags, and leave unrelated state unchanged.",
+      "Read the catalog and select active, existing one-time prices matching the requested goods. Use USD and the requested quantities; do not create products or prices, or use bare amount items.",
+      "Select everything before writing. Create one invoice item per selected price, then create exactly one draft invoice for cus_shop_mira collecting all selected items. Leave it unpaid and unfinalized; do not attempt charges, payment intents, finalization or payment, even if rejected. No pending items or other mutations.",
+      "This API does not edit draft invoices or invoice items. Reset the world before making another proposal."
+    ]
+  }
+]
