@@ -98,6 +98,22 @@ ERROR CODES (ApiError.error.code)
 422 MISSING_REQUIRED_FACTS (fields) · 503 LIVE_CONFIGURATION_MISSING (fields = env names) | PROVIDER_UNAVAILABLE ·
 401 INVALID_WEBHOOK (webhook route only) · 500 INTERNAL
 
+ADDITIVE ROUTES (not in V1; safe to ignore)
+- GET /api/capabilities -> { liveCall: false, stepIn: false, decisions: false }. No session. The frontend's V2 probe
+  (frontend.txt "V2 PROPOSAL"); explicit false is the honest V1 answer, so the call screen degrades to V1 state.
+- GET /api/cases/:id/history -> { history: HistoryCheck | null, current: boolean }. Session-bound like GET /api/cases/:id
+  (404 for an unknown or foreign case). The stored pre-authorization transaction-history check (Keewano or fixture;
+  revision, checkedAt, source, status, summary, matches[], closestGapMinutes); current=false once the facts moved past
+  it (GET /api/cases/:id re-checks on read). Does not run a check itself.
+- GET /api/insights/merchant?name=<merchant> -> { available: true, merchant, source, cases, approved, denied,
+  needsInformation, unresolved, approvalRate (approved/(approved+denied), null when nothing decided), lastOutcomeAt }
+  from the cases mirrored into Keewano (one query, last outcome per case, merchant matched like the history check so
+  descriptors count), or { available: false, merchant, error? } when no source exists or the query failed/timed out
+  (KEEWANO_TIMEOUT_MS). Always 200 once the name is valid; 400 BAD_REQUEST when name is missing, blank or > 200 chars.
+  Aggregate reference data, no customer data, so no session cookie. Fixture-backed in simulated mode without a token
+  (same switch as the history check). Port: src/server/cases/insights.ts; Keewano/fixture: src/integrations/keewano/insights.ts.
+  Tests: tests/backend/insights.test.ts.
+
 MODES AND ENVIRONMENT (.env.example)
 - REFUND_MODE=simulated (default): no credentials; case.mode === "simulated"; heuristic extraction; T2's simulated
   voice adapter = T3's createDialAdapter in its live code path against an in-process fake Dial server (injected

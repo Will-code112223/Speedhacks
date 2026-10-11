@@ -40,7 +40,7 @@ Import with `@/contracts/case` and `@/contracts/voice`. Never change V1 silently
 
 ## HTTP API (T2 implements, T1 consumes)
 
-See `team-prompts/00-shared-contract.txt` → "SHARED HTTP API". Routes are under `src/app/api/**` and run on the Node runtime.
+See `team-prompts/00-shared-contract.txt` → "SHARED HTTP API". Routes are under `src/app/api/**` and run on the Node runtime. Three read-only routes outside V1 (`GET /api/capabilities`, `GET /api/cases/:id/history`, `GET /api/insights/merchant?name=`) are listed under "ADDITIVE ROUTES" in `docs/handoffs/backend.txt`.
 
 ## Modes
 
