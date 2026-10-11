@@ -379,19 +379,12 @@ export function SelectField({ id, label, hint, error, children, "aria-describedb
 
 /**
  * Labels data that did not come from a live backend, where the data appears.
- * Fixture data says "Fixture"; simulated cases and calls say "Simulated".
+ * Both browser fixtures and simulated cases retain a compact provenance label.
  */
 export function SourcePill({ fixture, simulated }: { fixture: boolean; simulated: boolean }) {
-  if (fixture) {
+  if (fixture || simulated) {
     return (
-      <Pill tone="warning" title="Scripted data from the in-browser fixture, not a backend">
-        Fixture
-      </Pill>
-    );
-  }
-  if (simulated) {
-    return (
-      <Pill tone="warning" title="The server ran this in simulated mode; no real call was placed">
+      <Pill tone="warning" title="Simulated data; no real call was placed">
         Simulated
       </Pill>
     );

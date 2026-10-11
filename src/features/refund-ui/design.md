@@ -5,6 +5,41 @@ It follows the Refero skill in `.agents/skills/refero-design` with its bundled c
 
 ## October 11 visual refinement
 
+### Compact workspace revision
+
+The latest user revision removes the global mode badge, Graph help and extra graph panels.
+Keep source provenance with actual call results. The graph
+uses a wider 960 × 440 layout, capped at 350px on desktop and 260px on mobile, with pan, zoom, movable nodes and
+keyboard selection. Remove the inspector, connection list and timeline below
+the canvas, including Graph help; this supersedes the earlier inspector decision below.
+
+New case keeps a two-sentence description of Recourse's insurance and refund
+purpose, then three short steps: describe the issue, attach documents, review and
+approve. Three sample requests populate the composer without submitting. Provider logos and real document excerpt tiles supply visual interest.
+The source is the user's explicit request for less text and useful previews.
+
+### Provider library extension
+
+The Plans view reads the existing insurer knowledge-base API. It uses a provider
+picker with locally served official-site marks, sourced in
+`public/insurers/sources.json`, and paper-like resource tiles. Tiles show actual
+knowledge-base excerpts, not invented document screenshots. The existing Palantir
+reference owns crisp borders, monochrome typography and compact information;
+the user's request for browsable documents supplies the preview interaction.
+Provider marks retain their source colors. GEICO's white official mark uses a blue
+backplate for contrast. The name remains visible when any asset fails to load.
+
+| Decision | Source | Role | Reason |
+| --- | --- | --- | --- |
+| One provider picker backed by GET /api/insurers | Existing canonical API; user request | Navigation | All real providers remain selectable without duplicating the knowledge base |
+| Paper tiles contain real excerpts with source dates | User request; Refero craft guidance | Document navigation | Visual interest comes from useful, attributable content |
+| Selected resource preview and optional source opening | Existing contacts/terms source URLs | Reference inspection | No remote page is framed or claimed to be a complete document preview |
+| Separate uploaded-file preview and blank preparation worksheet | User request; canonical data boundaries | User documents | A policy file and a generated worksheet cannot be mistaken for official coverage or a filed claim |
+
+The generated blank TXT is labeled as a Recourse preparation worksheet, never an
+official insurer form. Unknown filing guidance remains unknown. Provider selection
+does not change an authorized destination, policy coverage or case facts.
+
 The user requested a parallel improvement pass against the published frontend at
 602069a, referencing https://optimizedhq.com and https://www.palantir.com.
 The build target is the existing working Recourse UI, not a new marketing site.
@@ -119,6 +154,25 @@ Status words come from the contract and are shown as written, never reworded to 
 Simulated and fixture modes are always labelled where the data appears.
 
 ## Decision ledger
+
+### Activity network correction
+
+The user's requested graph is a spatial node-and-edge network, not numbered cards.
+Keep the existing Palantir-derived monochrome workspace and code-native icons.
+Place the case agent at a branching junction between request, evidence, brief and
+call records. Directed, labeled edges describe relationships in the case snapshot;
+solid lines mean recorded relationships, dashed lines mean pending relationships.
+Historical calls must not attach to the current approval. No animated traffic is
+implied. Use a dotted coordinate canvas, movable circular nodes, pan, zoom, reset,
+keyboard controls and a text inspector. This follows the user's graph correction
+and Refero's craft guidance for visible focus and non-drag interaction alternatives.
+
+| Decision | Source | Role | Why |
+| --- | --- | --- | --- |
+| Spatial branches and circular nodes | User graph correction | Relationship visualization | Makes connections inspectable rather than presenting another card sequence |
+| Fine lines and graphite agent node | Existing reference lock | Canvas and hierarchy | Preserves the current operations workspace |
+| Edge labels and solid/dashed states | Canonical case records | Evidence | Separates available relationships from planned work |
+| Keyboard movement, zoom and reset | Refero craft guidance | Interaction | Keeps the graph usable without dragging |
 
 | Decision | Source | Role | Why |
 | --- | --- | --- | --- |

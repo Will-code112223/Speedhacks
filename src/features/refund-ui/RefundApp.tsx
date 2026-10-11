@@ -15,7 +15,7 @@
 
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import type { Mode } from "../../contracts/case";
-import { BACKEND_SIMULATED_SUFFIXES, detectApiMode } from "./api/client";
+import { detectApiMode } from "./api/client";
 import type { ApiMode } from "./api/types";
 import CallBar from "./call/CallBar";
 import CallScreen from "./call/CallScreen";
@@ -24,58 +24,31 @@ import MetricsStrip from "./metrics/MetricsStrip";
 import PlansManager from "./plans/PlansManager";
 import { usePlans, type PlansController } from "./plans/usePlans";
 import Rail from "./rail/Rail";
-import FixturePicker from "./shell/FixturePicker";
 import { useDocumentTitle, useLocationSearch, useMediaQuery } from "./state/browser";
 import { caseTitle } from "./state/call";
 import type { CaseSessionController } from "./state/controller";
 import { decisionForCallScreen, type CaseSession } from "./state/session";
 import { useCaseSession } from "./state/useCaseSession";
 import { CloseIcon, MenuIcon } from "./ui/icons";
-import { Button, Pill, SkeletonRows, VisuallyHidden } from "./ui/primitives";
+import { Button, SkeletonRows, VisuallyHidden } from "./ui/primitives";
 import styles from "./RefundApp.module.css";
 
 export interface RefundAppProps {
-  /** Server mode from REFUND_MODE, shown in the header. */
+  /** Server mode from REFUND_MODE; individual call records carry their provenance. */
   serverMode: Mode;
 }
 
-export default function RefundApp({ serverMode }: RefundAppProps) {
+export default function RefundApp(_props: RefundAppProps) {
   const search = useLocationSearch();
   const plans = usePlans();
-  if (search === null || plans.status === "loading") return <BootShell serverMode={serverMode} />;
+  if (search === null || plans.status === "loading") return <BootShell />;
   const apiMode = detectApiMode(search, "http");
-  return <Workspace key={apiMode} serverMode={serverMode} apiMode={apiMode} plans={plans} />;
+  return <Workspace key={apiMode} apiMode={apiMode} plans={plans} />;
 }
 
 // ---------------------------------------------------------------------------
 // Header pieces
 // ---------------------------------------------------------------------------
-
-function ServerModePill({ serverMode }: { serverMode: Mode }) {
-  return (
-    <Pill
-      tone={serverMode === "live" ? "success" : "warning"}
-      title={serverMode === "live" ? "The server places real calls" : "The server simulates calls; nothing is dialed"}
-      testId="server-mode-pill"
-    >
-      <VisuallyHidden>Server mode: </VisuallyHidden>
-      {serverMode === "live" ? "Live" : "Simulated"}
-    </Pill>
-  );
-}
-
-function ApiModePill({ apiMode }: { apiMode: ApiMode }) {
-  return (
-    <Pill
-      tone={apiMode === "fixture" ? "warning" : "neutral"}
-      title={apiMode === "fixture" ? "Scripted data from the in-browser fixture, not the server" : "Requests go to this server"}
-      testId="api-mode-pill"
-    >
-      <VisuallyHidden>Data source: </VisuallyHidden>
-      {apiMode === "fixture" ? "Fixture" : "Backend"}
-    </Pill>
-  );
-}
 
 function Wordmark() {
   return (
@@ -85,21 +58,17 @@ function Wordmark() {
         <path d="M1 6V1h5M22 1h5v5M27 22v5h-5M6 27H1v-5" stroke="currentColor" />
       </svg>
       <span className={styles.wordmark}>Recourse</span>
-      <span className={styles.brandLabel}>Claims workspace</span>
     </span>
   );
 }
 
 /** Painted at once on the server and while the browser state loads, so nothing jumps. */
-function BootShell({ serverMode }: { serverMode: Mode }) {
+function BootShell() {
   return (
     <div className={styles.app}>
       <header className={styles.header}>
         <div className={styles.headerInner}>
           <Wordmark />
-          <div className={styles.headerRight}>
-            <ServerModePill serverMode={serverMode} />
-          </div>
         </div>
       </header>
       <div className={styles.boot}>
@@ -112,37 +81,17 @@ function BootShell({ serverMode }: { serverMode: Mode }) {
 }
 
 // ---------------------------------------------------------------------------
-// Simulated server hint
-// ---------------------------------------------------------------------------
-
-const SHORT_RESULTS: Record<string, string> = {
-  "0001": "rejected before dialing",
-  "0002": "dispatch unknown",
-  "0003": "denied",
-  "0004": "needs more information",
-  "0005": "no answer",
-  "0006": "cancelled",
-  "any other": "approved",
-};
-
-/** In simulated mode the server picks the call result from the last four digits of the support phone. */
-const SIMULATED_PHONE_HINT = `Simulated server: the last four digits pick the result. ${BACKEND_SIMULATED_SUFFIXES.map(
-  ({ suffix, description }) => `${suffix} ${SHORT_RESULTS[suffix] ?? description}`,
-).join(", ")}.`;
-
-// ---------------------------------------------------------------------------
 // Workspace
 // ---------------------------------------------------------------------------
 
 type View = "chat" | "plans";
 
 interface WorkspaceProps {
-  serverMode: Mode;
   apiMode: ApiMode;
   plans: PlansController;
 }
 
-function Workspace({ serverMode, apiMode, plans }: WorkspaceProps) {
+function Workspace({ apiMode, plans }: WorkspaceProps) {
   const [view, setView] = useState<View>("chat");
   const onboarding = !plans.onboarded;
   const controller = useCaseSession({ apiMode, plans: plans.plans, measuring: !onboarding && view === "chat" });
@@ -224,27 +173,7 @@ function Workspace({ serverMode, apiMode, plans }: WorkspaceProps) {
   };
 
   const fixture = apiMode === "fixture";
-  const fixturePicker = (layout: "inline" | "stacked") => (
-    <FixturePicker
-      layout={layout}
-      scenario={controller.scenario}
-      settings={controller.fixtureSettings}
-      // The new-case view opens behind the picker; an open rail stays open so both switches can be set.
-      onScenarioChange={(next) => {
-        controller.setScenario(next);
-        setView("chat");
-      }}
-      onSettingsChange={(next) => {
-        controller.setFixtureSettings(next);
-        setView("chat");
-      }}
-    />
-  );
-  const pickerInHeader = fixture && !onboarding && wide;
-  const pickerInRail = fixture && !onboarding && !wide;
-
   const crumb = onboarding ? null : view === "plans" ? "Plans" : active ? caseTitle(caseData, active.summary) : null;
-  const phoneHint = apiMode === "http" && serverMode === "simulated" ? SIMULATED_PHONE_HINT : null;
 
   const callScreen = (headingId?: string) =>
     hasCall && active && caseData && call ? (
@@ -311,13 +240,6 @@ function Workspace({ serverMode, apiMode, plans }: WorkspaceProps) {
               </span>
             </span>
           ) : null}
-          <div className={styles.headerRight}>
-            {pickerInHeader ? (
-              <DemoControls>{fixturePicker("stacked")}</DemoControls>
-            ) : null}
-            <ApiModePill apiMode={apiMode} />
-            {fixture ? <span className={styles.demoNote}>No real calls</span> : <ServerModePill serverMode={serverMode} />}
-          </div>
         </div>
       </header>
 
@@ -342,7 +264,6 @@ function Workspace({ serverMode, apiMode, plans }: WorkspaceProps) {
               onNewCase={startNewCase}
               onSelectCase={selectCase}
               onManagePlans={managePlans}
-              footer={pickerInRail ? fixturePicker("stacked") : null}
             />
           </nav>
           <main className={styles.main} inert={showSheet || railOverlay || undefined}>
@@ -352,7 +273,7 @@ function Workspace({ serverMode, apiMode, plans }: WorkspaceProps) {
               <ChatColumn
                 controller={controller}
                 fixture={fixture}
-                phoneHint={phoneHint}
+                phoneHint={null}
                 planCount={plans.plans.length}
                 callBar={callBar}
                 metrics={metrics}
@@ -383,40 +304,6 @@ function Workspace({ serverMode, apiMode, plans }: WorkspaceProps) {
 // ---------------------------------------------------------------------------
 
 /** The header's demo panel: a disclosure that also closes on Escape and on a pointer press outside it. */
-function DemoControls({ children }: { children: ReactNode }) {
-  const detailsRef = useRef<HTMLDetailsElement>(null);
-  const summaryRef = useRef<HTMLElement>(null);
-  const [open, setOpen] = useState(false);
-
-  useEffect(() => {
-    const details = detailsRef.current;
-    if (!open || !details) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape" || event.defaultPrevented) return;
-      event.preventDefault();
-      details.open = false;
-      summaryRef.current?.focus();
-    };
-    const onPointerDown = (event: PointerEvent) => {
-      if (event.target instanceof Node && details.contains(event.target)) return;
-      details.open = false;
-    };
-    document.addEventListener("keydown", onKeyDown);
-    document.addEventListener("pointerdown", onPointerDown);
-    return () => {
-      document.removeEventListener("keydown", onKeyDown);
-      document.removeEventListener("pointerdown", onPointerDown);
-    };
-  }, [open]);
-
-  return (
-    <details ref={detailsRef} className={styles.demoSettings} onToggle={(event) => setOpen(event.currentTarget.open)}>
-      <summary ref={summaryRef}>Demo controls</summary>
-      <div className={styles.demoPopover}>{children}</div>
-    </details>
-  );
-}
-
 function CallSheet({ titleId, onClose, children }: { titleId: string; onClose: () => void; children: ReactNode }) {
   const panelRef = useRef<HTMLDivElement | null>(null);
 

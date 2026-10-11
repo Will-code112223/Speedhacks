@@ -43,6 +43,7 @@ import { currentCall } from "./call";
 import type { CaseSessionController, FixtureSettings } from "./controller";
 import { toUiError } from "./errors";
 import { createLocalId } from "./ids";
+import { createCaseRecovery, readRecoveryIndex, recoveryIndex, writeRecoveryIndex, type CaseRecovery } from "./recovery";
 import { initialSessionsState, pendingDecision, sessionsReducer, summaryAutoSend, type CaseSession } from "./session";
 
 /**
@@ -138,6 +139,37 @@ export function useCaseSession({ apiMode, plans, measuring }: UseCaseSessionOpti
   // Only consulted for capabilities while no case is open.
   const idleApi = useMemo(() => sharedApi ?? createFixtureApi(null, fixtureSettings), [sharedApi, fixtureSettings]);
 
+  // The workspace normally remounts on mode changes. Keep recovery explicitly
+  // keyed by its HTTP API as well, so a fixture engine can never be hydrated.
+  const selectionVersion = useRef(0);
+  const recovery = useRef<{ api: CaseApi; task: CaseRecovery; selectionVersion: number } | null>(null);
+  const [recoveredApi, setRecoveredApi] = useState<CaseApi | null>(null);
+  useEffect(() => {
+    if (sharedApi === null) return;
+    if (recovery.current?.api !== sharedApi) {
+      recovery.current = { api: sharedApi, selectionVersion: selectionVersion.current,
+        task: createCaseRecovery(sharedApi, readRecoveryIndex(browserSessionStorage(), "http")) };
+    }
+    const attempt = recovery.current;
+    // Reuse one read pass across StrictMode cleanup/setup. Replaying its latest
+    // snapshot also means no progress is lost while the subscriber is detached.
+    return attempt.task.subscribe(result => {
+      dispatch({ type: "sessions/recovered", api: sharedApi, ...result,
+        preserveSelection: selectionVersion.current !== attempt.selectionVersion,
+        liveCapable: true, at: nowIso() });
+      setRecoveredApi(sharedApi);
+    });
+  }, [sharedApi]);
+
+  useEffect(() => {
+    // Wait only for immediate pointer hydration, not the network. New cases and
+    // explicit selection remain saved even if unrelated history reads hang.
+    if (sharedApi === null || recoveredApi !== sharedApi) return;
+    const httpSessions = state.sessions.filter(session => session.api.mode === "http" && session.caseId !== null);
+    const selected = httpSessions.find(session => session.key === state.activeKey)?.caseId ?? null;
+    writeRecoveryIndex(browserSessionStorage(), "http", recoveryIndex(httpSessions.map(session => session.caseId!), selected));
+  }, [sharedApi, recoveredApi, state.sessions, state.activeKey]);
+
   const active = state.sessions.find((session) => session.key === state.activeKey) ?? null;
   const activeKey = active?.key ?? null;
   const activeApi = active?.api ?? idleApi;
@@ -162,7 +194,9 @@ export function useCaseSession({ apiMode, plans, measuring }: UseCaseSessionOpti
   const liveCapable = capabilities?.liveCall ?? true;
 
   // ---- Server state for the active case ------------------------------------
-  const polled = useCasePolling(activeApi, activeCaseId, { intervalMs: CASE_POLL_MS });
+  // Recovery already owns a bounded, cancellable initial GET for this pointer.
+  // Start normal polling as soon as this case resolves, independently of history.
+  const polled = useCasePolling(activeApi, active?.recoveryPending ? null : activeCaseId, { intervalMs: CASE_POLL_MS });
   const call = active ? currentCall(active.caseData, active.startedCall) : null;
   const liveCallId = call && canHaveLiveRecord(call) ? call.id : null;
   const liveCall = useLiveCall(activeApi, activeCaseId, liveCallId, { intervalMs: LIVE_POLL_MS });
@@ -176,8 +210,11 @@ export function useCaseSession({ apiMode, plans, measuring }: UseCaseSessionOpti
   const polledError = polled.error;
   useEffect(() => {
     if (activeKey === null) return;
+    // A newly mounted poller has neither data nor an error yet. Keep a failed
+    // recovery's retry banner visible until an actual read succeeds or fails.
+    if (polledError === null && polledCase === null) return;
     dispatch({ type: "poll/failed", key: activeKey, error: polledError ? toUiError(polledError) : null });
-  }, [activeKey, polledError]);
+  }, [activeKey, polledError, polledCase]);
 
   const polledLive = liveCall.liveCall;
   useEffect(() => {
@@ -277,6 +314,7 @@ export function useCaseSession({ apiMode, plans, measuring }: UseCaseSessionOpti
       const at = nowIso();
 
       if (session === null) {
+        selectionVersion.current += 1;
         const key = createLocalId();
         const picked = current.apiMode === "fixture" ? (current.scenario ?? inferScenario(trimmed)) : null;
         const api = current.sharedApi ?? createFixtureApi(picked, current.fixtureSettings);
@@ -558,6 +596,7 @@ export function useCaseSession({ apiMode, plans, measuring }: UseCaseSessionOpti
   }, [autoCallId, deliverSummary]);
 
   const selectCase = useCallback((key: string | null) => {
+    selectionVersion.current += 1;
     dispatch({ type: "session/selected", key });
   }, []);
 

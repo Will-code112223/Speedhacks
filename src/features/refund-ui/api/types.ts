@@ -208,7 +208,8 @@ export interface CaseApi {
   readonly mode: ApiMode;
 
   createCase(input: CreateCaseInput): Promise<CaseV1>;
-  getCase(caseId: string): Promise<CaseV1>;
+  /** Optional cancellation applies only to this read, never to dispatch. */
+  getCase(caseId: string, signal?: AbortSignal): Promise<CaseV1>;
   patchCase(caseId: string, expectedRevision: number, changes: CaseChanges): Promise<CaseV1>;
   authorize(caseId: string, expectedRevision: number): Promise<CaseV1>;
   startCall(caseId: string, input: StartCallInput): Promise<CallV1>;

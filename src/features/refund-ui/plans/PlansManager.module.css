@@ -1,9 +1,8 @@
 .onboarding {
   display: grid;
-  grid-template-columns: minmax(280px, 400px) minmax(360px, 560px);
+  grid-template-columns: minmax(0, 560px);
   justify-content: center;
   align-content: start;
-  gap: clamp(32px, 7vw, 112px);
   padding: clamp(48px, 8vh, 88px) 40px 64px;
   overflow-y: auto;
   height: 100%;

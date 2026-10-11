@@ -1,0 +1,270 @@
+[
+  {
+    "id": "state-farm",
+    "name": "State Farm",
+    "website": "https://www.statefarm.com",
+    "retrievedAt": "2026-10-11",
+    "asset": "/insurers/state-farm.ico",
+    "sourceUrl": "https://www.statefarm.com/favicon.ico"
+  },
+  {
+    "id": "geico",
+    "name": "GEICO",
+    "website": "https://www.geico.com/",
+    "retrievedAt": "2026-10-11",
+    "asset": "/insurers/geico.png",
+    "sourceUrl": "https://geico.wd1.myworkdayjobs.com/External/assets/logo",
+    "discoveredOn": "https://geico.wd1.myworkdayjobs.com/External"
+  },
+  {
+    "id": "progressive",
+    "name": "Progressive",
+    "website": "https://www.progressive.com/",
+    "retrievedAt": "2026-10-11",
+    "asset": "/insurers/progressive.png",
+    "sourceUrl": "https://www.progressive.com/apple-touch-icon.png"
+  },
+  {
+    "id": "allstate",
+    "name": "Allstate",
+    "website": "https://www.allstate.com",
+    "retrievedAt": "2026-10-11",
+    "asset": "/insurers/allstate.svg",
+    "sourceUrl": "https://delivery.contenthub.allstate.com/api/public/content/8a2419a001604261a9663de6492c6a04?v=536a1589"
+  },
+  {
+    "id": "usaa",
+    "name": "USAA",
+    "website": "https://www.usaa.com",
+    "retrievedAt": "2026-10-11",
+    "asset": "/insurers/usaa.ico",
+    "sourceUrl": "https://www.usaa.com/favicon.ico"
+  },
+  {
+    "id": "liberty-mutual",
+    "name": "Liberty Mutual",
+    "website": "https://www.libertymutual.com",
+    "retrievedAt": "2026-10-11",
+    "asset": "/insurers/liberty-mutual.ico",
+    "sourceUrl": "https://www.libertymutual.com/favicon.ico?v=1"
+  },
+  {
+    "id": "northwestern-mutual",
+    "name": "Northwestern Mutual",
+    "website": "https://www.northwesternmutual.com",
+    "retrievedAt": "2026-10-11",
+    "asset": "/insurers/northwestern-mutual.png",
+    "sourceUrl": "https://www.northwesternmutual.com/template/assets/4.9.6/images/favicon/apple-touch-icon.png"
+  },
+  {
+    "id": "new-york-life",
+    "name": "New York Life",
+    "website": "https://www.newyorklife.com",
+    "retrievedAt": "2026-10-11",
+    "asset": "/insurers/new-york-life.png",
+    "sourceUrl": "https://www.newyorklife.com/logo.png"
+  },
+  {
+    "id": "prudential",
+    "name": "Prudential Financial",
+    "website": "https://www.prudential.com",
+    "retrievedAt": "2026-10-11",
+    "asset": "/insurers/prudential.ico",
+    "sourceUrl": "https://www.prudential.com/favicon.ico"
+  },
+  {
+    "id": "lincoln-financial",
+    "name": "Lincoln Financial Group",
+    "website": "https://www.lincolnfinancial.com",
+    "retrievedAt": "2026-10-11",
+    "asset": "/insurers/lincoln-financial.png",
+    "sourceUrl": "https://www.lincolnfinancial.com/pbl-static-ui/assets/touch192.png"
+  },
+  {
+    "id": "massmutual",
+    "name": "MassMutual",
+    "website": "https://www.massmutual.com/",
+    "retrievedAt": "2026-10-11",
+    "asset": "/insurers/massmutual.png",
+    "sourceUrl": "https://ok2static2.oktacdn.com/fs/bco/1/fs0dbei6x28HDYhoQ0x7",
+    "discoveredOn": "https://brand.massmutual.com/"
+  },
+  {
+    "id": "mutual-of-omaha",
+    "name": "Mutual of Omaha",
+    "website": "https://www.mutualofomaha.com/",
+    "retrievedAt": "2026-10-11",
+    "asset": "/insurers/mutual-of-omaha.png",
+    "sourceUrl": "https://www.mutualofomaha.com/favicon.ico"
+  },
+  {
+    "id": "first-american-title",
+    "name": "First American Title Insurance Company",
+    "website": "https://www.firstam.com/",
+    "retrievedAt": "2026-10-11",
+    "asset": "/insurers/first-american-title.ico",
+    "sourceUrl": "https://www.firstam.com/assets/lib/img/favicon.ico"
+  },
+  {
+    "id": "fidelity-national-financial",
+    "name": "Fidelity National Financial, Inc. (FNF)",
+    "website": "https://fnf.com/",
+    "retrievedAt": "2026-10-11",
+    "asset": "/insurers/fidelity-national-financial.ico",
+    "sourceUrl": "https://fnf.com/FNF/media/media/favicon.ico"
+  },
+  {
+    "id": "chicago-title",
+    "name": "Chicago Title Insurance Company",
+    "website": "https://www.chicagotitle.com/",
+    "retrievedAt": "2026-10-11",
+    "asset": "/insurers/chicago-title.png",
+    "sourceUrl": "https://premier.ctic.com/Content/images/Brands/BrandIcons/CTIC/apple-touch-icon.png"
+  },
+  {
+    "id": "commonwealth-land-title",
+    "name": "Commonwealth Land Title Insurance Company",
+    "website": "https://www.cltic.com/",
+    "retrievedAt": "2026-10-11",
+    "asset": "/insurers/commonwealth-land-title.png",
+    "sourceUrl": "https://www.cltic.com/favicon.png"
+  },
+  {
+    "id": "fidelity-national-title",
+    "name": "Fidelity National Title Insurance Company",
+    "website": "https://fntic.com/",
+    "retrievedAt": "2026-10-11",
+    "asset": "/insurers/fidelity-national-title.ico",
+    "sourceUrl": "https://fntic.com/favicon.ico"
+  },
+  {
+    "id": "travelers",
+    "name": "Travelers",
+    "website": "https://www.travelers.com/",
+    "retrievedAt": "2026-10-11",
+    "asset": "/insurers/travelers.png",
+    "sourceUrl": "https://www.travelers.com/favicon.ico"
+  },
+  {
+    "id": "chubb",
+    "name": "Chubb",
+    "website": "https://www.chubb.com/us-en/",
+    "retrievedAt": "2026-10-11",
+    "asset": "/insurers/chubb.ico",
+    "sourceUrl": "https://www.chubb.com/content/dam/aem-chubb-global/logo/favicon.ico"
+  },
+  {
+    "id": "unitedhealthcare",
+    "name": "UnitedHealthcare",
+    "website": "https://www.uhc.com",
+    "retrievedAt": "2026-10-11",
+    "asset": "/insurers/unitedhealthcare.svg",
+    "sourceUrl": "https://abyss-cloud.uhg.com/cdn/assets/v1.9.0/uhc/brandmarks/uhc/uhc-wordmark-blue.svg",
+    "discoveredOn": "https://abyss.uhc.com/web/brand/uhc/get-started/"
+  },
+  {
+    "id": "elevance-health",
+    "name": "Elevance Health (Anthem Blue Cross Blue Shield)",
+    "website": "https://www.anthem.com",
+    "retrievedAt": "2026-10-11",
+    "asset": "/insurers/elevance-health.svg",
+    "sourceUrl": "https://www.anthem.com/content/dam/anthem/us/global/icons/fav-icon/Anthem-bluecross_favicon.svg"
+  },
+  {
+    "id": "aetna",
+    "name": "Aetna",
+    "website": "https://www.aetna.com",
+    "retrievedAt": "2026-10-11",
+    "asset": "/insurers/aetna.png",
+    "sourceUrl": "https://www.aetna.com/content/dam/aetna/asset-libraries/logos/favicon-violet-heart-32x32.png"
+  },
+  {
+    "id": "cigna",
+    "name": "Cigna Healthcare",
+    "website": "https://www.cigna.com",
+    "retrievedAt": "2026-10-11",
+    "asset": "/insurers/cigna.ico",
+    "sourceUrl": "https://www.cigna.com/themes/custom/cigna/favicon.ico"
+  },
+  {
+    "id": "kaiser-permanente",
+    "name": "Kaiser Permanente",
+    "website": "https://healthy.kaiserpermanente.org",
+    "retrievedAt": "2026-10-11",
+    "asset": "/insurers/kaiser-permanente.png",
+    "sourceUrl": "https://healthy.kaiserpermanente.org/etc.clientlibs/settings/wcm/designs/kporg/kp-foundation/clientlib-modules/styleguide/resources/assets/images/favicon-16x16.png"
+  },
+  {
+    "id": "humana",
+    "name": "Humana",
+    "website": "https://www.humana.com",
+    "retrievedAt": "2026-10-11",
+    "asset": "/insurers/humana.png",
+    "sourceUrl": "https://www.humana.com/assets/icons/apple-touch-icon-120x120-precomposed.png"
+  },
+  {
+    "id": "unum",
+    "name": "Unum",
+    "website": "https://www.unum.com",
+    "retrievedAt": "2026-10-11",
+    "asset": "/insurers/unum.ico",
+    "sourceUrl": "https://www.unum.com/-/media/Favicons/unum_favicon.ashx"
+  },
+  {
+    "id": "principal-financial",
+    "name": "Principal Financial Group",
+    "website": "https://www.principal.com",
+    "retrievedAt": "2026-10-11",
+    "asset": "/insurers/principal-financial.ico",
+    "sourceUrl": "https://www.principal.com/themes/custom/principalcom/favicon.ico"
+  },
+  {
+    "id": "guardian-life",
+    "name": "Guardian Life",
+    "website": "https://www.guardianlife.com",
+    "retrievedAt": "2026-10-11",
+    "asset": "/insurers/guardian-life.png",
+    "sourceUrl": "https://www.guardianlife.com/apple-touch-icon.png"
+  },
+  {
+    "id": "the-hartford",
+    "name": "The Hartford",
+    "website": "https://www.thehartford.com",
+    "retrievedAt": "2026-10-11",
+    "asset": "/insurers/the-hartford.png",
+    "sourceUrl": "https://www.thehartford.com/.resources/thehartford/webresources/images/logo_180x180.png"
+  },
+  {
+    "id": "cna",
+    "name": "CNA Financial",
+    "website": "https://www.cna.com",
+    "retrievedAt": "2026-10-11",
+    "asset": "/insurers/cna.png",
+    "sourceUrl": "https://www.cna.com/sites/default/files/CNA%2BLogo%2BRed.png"
+  },
+  {
+    "id": "trupanion",
+    "name": "Trupanion",
+    "website": "https://www.trupanion.com",
+    "retrievedAt": "2026-10-11",
+    "asset": "/insurers/trupanion.png",
+    "sourceUrl": "https://vet.trupanion.com/assets/img/TRULogo_EN_RGB_Tag_Mont.png",
+    "discoveredOn": "https://vet.trupanion.com/"
+  },
+  {
+    "id": "healthy-paws",
+    "name": "Healthy Paws Pet Insurance",
+    "website": "https://www.healthypawspetinsurance.com",
+    "retrievedAt": "2026-10-11",
+    "asset": "/insurers/healthy-paws.ico",
+    "sourceUrl": "https://www.healthypawspetinsurance.com/content/dam/healthypaws/logo/hp-favicon.ico"
+  },
+  {
+    "id": "allianz-global-assistance",
+    "name": "Allianz Global Assistance (Allianz Partners USA)",
+    "website": "https://www.allianztravelinsurance.com",
+    "retrievedAt": "2026-10-11",
+    "asset": "/insurers/allianz-global-assistance.png",
+    "sourceUrl": "https://www.allianztravelinsurance.com/v_1764171928442/media/companies/logos_291/Allianz_Travel.png"
+  }
+]

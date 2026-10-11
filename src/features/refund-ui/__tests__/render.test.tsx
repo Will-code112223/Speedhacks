@@ -158,10 +158,10 @@ function callScreen(controller: CaseSessionController): string {
 }
 
 describe("server render of each stage", () => {
-  it("paints the boot shell with the wordmark and server mode before the browser state exists", () => {
+  it("paints the boot shell without a global mode badge before the browser state exists", () => {
     const html = renderToString(<RefundApp serverMode="simulated" />);
     expect(html).toContain("Recourse");
-    expect(html).toContain('data-testid="server-mode-pill"');
+    expect(html).not.toContain('data-testid="server-mode-pill"');
     expect(html).toContain("Loading Recourse");
   });
 
@@ -177,7 +177,13 @@ describe("server render of each stage", () => {
         metrics={null}
       />,
     );
-    expect(empty).toContain("What are you owed?");
+    expect(empty).toContain("New case");
+    expect(empty).toContain("Describe the issue");
+    expect(empty).toContain("Attach supporting documents");
+    expect(empty).toContain("Review details and approve the action");
+    expect(empty).not.toContain("Start with an example");
+    expect(empty).not.toContain("Fictional cases");
+    expect(empty).toContain("Activity graph");
     expect(empty).toContain('data-testid="composer-input"');
     expect(empty).toContain('data-testid="composer-send"');
 
@@ -203,11 +209,14 @@ describe("server render of each stage", () => {
       "approve-checkbox",
       "approve-button",
       "draft-toggle",
+      "case-documents",
+      "document-packet-download",
     ]) {
       expect(html).toContain(`data-testid="${id}"`);
     }
     expect(html).toContain("Approve the call to Northwind Mutual claims line");
     expect(html).toContain("$1,200.00");
+    expect(html.indexOf('data-testid="case-documents"')).toBeLessThan(html.indexOf('data-testid="approve-button"'));
   });
 
   it("lists missing information and holds the approval back", async () => {
@@ -403,6 +412,9 @@ describe("server render of each stage", () => {
     expect(rail).toContain('data-testid="rail-new-case"');
     expect(rail).toContain('data-testid="rail-case"');
     expect(rail).toContain("Reading your request");
+    expect(rail).not.toContain("Personal workspace");
+    expect(rail).not.toContain("You approve. Then we call.");
+    expect(rail).not.toContain("Cases stay in this tab.");
 
     const plans: PlansController = {
       status: "ready",
@@ -422,5 +434,7 @@ describe("server render of each stage", () => {
     expect(onboarding).toContain('data-testid="plans-dropzone"');
     expect(onboarding).toContain('data-testid="plans-file-input"');
     expect(onboarding).toContain('data-testid="plans-continue"');
+    expect(onboarding).not.toContain("Your next step");
+    expect(onboarding).not.toContain("Plans stay in this browser");
   });
 });

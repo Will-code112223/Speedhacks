@@ -526,3 +526,63 @@ https://docs.getdial.ai/documentation/platform/context-mcp
 Official @getdial/sdk 0.41.1 source corroborates /api/v1 paths, request fields,
 Idempotency-Key and {call} response unwrapping. Some guide examples omit /api;
 use the verified SDK/OpenAPI route here. Transcript-late behavior is documented.
+2026-10-11 REAL GEICO INFORMATION INQUIRY AND PRODUCT AUDIT
+
+The user explicitly authorized one call asking what documents a hypothetical
+car-damage claim would need, with no filing or submission. The official claims
+contact was verified at https://www.geico.com/claims/. One guarded live dispatch
+completed after 221 seconds; the provider transcript was retrieved. The agent
+disclosed AI, stated that no incident was being reported, and ended when GEICO's
+automated service could not provide general information. No claim was filed and
+no document requirements were confirmed. This verifies outbound Dial calling
+and authenticated transcript retrieval, not successful insurer advice or the
+integrated HTTP information-gathering workflow. Private attempt/transcript data
+stays outside git. No second dispatch is authorized by that completed attempt.
+
+The adapter now tells agents to use short routing phrases for automated menus,
+save substantive questions for a capable respondent, and stop when an
+information-only inquiry would require opening or reporting a claim.
+
+Independent source audit of case-engine 0f67707 found that V1.1 types and the
+adapter plan path were added, but the HTTP authorization route/service still
+ignored purpose and froze a duplicate-charge refund brief. T2 was notified on
+Alike, including the need to bind purpose/plan to the authorization revision.
+Do not describe the integrated insurance-information workflow as complete until
+that path is implemented and verified. Provider form automation and official
+insurer submission are also not implemented. The existing packet is a text
+preparation draft with an evidence index, not a submitted insurer form.
+
+LATEST WORKSPACE AND V1.1 REVIEW UPDATE (2026-10-11)
+
+The compact frontend now exposes the canonical insurer KB through a provider
+picker with all 33 official-site marks, actual KB excerpt/source links, uploaded
+policy previews, and a blank Recourse preparation worksheet. The worksheet is
+not an insurer form. Provider selection does not authorize a call or establish
+coverage. New case has two purpose sentences and three steps. The graph is
+smaller and ends at its canvas; the help block is removed. Global simulation chrome is removed; actual
+call/result provenance remains accurate. No backend KB duplication was added.
+
+HTTP case recovery now stores only case IDs and selection in sessionStorage,
+restores the active case independently of history, cancels timed-out reads, and
+never dispatches. A transcript outcome correction prevents partial offers from
+being represented as refunds for the full requested amount.
+
+Jonathan subsequently published cb74827, which implements purpose-aware
+authorization. An isolated offline review confirmed three material remaining
+issues: refund-seeking merchant guidance included in information-only plans;
+more than ten duplicate-history references blocking authorization; and the
+simulated adapter still requesting/refunding for information-only calls. Also
+reported purpose-conflict validation order and missing required disclosure
+consistency. Reproduction inputs were sent through Alike. These commits have
+not been integrated into this branch. Proposed transcript updates and amountless
+case status remain known T2 work. No teammate files or main were changed by the
+review, and no additional live call was made.
+
+Verification for this update: npm test passes 432 tests in 29 files; npm run
+typecheck passes; production build passes with the existing dynamic DATA_DIR
+tracing warning. The current Dial runtime passed 212 provider-mocked Node tests
+and standalone strict TypeScript checks. Provider-library tests include the
+actual canonical GEICO root claims portal, not only keyword-shaped test URLs.
+Browser interaction and PDF rendering were not re-verified because local
+browser access remains declined. These checks do not establish deployment,
+provider-form automation, webhook delivery, or end-to-end live insurance filing.

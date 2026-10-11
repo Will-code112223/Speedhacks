@@ -58,9 +58,6 @@ export default function Rail(props: RailProps) {
 
   return (
     <div className={styles.rail}>
-      <div className={styles.workspace}>
-        <span className={styles.workspaceTitle}>Your cases</span>
-      </div>
       <Button
         variant="primary"
         className={styles.newCase}
@@ -80,7 +77,7 @@ export default function Rail(props: RailProps) {
           <span className={styles.count}>{sessions.length}</span>
         </div>
         {sessions.length === 0 ? (
-          <p className={styles.empty}>A place for every request.<br />Start a case to keep it in view.</p>
+          <p className={styles.empty}>No cases</p>
         ) : (
           <ul className={styles.list}>
             {sessions.map((session) => {
@@ -123,7 +120,7 @@ export default function Rail(props: RailProps) {
           </Button>
         </div>
         {plans.length === 0 ? (
-          <p className={styles.empty}>Keep your policy documents ready for your next case.</p>
+          <p className={styles.empty}>No plans</p>
         ) : (
           <ul className={styles.list}>
             {plans.map((plan) => {
@@ -151,10 +148,7 @@ export default function Rail(props: RailProps) {
         )}
       </section>
 
-      <div className={styles.footer}>
-        {footer}
-        <p className={styles.localNote}>Cases stay in this tab.<br />Plans stay in this browser.</p>
-      </div>
+      {footer ? <div className={styles.footer}>{footer}</div> : null}
     </div>
   );
 }
