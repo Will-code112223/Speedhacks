@@ -21,20 +21,24 @@ Test and script value imports use .ts: set compilerOptions.allowImportingTsExten
 separate noEmit check. TypeScript >=5.0 and @types/node are development dependencies
 owned by T2, not added to the repository by this workstream.
 
-TEMPORARY CONTRACT BRIDGE
-Canonical src/contracts/* does not exist on origin/main. Teammate 2 has now
-published matching V1 types on origin/codex/case-engine at db5f311; that inspected
-scaffold still has no case service or webhook route. No T2 branch was merged here.
-types.ts is the exact, isolated shared V1 mirror permitted by the prompts.
-On the combined integration branch, replace its definitions with:
+CONTRACT BRIDGE AND PINNED T2 SNAPSHOT
+Teammate 2 has published its backend service/routes at pinned commit 23bd75a on
+codex/case-engine. That branch independently includes Dial adapter 3ef5066 and
+replaces its types.ts mirror with re-exports from canonical src/contracts/*.
+Our codex/voice branch remains separate at 48541aa before this handoff update;
+no T2 code or branch was merged here. This branch's types.ts remains the exact,
+isolated shared V1 mirror permitted by the prompts. T2's canonical bridge is:
   export type {Mode} from "../../contracts/case";
   export type {AuthorizedCallInput, StartCallResult, VoiceSnapshot,
     VerifiedVoiceEvent, VoiceAdapter} from "../../contracts/voice";
-No routes, root manifests, lockfiles, database, or shared contracts were edited.
-The lead checked a temporary combined projection against db5f311: production
+No routes, root manifests, lockfiles, database, or shared contracts were edited
+by this workstream. The lead's earlier temporary projection against db5f311
+established source compatibility: production
 files pass T2's strict compiler flags (including noUncheckedIndexedAccess and
 without allowImportingTsExtensions), and both canonical type directions match.
-This establishes source compatibility, not a running application integration.
+The V1 equality/production compile check also passed against 23bd75a's canonical
+types. Compilation does not establish correct runtime wiring or live verification;
+pending boundary findings appear below.
 
 SERVER CONFIGURATION (T2 adds to .env.example; never NEXT_PUBLIC_)
 DIAL_API_KEY                  Existing account API key.
@@ -46,9 +50,9 @@ does not establish that free limits are lifted. Missing API key/from number
 rejects before dispatch; webhook verification only requires the webhook secret.
 The API key must be a nonempty visible-ASCII bearer token without whitespace.
 An explicit injected config replaces environment config in full.
-The inspected T2 .env.example at db5f311 is missing DIAL_FROM_NUMBER; T2 must
-add it. If exposing the optional duration in its template, set300 or comment
-the variable out. A blank duration is parsed as0 and correctly rejected.
+The pinned T2 .env.example at 23bd75a now includes DIAL_FROM_NUMBER. Its optional
+DIAL_MAX_CALL_DURATION_SECONDS is still blank: T2 must set 300 or comment out
+the variable. A blank duration is parsed as 0 and correctly rejected.
 
 LOCAL SERVER STARTUP WITH THE EXTERNAL ENV FILE
 The user-configured local credentials live in ~/.config/speedhacks/dial.env,
@@ -330,24 +334,77 @@ Current task-linked sessions: Claude implementation fe22b3b41e3baa624cea09c28771
 Codex verification dc49c607d8512c47da66e814df762a82. The newer colleague split
 decision assigns Claude implementation and Codex tests/integration + tests/sparta;
 it supersedes the older proposed split mentioned in the scaffold handoff.
-The colleague task's latest recorded status at19:30:59Z reports outcome-safety
-tests with8 failures/4 passes (negation, conditionals, quotations and customer
-claims). This is their reported WIP status, not a locally reproduced result.
-
-Published backend snapshot remains db5f311: exact canonical V1 types are at
-src/contracts/case.ts and src/contracts/voice.ts; no service/routes/persistence
-implementation is present in that remote commit. Do not mistake its unchecked
-handoff checklist for evidence that newer unpushed work does not exist.
-Our exact V1 equality/bundler compiler checks passed again against that snapshot.
-T2's actual isInvalidWebhookError helper recognizes Dial's INVALID_WEBHOOK and
-does not misclassify MISSING_CONFIG as an authentication failure.
+Published backend snapshot is now pinned 23bd75a, with service, persistence and
+routes. Its live composition root is src/server/cases/composition.ts, importing
+the adapter and re-exporting canonical V1 types in src/integrations/dial/types.ts.
+T2 independently incorporated adapter 3ef5066 into its branch; this is not a merge
+into codex/voice or main and does not establish live verification. Our historical
+V1 equality/bundler checks against db5f311 remain recorded under VERIFICATION.
 
 Alike question0ecf15fd-be61-412c-93bd-cf2584880d4f sent to Jonathan's colleague
 inbox: exported interface, codex/voice3ef5066,183-test/typecheck evidence, exact
 env gap and late-transcript requirement. Requested the current composition-root
 and env-loading paths; durable attempt/event/job ownership; pending-secret
 behavior; and any newer WIP commit or V1 deviation. No secrets/customer data sent.
-No new agreement was received as of this handoff; reply remains pending.
+Alike marks that question seen at 2026-10-11T19:44:58Z; no reply had arrived at
+the latest check. Seen is not agreement. The newer published wiring allows a
+concrete boundary review. The requirements
+below await T2's fixes or explicit agreement; no shared contract change is made.
+
+PENDING T2 BOUNDARY FINDINGS — 2026-10-11, PINNED 23bd75a
+- Before dispatch, stored case/authorization mode must match the runtime's live
+  mode. A case authorized in simulated mode must not become a real call merely
+  because the server restarts with REFUND_MODE=live. Keep this check in T2's
+  authorization/attempt transaction before the provider side effect.
+- src/app/api/webhooks/dial/route.ts checks Content-Length, then buffers via
+  arrayBuffer before enforcing actual size. Bound streamed bytes before full
+  buffering, including absent/false Content-Length; the route factory above is
+  an example. Provider authentication does not replace an HTTP body-size limit.
+- The composition root validates config.dial, but constructs createDialAdapter
+  with only {mode:"live"}; the adapter then reads process.env independently.
+  Pass T2's validated values through the adapter's existing public optional
+  dependencies argument. This needs no shared V1 contract change:
+    createDialAdapter({mode: "live"}, {config: {
+      apiKey: config.dial.apiKey!,
+      fromNumber: config.dial.fromNumber!,
+      webhookSecret: config.dial.webhookSecret!,
+      maxCallDurationSeconds: validatedDuration,
+    }});
+  This expression belongs AFTER T2 checks all three required values and validates
+  the integer duration 60..3600, defaulting an absent duration to 300. The non-null
+  assertions do not perform runtime validation. Explicit config replaces the
+  adapter's environment config in full. Do not validate one set of credentials
+  while dispatching with another.
+- Set DIAL_MAX_CALL_DURATION_SECONDS=300 or comment it out in T2's template;
+  the present blank value becomes 0 and fails adapter validation.
+- T2 currently provides a bounded 45s transcript wait driven by case GETs.
+  Expiry publishes an unknown outcome; there is no background worker and no
+  in-app transcript refresh after terminal publication. A later transcript needs
+  explicit manual provider review under this implementation. T2 must document
+  and agree that operational handoff, or add a durable read-only reconciliation
+  path before claiming the worker example above is implemented. Never redial
+  to recover a missing transcript. If case GET polling stops, no background job
+  currently advances that wait.
+
+TARGETED BOUNDARY VERIFICATION — SYNTHETIC ONLY
+An independent reviewer ran five existing targeted backend tests successfully,
+then four new probes exposed the following failures against pinned 23bd75a:
+- Reusing a simulated authorization after switching runtime to live triggered
+  one fake live dispatch. No actual provider was contacted.
+- The blank optional duration produced INVALID_CONFIG with zero transport calls.
+- Validated config.dial values were ignored by the environment-reading factory,
+  producing MISSING_CONFIG and a persisted failed attempt with zero transport
+  calls.
+- An oversized request without Content-Length was fully drained (2,097,152
+  bytes) before its 400 response; the stream was never cancelled at the 1 MiB cap.
+The published snapshot's standalone Dial suite also passed 183/183 tests. Exact
+equality of six local adapter types against T2's canonical types and local factory
+assignability passed strict TypeScript with noUncheckedIndexedAccess.
+All probes used synthetic values, a scrubbed environment and intercepted fetch.
+The duration failure concerns the backend template, not a request to make Dial
+accept an explicitly invalid duration. These probes are boundary verification,
+not live calling,
+deployed-webhook verification or a full application acceptance result.
 
 Confirmed boundary from shared V1: T2 owns frozen authorization/case access,
 durable dispatch dedup before sending, unknown-dispatch locking, raw webhook
@@ -355,9 +412,10 @@ acceptance and durable event dedup, unmatched-event retention, late-transcript
 jobs and atomic terminal outcome publication. Dial owns transport/normalization,
 authentication and explicit simulation. Do not move those T2 responsibilities
 into the adapter or modify the shared contract without agreement.
-Next handoff point: T2 supplies its reviewable wiring commit/paths and confirms
-the env + reconciliation details. Review that boundary without merging; deploy
-and register the webhook only in a separately authorized later phase.
+Next handoff point: T2 fixes or explicitly resolves these findings in a new
+reviewable commit and confirms env loading, mode isolation and transcript expiry
+behavior. Review that boundary without merging; deploy and register the webhook
+only in a separately authorized later phase.
 
 VERIFICATION
 Run:
