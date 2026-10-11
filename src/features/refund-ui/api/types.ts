@@ -141,11 +141,13 @@ export interface LiveCallV2 {
   pendingDecision: PendingDecision | null;
   userJoined: boolean;
   /**
-   * The agent's plan and progress (V2 proposal, additive). Absent or null
-   * when the backend does not report one; the UI then derives a plan from
-   * the phase with `callPlanFor` in state/call.ts.
+   * The agent's plan and where it is in it (V2 proposal, additive). Named
+   * `progress` because the voice contract V2 uses `CallPlan` for the
+   * authorization's facts, allowed actions and asks on the case. Absent or
+   * null when the backend does not report one; the UI then derives a plan
+   * from the phase with `callPlanFor` in state/call.ts.
    */
-  plan?: CallPlan | null;
+  progress?: CallPlan | null;
   updatedAt: string;
 }
 

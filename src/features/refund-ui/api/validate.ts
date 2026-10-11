@@ -221,7 +221,7 @@ export function isLiveCallV2(v: unknown): v is LiveCallV2 {
     isArrayOf(v.notes, isNote) &&
     (v.pendingDecision === null || isPendingDecision(v.pendingDecision)) &&
     isBoolean(v.userJoined) &&
-    (v.plan === undefined || v.plan === null || isPlan(v.plan)) &&
+    (v.progress === undefined || v.progress === null || isPlan(v.progress)) &&
     isString(v.updatedAt)
   );
 }

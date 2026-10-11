@@ -318,11 +318,11 @@ class FixtureCaseApi implements CaseApi {
           "CALL_ENDED",
           live.startedAt === null ? "This call attempt ended without connecting." : "The call has ended.",
         );
-      case "dialing":
-      case "ringing":
-        return fail(409, "CALL_NOT_CONNECTED", "The call has not connected yet.");
       case "user_joined":
         return live;
+      // The user can step in at any live phase, before the call connects too; the script pauses until they hand back.
+      case "dialing":
+      case "ringing":
       case "navigating_menu":
       case "on_hold":
       case "talking":

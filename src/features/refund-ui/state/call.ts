@@ -126,7 +126,7 @@ export function phaseEventText(live: LiveCallV2): string {
     case "waiting_for_user":
       return "Waiting for your answer";
     case "user_joined":
-      return "You joined the call";
+      return "You stepped in";
     case "ended":
       return "Call ended";
     default: {
@@ -144,7 +144,7 @@ export function phaseEventText(live: LiveCallV2): string {
  */
 export function callPlanFor(live: LiveCallV2 | null): CallPlan | null {
   if (live === null) return null;
-  if (live.plan) return live.plan;
+  if (live.progress) return live.progress;
   return derivedPlan(live);
 }
 
@@ -155,8 +155,8 @@ const DERIVED_STEPS: readonly { id: string; title: string; detail: string }[] = 
   { id: "record", title: "Record the outcome", detail: "Reference number, next step and transcript." },
 ];
 
-function derivedStepIndex(phase: LiveCallPhase): number {
-  switch (phase) {
+function derivedStepIndex(live: LiveCallV2): number {
+  switch (live.phase) {
     case "dialing":
     case "ringing":
       return 0;
@@ -165,12 +165,17 @@ function derivedStepIndex(phase: LiveCallPhase): number {
       return 1;
     case "talking":
     case "waiting_for_user":
-    case "user_joined":
       return 2;
+    case "user_joined":
+      // The join hides the underlying phase, so read the evidence the record
+      // still carries: nobody identified and no hold time means the line was
+      // not reached yet; hold time without a counterpart means still routing.
+      if (live.counterpart !== "unknown") return 2;
+      return live.holdSeconds > 0 ? 1 : 0;
     case "ended":
       return 3;
     default: {
-      const unreachable: never = phase;
+      const unreachable: never = live.phase;
       return unreachable;
     }
   }
@@ -178,7 +183,7 @@ function derivedStepIndex(phase: LiveCallPhase): number {
 
 function derivedPlan(live: LiveCallV2): CallPlan {
   const ended = live.phase === "ended";
-  const current = derivedStepIndex(live.phase);
+  const current = derivedStepIndex(live);
   const paused = live.userJoined || live.phase === "user_joined";
   return {
     steps: DERIVED_STEPS.map((step, index) => ({

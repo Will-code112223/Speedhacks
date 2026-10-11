@@ -12,10 +12,10 @@ import {
   type CaseStatus,
   type CaseV1,
 } from "../../../../contracts/case";
-import type { Counterpart, LiveCallV2 } from "../types";
+import type { CallPlan, CallPlanStepStatus, Counterpart, LiveCallV2 } from "../types";
 import { assertNever } from "../assert-never";
-import { runCall, type CallRun, type DecisionGate } from "./call-run";
-import type { CallContext, Conversation } from "./conversations";
+import { LEAVE_NOTE, runCall, type CallRun, type DecisionGate } from "./call-run";
+import type { CallContext, Conversation, PlanStepDefinition } from "./conversations";
 import { buildDraft } from "./documents";
 import { missingFields, type FrozenFacts } from "./facts";
 import { stableId } from "./ids";
@@ -145,6 +145,7 @@ function refusedLiveCall(call: CallRecord): LiveCallV2 {
     notes: [{ at, text: REFUSED_NOTE }],
     pendingDecision: null,
     userJoined: false,
+    progress: null,
     updatedAt: at,
   };
 }
@@ -226,13 +227,40 @@ function projectConversation(
       error: null,
       updatedAt: iso(updatedAtMs),
     },
-    live: toLiveCall(call, run, script.gate, speed),
+    live: toLiveCall(call, run, script.gate, conversation.plan(ctx), speed),
     timeline: callTimeline(call, run, script.gate, outcome?.value ?? null, speed),
     outcome,
   };
 }
 
-function toLiveCall(call: CallRecord, run: CallRun, gate: DecisionGate | null, speed: number): LiveCallV2 {
+/**
+ * Where the agent is in its plan. Steps before the one it entered are done,
+ * that one is current (paused while the user is on the call) and later ones
+ * are upcoming; before the first tagged step the first step is current. Once
+ * the call ends every step is done.
+ */
+export function planFor(definitions: readonly PlanStepDefinition[], run: CallRun): CallPlan | null {
+  if (definitions.length === 0) return null;
+  const entered = run.stepId === null ? 0 : definitions.findIndex((d) => d.id === run.stepId);
+  const currentIndex = entered < 0 ? 0 : entered;
+  const ended = run.endedAt !== null;
+  return {
+    steps: definitions.map((d, index) => {
+      let status: CallPlanStepStatus = "upcoming";
+      if (ended || index < currentIndex) status = "done";
+      else if (index === currentIndex) status = run.joined ? "paused" : "current";
+      return { id: d.id, title: d.title, ...(d.detail === undefined ? {} : { detail: d.detail }), status };
+    }),
+  };
+}
+
+function toLiveCall(
+  call: CallRecord,
+  run: CallRun,
+  gate: DecisionGate | null,
+  plan: readonly PlanStepDefinition[],
+  speed: number,
+): LiveCallV2 {
   const at = (virtualMs: number): string => iso(toReal(call.startedAtMs, virtualMs, speed));
   const lastEvent = run.events[run.events.length - 1];
   return {
@@ -257,6 +285,7 @@ function toLiveCall(call: CallRecord, run: CallRun, gate: DecisionGate | null, s
           }
         : null,
     userJoined: run.joined,
+    progress: planFor(plan, run),
     updatedAt: at(lastEvent?.at ?? 0),
   };
 }
@@ -309,10 +338,10 @@ function callTimeline(
         }
         break;
       case "joined":
-        add(event.at, "user_joined_call", "You joined the call.");
+        add(event.at, "user_joined_call", "You stepped in. The agent paused.");
         break;
       case "left":
-        add(event.at, "user_left_call", "The agent took over the call again.");
+        add(event.at, "user_left_call", LEAVE_NOTE);
         break;
       case "note":
         break;

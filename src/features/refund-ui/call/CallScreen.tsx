@@ -11,12 +11,13 @@
 
 import { useEffect, useId, useRef } from "react";
 import type { CallV1, CaseV1 } from "../../../contracts/case";
-import type { CaseApiCapabilities, Counterpart, LiveCallV2 } from "../api/types";
+import type { CallPlan, CaseApiCapabilities, Counterpart, LiveCallV2 } from "../api/types";
 import DecisionCard from "../ui/DecisionCard";
+import { CheckIcon } from "../ui/icons";
 import { Button, Mono, MonoBlock, SourcePill } from "../ui/primitives";
 import { formatClock, formatDuration, formatPhone, secondsBetween, statusWord } from "../ui/format";
 import { useNow, usePrefersReducedMotion } from "../state/browser";
-import { phaseHasCounterpart, phaseIsLive, phaseLabel } from "../state/call";
+import { callPlanFor, currentPlanStep, phaseHasCounterpart, phaseIsLive, phaseLabel, planProgressText } from "../state/call";
 import type { UiError } from "../state/errors";
 import type { DecisionRecord, RequestState } from "../state/session";
 import styles from "./Call.module.css";
@@ -77,16 +78,14 @@ export default function CallScreen(props: CallScreenProps) {
   const stepInSupported = capabilities?.stepIn ?? false;
   const hasTranscript = Boolean(call.transcript?.trim());
   const canRefreshTranscript = call.state === "completed" && !hasTranscript;
-  // Joining needs someone on the line: the backend refuses while dialing or ringing.
-  const connecting = live === null || live.phase === "dialing" || live.phase === "ringing";
+  // The user can step in at any point of a live call, dialing included; the agent pauses while they are on the line.
   const stepInHint =
     capabilities === null
       ? null
       : !stepInSupported
         ? "Not available with this backend"
-        : connecting
-          ? "Available once someone answers"
-          : null;
+        : "Step in at any point. The agent pauses while you are on the line and resumes when you hand back.";
+  const plan = callPlanFor(live);
 
   return (
     <section className={styles.screen} aria-labelledby={headingId} data-testid="call-screen">
@@ -145,6 +144,8 @@ export default function CallScreen(props: CallScreenProps) {
         </div>
       ) : null}
 
+      {plan ? <CallPlanSection plan={plan} /> : null}
+
       {liveError ? (
         <div className={styles.liveError} role="status">
           <span>
@@ -187,9 +188,9 @@ export default function CallScreen(props: CallScreenProps) {
         {callIsLive ? (
           joined ? (
             <>
-              <p className={styles.controlNote}>You are on the call. The agent is listening and takes over when you leave.</p>
+              <p className={styles.controlNote}>You are on the call. The agent is paused.</p>
               <Button variant="secondary" onClick={props.onLeave} data-testid="leave-call-button">
-                Leave the call
+                Hand back to the agent
               </Button>
             </>
           ) : stepInSupported ? (
@@ -197,13 +198,13 @@ export default function CallScreen(props: CallScreenProps) {
               <Button
                 variant="primary"
                 onClick={props.onStepIn}
-                disabled={!stepInSupported || connecting}
+                disabled={!stepInSupported}
                 busy={join.busy}
                 busyLabel="Joining the call"
                 aria-describedby={stepInHint ? `${headingId}-stepin-hint` : undefined}
                 data-testid="step-in-button"
               >
-                Step into the call
+                Step in now
               </Button>
               {stepInHint ? (
                 <p id={`${headingId}-stepin-hint`} className={styles.controlNote}>
@@ -247,6 +248,59 @@ export default function CallScreen(props: CallScreenProps) {
         ) : null}
       </div>
     </section>
+  );
+}
+
+/**
+ * The agent's plan for the call: a one-line dashboard of where it is, a
+ * segmented progress bar, and the ordered map of every step. The plan is the
+ * agent's intent; only steps the backend marks done are shown as done.
+ */
+function CallPlanSection({ plan }: { plan: CallPlan }) {
+  const current = currentPlanStep(plan);
+  const progress = planProgressText(plan);
+  return (
+    <div className={styles.plan} data-testid="call-plan">
+      <h3 className={styles.sectionLabel}>Call plan</h3>
+      <p className={styles.planNow} data-testid="call-plan-step">
+        {current ? `${progress} - ${current.step.title}` : progress}
+      </p>
+      <div className={styles.planBar} aria-hidden="true">
+        {plan.steps.map((step) => (
+          <span key={step.id} className={[styles.planSegment, styles[`segment_${step.status}`] ?? ""].join(" ")} />
+        ))}
+      </div>
+      <ol className={styles.planList} aria-label="Call plan">
+        {plan.steps.map((step, index) => {
+          const active = step.status === "current" || step.status === "paused";
+          return (
+            <li
+              key={step.id}
+              className={[styles.planItem, styles[`planItem_${step.status}`] ?? ""].join(" ")}
+              aria-current={active ? "step" : undefined}
+            >
+              <span className={styles.planNumber}>{String(index + 1).padStart(2, "0")}</span>
+              <span className={styles.planBody}>
+                <span className={styles.planTitleRow}>
+                  <span className={styles.planTitle}>{step.title}</span>
+                  {step.status === "done" ? (
+                    <span className={styles.planCheck}>
+                      <CheckIcon />
+                      <span className={styles.visuallyHidden}>Done</span>
+                    </span>
+                  ) : step.status === "current" ? (
+                    <span className={[styles.statusDot, styles.dot_live].join(" ")} aria-hidden="true" />
+                  ) : step.status === "paused" ? (
+                    <span className={styles.planPaused}>Paused - you are on the line</span>
+                  ) : null}
+                </span>
+                {active && step.detail ? <span className={styles.planDetail}>{step.detail}</span> : null}
+              </span>
+            </li>
+          );
+        })}
+      </ol>
+    </div>
   );
 }
 

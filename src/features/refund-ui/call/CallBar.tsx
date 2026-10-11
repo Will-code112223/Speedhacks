@@ -11,7 +11,7 @@ import { Button } from "../ui/primitives";
 import { PhoneIcon } from "../ui/icons";
 import { formatDuration, secondsBetween, statusWord } from "../ui/format";
 import { useNow } from "../state/browser";
-import { phaseIsLive, phaseLabel } from "../state/call";
+import { callPlanFor, currentPlanStep, phaseIsLive, phaseLabel } from "../state/call";
 import styles from "./Call.module.css";
 
 export interface CallBarProps {
@@ -27,6 +27,8 @@ export default function CallBar({ caseData, call, live, needsAnswer, onOpen }: C
   const now = useNow(running);
   const name = live?.calling.name ?? caseData.merchant.name ?? "Support line";
   const status = live ? phaseLabel(live.phase) : statusWord(call.state);
+  const plan = callPlanFor(live);
+  const step = plan ? currentPlanStep(plan) : null;
 
   return (
     <div className={[styles.callBar, needsAnswer ? styles.callBarAttention : ""].join(" ")}>
@@ -37,6 +39,11 @@ export default function CallBar({ caseData, call, live, needsAnswer, onOpen }: C
         <span className={styles.callBarStatus}>{needsAnswer ? "Needs your answer" : status}</span>
         <span className={styles.callBarName}>{name}</span>
       </span>
+      {plan && step ? (
+        <span className={styles.callBarStep} data-testid="call-bar-step">
+          Step {step.position}/{plan.steps.length}
+        </span>
+      ) : null}
       {live?.startedAt ? (
         <span className={styles.callBarTimer}>{formatDuration(secondsBetween(live.startedAt, live.endedAt, now))}</span>
       ) : null}
