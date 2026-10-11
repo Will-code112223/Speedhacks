@@ -1,0 +1,28 @@
+CONTEXT MCP — DESIGN ONLY; NOT IMPLEMENTED
+
+Core V1 uses REST, then authenticated webhooks and read-only call retrieval.
+Dial's documentation MCP provides docs; it cannot place our calls.
+
+Dial Context MCP is account-wide and currently documents only direction,
+user-number and agent-number headers. These do not prove customer identity or
+uniquely identify an authorized case. Discovery may omit or leave headers
+unexpanded. Do not make getCase(phoneNumber) or arbitrary caseId lookup tools.
+
+Before implementation, teammate 2 must agree how a per-attempt capability is
+bound to the actual call using a documented provider mechanism. None is verified
+in the current headers or create-call request schema. Do not embed secrets in
+spoken instructions or rely on an LLM to keep a capability secret.
+
+If a secure binding becomes available, propose (not yet a shared contract):
+- get_approved_context(): no arbitrary case argument; return only the frozen
+  approved facts attached to the short-lived capability's one attempt.
+- record_support_observation({quote, referenceNumber, requestedNextStep}):
+  append an untrusted observation, never mutate payment/approval automatically.
+
+T2 owns authentication, capability TTL/revocation, attempt/case ownership,
+audit persistence, deduplication and outcome evaluation. Deny discovery-time
+or cross-case requests. Never expose account-wide search, documents, credentials,
+actual refund issuance, settlement acceptance or caller-ID-based authorization.
+
+Source checked 2026-10-11:
+https://docs.getdial.ai/documentation/platform/context-mcp
