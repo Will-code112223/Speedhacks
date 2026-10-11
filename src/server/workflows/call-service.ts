@@ -70,7 +70,7 @@ export class WorkflowCallService {
       // Only structured known fields are passed, not raw interview messages or
       // uploaded document instructions. Sensitive identity/account fields are
       // unnecessary for an information-only inquiry and stay on the website.
-      const disclosedKeys = action.call.role === "insurer" ? ["insuranceProvider", "claimantRole", "vehicle", "incidentDescription"]
+      const disclosedKeys = action.call.role === "insurer" ? ["insuranceProvider", "claimantRole", "vehicle", "incidentDescription", "lossDate", "lossLocation"]
         : action.call.role === "other_party" ? ["lossDate", "lossLocation", "vehicle", "incidentDescription", "otherPartyName"]
         : ["merchantName", "product", "purchaseDate", "issue"];
       const facts = Object.fromEntries(disclosedKeys.map(key => [key, workflow.facts[key as keyof typeof workflow.facts]?.value ?? null]));

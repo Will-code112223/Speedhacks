@@ -117,6 +117,26 @@ function Workspace({ plans }: WorkspaceProps) {
   const showToolColumn = hasTool && wide && view === "chat";
   const showSheet = hasTool && !wide && sheetOpen && view === "chat";
   const railOverlay = narrow && railOpen && !onboarding;
+  const defaultedInsuranceCase = useRef<string | null>(null);
+
+  // Insurance starts with its information call. Later analysis and evidence
+  // revisions must not switch away from a browser task the person selected.
+  useEffect(() => {
+    if (!caseData) { defaultedInsuranceCase.current = null; return; }
+    if (intakeKind === "auto_insurance" && defaultedInsuranceCase.current !== caseData.id) {
+      defaultedInsuranceCase.current = caseData.id;
+      setSideTab("call");
+    }
+  }, [caseData?.id, intakeKind]);
+
+  const requestEvidence = () => {
+    setSheetOpen(false);
+    requestAnimationFrame(() => {
+      const input = document.querySelector<HTMLInputElement>("[data-evidence-input]");
+      input?.scrollIntoView({ block: "center", behavior: "smooth" });
+      input?.focus();
+    });
+  };
 
   // A call placed from this tab opens the call sheet on narrow screens.
   const startedCallId = active?.startedCall?.id ?? null;
@@ -165,15 +185,17 @@ function Workspace({ plans }: WorkspaceProps) {
     if (railOpen) closeRail();
   };
   const startNewCase = () => {
+    defaultedInsuranceCase.current = null;
     controller.selectCase(null);
     setSheetOpen(false);
     setSideTab("browser");
     openChat();
   };
   const selectCase = (key: string) => {
+    defaultedInsuranceCase.current = null;
     controller.selectCase(key);
     setSheetOpen(false);
-    setSideTab("browser");
+    setSideTab(key === active?.key && intakeKind === "auto_insurance" ? "call" : "browser");
     openChat();
   };
   const managePlans = () => {
@@ -227,7 +249,7 @@ function Workspace({ plans }: WorkspaceProps) {
       {hasBrowserCase ? <Button variant="ghost" size="small" aria-pressed={selectedTool === "browser"} onClick={() => setSideTab("browser")}>Browser</Button> : null}
       {hasTool ? <Button variant="ghost" size="small" aria-pressed={selectedTool === "call"} onClick={() => setSideTab("call")}>Call support</Button> : null}
     </div>
-    {selectedTool === "browser" && hasBrowserCase && caseData ? <BrowserPanel preset={browserPreset?.caseId === caseData.id && browserPreset.revision === caseData.revision ? browserPreset.action.browser ?? undefined : undefined} key={caseData.id} caseData={caseData} visible={view === "chat" && (wide || sheetOpen)} /> : hasCall ? callScreen() : hasBrowserCase && caseData ? <WorkflowCallPanel key={caseData.id} caseData={caseData} workflow={controller.workflow?.workflow ?? null} actionId={callPreset?.caseId === caseData.id ? callPreset.actionId : undefined} visible={view === "chat" && (wide || sheetOpen)} /> : <div className={styles.callGuide}><h2>Call support</h2><p>{callsSupported ? "Review the contact and request in chat, then approve the call when you are ready." : intakeKind === "auto_insurance" ? "Your call plans are in the action list. Calling additional insurance contacts requires a separate recipient-specific authorization flow." : "Finish preparing the case before reviewing its call contact and request."}</p></div>}
+    {selectedTool === "browser" && hasBrowserCase && caseData ? <BrowserPanel preset={browserPreset?.caseId === caseData.id && browserPreset.revision === caseData.revision ? browserPreset.action.browser ?? undefined : undefined} key={caseData.id} caseData={caseData} visible={view === "chat" && (wide || sheetOpen)} /> : hasCall ? callScreen() : hasBrowserCase && caseData ? <WorkflowCallPanel key={caseData.id} caseData={caseData} workflow={controller.workflow?.workflow ?? null} actionId={callPreset?.caseId === caseData.id ? callPreset.actionId : undefined} visible={view === "chat" && (wide || sheetOpen)} onRequestEvidence={requestEvidence} /> : <div className={styles.callGuide}><h2>Call support</h2><p>{callsSupported ? "Review the contact and request in chat, then approve the call when you are ready." : intakeKind === "auto_insurance" ? "Your call plans are in the action list. Calling additional insurance contacts requires a separate recipient-specific authorization flow." : "Finish preparing the case before reviewing its call contact and request."}</p></div>}
   </>;
 
 

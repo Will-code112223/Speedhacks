@@ -56,6 +56,26 @@ describe("durable live information call boundary (mock provider)", () => {
     expect(h.startCall).toHaveBeenCalledWith(expect.objectContaining({ to: auth.to, brief: auth.brief, authorizationId: auth.id }));
     expect((await h.cases.getCase(OWNER, h.c.id)).outcome.decision).toBe("unknown");
   });
+  it.each([true, false])("freezes known loss date/location without guessing absent facts or exposing identity (known: %s)", async known => {
+    const h = await harness();
+    const w = h.workflow.get(OWNER, h.c.id).workflow;
+    if (known) {
+      w.facts.lossDate = { label: "Loss date", value: "October 10, 2026", source: "user", sourceRefs: [] };
+      w.facts.lossLocation = { label: "Loss location", value: "Oakland parking lot", source: "user", sourceRefs: [] };
+    }
+    w.facts.customerName = { label: "Name", value: "PRIVATE-NAME", source: "user", sourceRefs: [] };
+    w.facts.customerEmail = { label: "Email", value: "private@example.com", source: "user", sourceRefs: [] };
+    new WorkflowStore(h.db).save(OWNER, w);
+    const auth = h.approve();
+    expect(auth.brief).toContain(known ? '"lossDate":"October 10, 2026"' : '"lossDate":null');
+    expect(auth.brief).toContain(known ? '"lossLocation":"Oakland parking lot"' : '"lossLocation":null');
+    expect(auth.brief).not.toContain("PRIVATE-POLICY");
+    expect(auth.brief).not.toContain("PRIVATE-NAME");
+    expect(auth.brief).not.toContain("private@example.com");
+    await h.service.start(OWNER, h.c.id, { requestId: randomUUID(), authorizationId: auth.id });
+    expect(h.startCall).toHaveBeenCalledWith(expect.objectContaining({ brief: auth.brief }));
+    expect((await h.service.list(OWNER, h.c.id)).authorizations.find(item => item.id === auth.id)?.brief).toBe(auth.brief);
+  });
   it("rejects stale or superseded authorizations before any dispatch", async () => {
     const h = await harness(); const first = h.approve(); h.approve();
     await expect(h.service.start(OWNER, h.c.id, { requestId: randomUUID(), authorizationId: first.id })).rejects.toMatchObject({ code: "AUTHORIZATION_CONFLICT" });

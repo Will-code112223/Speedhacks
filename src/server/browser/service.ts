@@ -15,6 +15,7 @@ export interface BrowserDependencies {
   evidence(owner: string, caseId: string): Promise<StoredArtifact[]>;
   /** Current persisted interview brief, when the additive workflow is available. */
   preparation?(owner: string, caseId: string, revision: number): Promise<string | null>;
+  executionPolicy?(owner: string, caseId: string): Promise<NonNullable<BrowserRun["executionPolicy"]>>;
   launch(input: { startUrl: string; hosts: string[]; signal: AbortSignal; onLost(): void; onBlocked(host?: string): void }): Promise<BrowserPort>;
   now?: () => number;
 }
@@ -96,6 +97,7 @@ export class BrowserService {
     this.caseMatches(c, input);
     const artifacts = await this.deps.evidence(owner, c.id);
     const interviewBrief = await this.deps.preparation?.(owner, c.id, input.expectedRevision);
+    const executionPolicy = await this.deps.executionPolicy?.(owner, c.id) ?? "review_each_action";
     const afterRead = await this.deps.loadCase(owner, c.id); this.caseMatches(afterRead, input);
     const existing = this.deps.store.byRequest(owner, input.requestId);
     if (existing) {
@@ -113,7 +115,7 @@ export class BrowserService {
     const draft = interviewBrief ?? preparationDocument(afterRead);
     artifacts.unshift({ id: randomUUID(), name: "request.txt", mimeType: "text/plain", bytes: Buffer.from(draft) });
     const row: StoredRun = { owner, requestHash, draft, pending: null, executing: false, steps: 0,
-      run: { id, caseId: c.id, caseRevision: c.revision, requestId: input.requestId, status: "starting", task: input.task,
+      run: { id, caseId: c.id, caseRevision: c.revision, requestId: input.requestId, status: "starting", task: input.task, executionPolicy,
         startUrl: input.startUrl, allowedHosts: input.allowedHosts, currentUrl: null, pageTitle: null,
         message: "Starting a real isolated browser.", pendingAction: null, frameAvailable: false, events: [], createdAt: now, updatedAt: now,
         artifacts: artifacts.map(a => ({ id: a.id, name: a.name, mimeType: a.mimeType, sizeBytes: a.bytes.length, downloadUrl: `/api/browser/${id}/artifacts/${a.id}` })),
@@ -140,6 +142,15 @@ export class BrowserService {
         },
       });
       if (!this.active(w)) { await w.port.close(); return; }
+      if (w.row.run.executionPolicy === "inspect_only") {
+        const observed = await this.observation(w);
+        if (observed.hasPassword) {
+          this.finish(w, "completed", "Provider sign-in is required. The sample packet stays in Recourse; no sign-in, form filling or upload was performed.");
+        } else {
+          this.finish(w, "completed", "Provider page opened for reference. The sample packet stays in Recourse; no form filling, upload, or claim submission was performed.");
+        }
+        return;
+      }
       await this.plan(w);
     } catch (error) { this.finish(w, "failed", safeFailure(error, "Real browser could not start or observe the approved page. Check Chromium installation, approved hosts, and local display setup.")); }
     finally { w.busy = false; }

@@ -6,6 +6,9 @@ import { ApiRequestError, ApiUnreachableError } from "../../api/types";
 import { createWorkflowApi, type WorkflowApi } from "../client";
 import WorkflowPanel, { EvidencePicker, publicContactUrl } from "../WorkflowPanel";
 import { createWorkflowSession, EMPTY_WORKFLOW } from "../session";
+import ChatColumn from "../../chat/ChatColumn";
+import type { CaseSessionController } from "../../state/controller";
+import { initialSessionsState, sessionsReducer } from "../../state/session";
 
 async function response(revision = 1): Promise<WorkflowResponse> {
   const caseData = await createFixtureCaseApi({ scenario: "insurance_claim", latencyMs: 0 }).createCase({ summary: "Help prepare my car claim" });
@@ -134,6 +137,33 @@ describe("workflow recovery and mutation ordering", () => {
 });
 
 describe("workflow evidence and action UI", () => {
+  it("keeps an insurance case out of the legacy refund facts and approval form", async () => {
+    const value = await response();
+    value.case.mode = "live";
+    value.case.evidence = [{ id: "evidence-photo", name: "damage-photo.png", mimeType: "image/png" }];
+    const api = createFixtureCaseApi({ latencyMs: 0 });
+    let sessions = sessionsReducer(initialSessionsState, { type: "session/started", key: "insurance", api, scenario: null, text: "Prepare my claim", attachments: [], notice: null, at: value.case.createdAt });
+    sessions = sessionsReducer(sessions, { type: "create/succeeded", key: "insurance", caseData: value.case, liveCapable: false, at: value.case.updatedAt });
+    const noop = () => {};
+    const controller: CaseSessionController = {
+      apiMode: "http", scenario: null, setScenario: noop, fixtureSettings: { showLoading: false, v1Only: false }, setFixtureSettings: noop,
+      sessions: sessions.sessions, active: sessions.sessions[0]!, capabilities: null, call: null, live: null, liveError: null, pendingDecision: null, activeMs: 0,
+      selectCase: noop, send: async () => true, retryCreate: noop, saveFacts: async () => null, reloadCase: noop, retryUpdates: noop, approve: noop,
+      answerDecision: noop, dismissDecision: noop, stepIn: noop, leaveCall: noop, downloadPacket: noop,
+      workflow: { ...EMPTY_WORKFLOW, workflow: value.workflow, refresh: async () => {}, upload: async () => false, retry: async () => false, analyze: async () => false },
+    };
+    const html = renderToStaticMarkup(<ChatColumn controller={controller} fixture={false} phoneHint={null} planCount={0} callBar={null} metrics={null} />);
+    expect(html).toContain("Insurance packet"); expect(html).toContain("damage-photo.png");
+    expect(html).toContain("When did the damage happen?"); expect(html).toContain("Review call");
+    expect(html).not.toContain('data-testid="facts-card"'); expect(html).not.toContain('data-testid="approve-button"');
+    expect(html).not.toContain('data-testid="case-documents"');
+  });
+  it("shows the updated evidence revision without claiming an insurer submission", async () => {
+    const value = await response(4);
+    const html = renderToStaticMarkup(<WorkflowPanel controller={{ ...EMPTY_WORKFLOW, workflow: value.workflow, refresh: async () => {}, upload: async () => false, retry: async () => false, analyze: async () => false }} evidence={[{ id: "photo", name: "damage-photo.png", mimeType: "image/png" }, { id: "quote", name: "repair-estimate.txt", mimeType: "text/plain" }]} />);
+    expect(html).toContain("Revision 4"); expect(html).toContain("damage-photo.png"); expect(html).toContain("repair-estimate.txt");
+    expect(html).toContain("not submitted to an insurer");
+  });
   it("shows unknown facts, questions and real brief download without authorizing insurance calls", async () => {
     const value = await response(); const onAction = vi.fn();
     const html = renderToStaticMarkup(<WorkflowPanel controller={{ ...EMPTY_WORKFLOW, workflow: value.workflow, refresh: async () => {}, upload: async () => false, retry: async () => false, analyze: async () => false }} onAction={onAction} />);

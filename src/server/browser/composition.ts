@@ -10,6 +10,7 @@ import { BrowserStore } from "./store";
 import { OpenAIPlanner } from "./planner";
 import { launchBrowser } from "./playwright";
 import { getWorkflowService } from "@/server/workflows/composition";
+import { isSampleInsurance } from "./policy";
 
 const globals = globalThis as unknown as { __recourseBrowserService?: { key: string; service: BrowserService } };
 export function getBrowserService(): BrowserService {
@@ -25,6 +26,7 @@ export function getBrowserService(): BrowserService {
     store: new BrowserStore(path.join(config.dataDir, "browser")),
     planner: new OpenAIPlanner({ model: config.llm.model ?? "", apiKey: config.llm.apiKey ?? "", baseUrl: config.llm.baseUrl }),
     loadCase: async (owner, id) => owned(owner, id),
+    executionPolicy: async (owner, id) => isSampleInsurance(getWorkflowService().get(owner, id).workflow) ? "inspect_only" : "review_each_action",
     preparation: async (owner, id, revision) => {
       const response = getWorkflowService().get(owner, id);
       if (response.case.revision !== revision || response.workflow.caseRevision !== revision) {

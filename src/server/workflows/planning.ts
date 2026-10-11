@@ -15,6 +15,9 @@ const QUESTIONS: Record<WorkflowFactKey, string> = {
   otherPartyName: "Is another person involved whose information we may need?", otherPartyPhone: "If contact is needed, what number did that person give you, and do you have permission to contact them?",
 };
 export function rebuildWorkflow(workflow: CaseWorkflow, c: CaseV1, contacts: WorkflowContact[], now: string, state?: "processing" | "failed"): CaseWorkflow {
+  // AAA is a federation of regional clubs. An incident location does not tell
+  // us which company issued the policy; only an explicit CSAA carrier does.
+  contacts = withAaaPortal(workflow, contacts);
   const questions: WorkflowQuestion[] = requiredFor(workflow.kind).filter(key => !value(workflow, key))
     .map(field => ({ id: `question-${field}`, field, question: QUESTIONS[field], required: true }));
   if (workflow.kind === "auto_insurance" && !value(workflow, "policyNumber") && /policyholder|insured|owner/i.test(value(workflow, "claimantRole") ?? "")) {
@@ -49,8 +52,9 @@ export function rebuildWorkflow(workflow: CaseWorkflow, c: CaseV1, contacts: Wor
     const blockedBy = [...workflow.conflicts.map(() => "Resolve conflicting evidence before using it externally")];
     if (state === "processing") blockedBy.push("Interview extraction is in progress");
     if (state === "failed") blockedBy.push("Review the failed interview update before external action");
-    const task = `Help prepare this ${workflow.kind === "auto_insurance" ? "insurance request" : "customer request"}: ${(value(workflow, "issue") ?? c.reason).slice(0, 650)}. Requested outcome: ${(value(workflow, "desiredOutcome") ?? "clarification required").slice(0, 250)}. Review the provider's requirements and use the attached preparation document and evidence. Fill only known, supported facts. Stop and ask for missing facts; do not invent any. Stop before final submission, signing, attesting, accepting terms, payment, or any new commitment. The human must review each browser action. This task does not authorize phone calls.`;
-    actions.push({ id: `browser-${contact.id}`, type: "browser", title: `Open ${contact.name}`, description: "Review this sourced destination and its applicability. Open the real provider workflow; each browser step requires approval.",
+    const insurance = workflow.kind === "auto_insurance";
+    const task = `Help prepare this ${insurance ? "insurance request" : "customer request"}: ${(value(workflow, insurance ? "incidentDescription" : "issue") ?? c.reason).slice(0, 650)}. Requested outcome: ${(value(workflow, "desiredOutcome") ?? "clarification required").slice(0, 250)}. Review the provider's requirements and use the attached preparation document and evidence. Fill only known, supported facts. Stop and ask for missing facts; do not invent any. Stop before final submission, signing, attesting, accepting terms, payment, or any new commitment. The human must review each browser action. This task does not authorize phone calls.${insurance ? " Confirm the actual policy carrier and policy ZIP with the user; never infer them from the incident location. Sample or role-play records are for local review only: do not type or upload them to a real provider. Browser preparation is not insurer approval or a filed claim." : ""}`;
+    actions.push({ id: `browser-${contact.id}`, type: "browser", title: `Open ${contact.name}`, description: insurance ? "View the real provider portal. Confirm the carrier and policy details first; stop before submission. Sample records stay in Recourse." : "Review this sourced destination and its applicability. Open the real provider workflow; each browser step requires approval.",
       status: blockedBy.length ? "blocked" : "ready", blockedBy, browser: { startUrl: url.href, allowedHosts: [url.hostname], task }, call: null });
   }
   if (!browserContacts.length) actions.push({ id: "provider-portal-needed", type: "clarify", title: "Confirm the provider's official portal", description: "No sourced provider portal is available for the current facts.", status: "blocked", blockedBy: ["Confirm the merchant or insurer and an official destination"], browser: null, call: null });
@@ -69,6 +73,21 @@ export function rebuildWorkflow(workflow: CaseWorkflow, c: CaseV1, contacts: Wor
   }
   const stage = state === "processing" ? "in_progress" : state === "failed" || workflow.conflicts.length ? "needs_review" : questions.some(q => q.required) ? "collecting" : "ready";
   return { ...workflow, caseRevision: c.revision, stage, questions, contacts, brief: { title, body, updatedAt: now }, actions, updatedAt: now };
+}
+
+/** Official entry points verified 2026-10-11. Never invent a club or policy ZIP. */
+function withAaaPortal(workflow: CaseWorkflow, contacts: WorkflowContact[]): WorkflowContact[] {
+  if (workflow.kind !== "auto_insurance" || contacts.some(contact => contact.role === "insurer" && contact.url)) return contacts;
+  const provider = value(workflow, "insuranceProvider") ?? "";
+  const csaa = /\bCSAA\b/i.test(provider);
+  if (!csaa && !/\bAAA\b/i.test(provider)) return contacts;
+  return [...contacts, {
+    id: csaa ? "csaa-mypolicy" : "aaa-regional-entry", role: "insurer", phone: null,
+    name: csaa ? "CSAA MyPolicy (policy ZIP required)" : "AAA (confirm your regional club)",
+    url: csaa ? "https://www.mypolicy.csaa-insurance.aaa.com/" : "https://www.aaa.com/",
+    source: "knowledge_base", sourceUrl: csaa ? "https://csaa-insurance.aaa.com/content/aaa-ie/b2c/en/misc/manage-mypolicy.html/" : "https://www.aaa.com/",
+    requiresConfirmation: true,
+  }];
 }
 export function nextAssistantMessage(workflow: CaseWorkflow): string {
   if (workflow.conflicts.length) return `I found conflicting information and kept the earlier value unchanged. ${workflow.questions.filter(q => q.id.startsWith("conflict-")).map(q => q.question).slice(0, 2).join(" ")}`;

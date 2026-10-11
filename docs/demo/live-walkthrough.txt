@@ -1,69 +1,96 @@
-Recourse: two real-service walkthroughs
+Recourse: car-insurance rehearsal
 
-Setup
-Pull main; npm ci; configure .env.local from .env.example using your own funded
-OpenAI and Dial credentials. For dev:live put Dial settings in the private file
-~/.config/speedhacks/dial.env. Install Chromium with npx playwright install chromium.
-Set REFUND_MODE=live, BROWSER_ENABLED=true and BROWSER_HEADLESS=false.
-Run npm run dev:live. Use http://127.0.0.1:3000/ without ?api=fixture.
-Cases are owner-cookie scoped in local SQLite; git pull does not share cases,
-credentials, authenticated browser sessions or private evidence between teammates.
+Outcome to demonstrate
+Prepare a source-linked case brief; call a consenting participant acting as an
+AAA representative; show the actual returned transcript and document request;
+attach the labeled sample photos and estimate; review the updated packet.
+Keep the sample packet in Recourse. Show AAA's public site separately, read-only.
+The result is a prepared packet, not a submitted or approved insurance claim.
 
-Amazon return
-1. Paste the private order intake prepared for the presenter. Attach the actual
-   screenshot. Public teammates should use their own order and truthful reason.
-2. Send once; allow the real model to prepare questions, facts, brief and actions.
-   The presenter's chosen reason is wrong size. Check the screenshot's order
-   total separately from the item price/refund amount; don't assume they match.
-3. Open Amazon order history from the browser action. Review the task, sign in
-   when prompted and approve the proposed browser steps. The side viewer shows
-   actual browser frames. Stop for unknown details and review final submission.
-4. Do not claim a completed return/refund without the provider's confirmation.
-   Amazon login, CAPTCHA, cross-host navigation and return eligibility may block
-   the run. This exact Amazon return has not been verified end to end.
+Before recording
+1. Configure .env.local from .env.example with funded OpenAI and Dial credentials.
+   For dev:live, Dial settings may live in ~/.config/speedhacks/dial.env.
+   Set REFUND_MODE=live, BROWSER_ENABLED=true and BROWSER_HEADLESS=false.
+   Install Chromium with npx playwright install chromium. Run npm run dev:live.
+   Open http://127.0.0.1:3000/ without ?api=fixture.
+2. Have docs/demo/samples/auto-insurance-intake.txt ready to paste and these two
+   files ready in the file chooser: auto-damage-sample.png and
+   auto-repair-estimate.txt. Both are clearly labeled synthetic examples.
+3. Have a willing participant ready on speakerphone. Confirm their number in
+   the app yourself. Do not choose a number from the insurer directory for this
+   role-play. Agree that they will request photos and an estimate, not claim
+   that a real loss, policy, claim approval or payment exists.
+4. Preserve your current browser session. Cases belong to an owner cookie in
+   local SQLite; another browser, teammate or cleared cookie may not see them.
+   Git does not share cases, credentials, phone numbers or signed-in sessions.
 
-Car insurance information call and follow-up
-1. Paste samples/auto-insurance-intake.txt. Send once and review the prepared brief.
-2. Choose Review insurer information call. Enter the consenting participant's
-   phone, not an official AAA number. Select 60–120 seconds for a short run.
-3. Authorize call, review the frozen brief, then Place live call. Only the last
-   action dispatches. Use the recipient's speakerphone for live audience audio.
-4. Participant asks: What vehicle and damage? When/where? Are photos and a repair
-   estimate available? Then: Please provide damage photos and a repair estimate
-   so we can review the next steps. Do not pretend a real claim was opened.
-5. Wait for real Call results/transcript; late transcripts can take another poll.
-   Recording is post-call. Refresh reconciles; it does not place another call.
-6. Attach samples/auto-damage-sample.png and samples/auto-repair-estimate.txt using
-   Evidence, then Upload evidence. These files are visibly synthetic examples.
-   A successful real analysis automatically updates the saved brief, evidence
-   index and action list. Review facts/conflicts and download the updated brief.
-7. This ends with a packet prepared in Recourse for review, per the user's choice.
-   There is no automatic external submission, new call, email or SMS here.
+Recording sequence (you operate the website)
+1. Start a new car-insurance case. Paste auto-insurance-intake.txt and Send once.
+   Wait for analysis to complete. Review the facts and preparation document.
+   An unknown policy number or repair amount is not a reason to invent one.
+2. Under Review insurer information call, choose Review call. Enter the participant's
+   number, select 60–120 seconds, and confirm the recipient. Authorize call,
+   review the frozen brief, then Place live call. Only that final button calls.
+3. The participant asks: "What vehicle and damage?" and "When and where?"
+   Then says: "Please provide damage photos and a repair estimate so we can
+   review the next steps." End the call normally. Speakerphone supplies live
+   audience audio; the website recording, if available, is for after the call.
+4. Keep the case open. Wait for Call results, the transcript and the recipient's
+   quoted document request. A completed call may initially say transcript
+   pending. Refresh checks the existing attempt; it does not place another call.
+5. Choose Add requested documents in the latest call result, attach both sample
+   files using Evidence, then Upload evidence. Wait for the
+   real analysis to finish. Show the updated brief's evidence index and download
+   the updated preparation document. No second call is needed or automatic.
+6. Open the AAA public-site action separately if desired. The side browser can
+   show the actual public page. With this sample case, keep it read-only: do not
+   log in, enter policy details, fill claim fields, upload files or submit.
+   Finish by showing the packet in Recourse, ready for the user's review.
 
-What is and isn't established
-Live calls to a consenting human and actual transcript/recording retrieval were
-verified previously. Website call ownership, approvals, dispatch deduplication,
-late results and UI recovery are tested with mocked provider responses.
-The merged code passed 777 tests, typecheck and production build on 2026-10-11.
-Real model intake was previously exercised with three synthetic scenarios.
-On 2026-10-11 the expanded real-model check completed the sample insurance intake
-in 4.769s and image/estimate upload in 4.963s. It verified two persisted evidence
-files, regenerated brief, unchanged unknown/unverified outcome, and a same-ID
-upload retry with no duplicate files or revision change. No call was dispatched.
-Earlier attempts hit a clarification conflict and a model error; a later pass
-does not establish deterministic success. Review any conflict; if analysis fails,
-the saved input can be analyzed again using the explicit retry control.
-Reproduce (paid model use, no external browser/call/submission):
+Fast recovery
+- Analysis still processing: wait; do not create a second case or resubmit.
+- Analysis failed: saved answers/evidence remain; use the explicit retry control.
+- Conflicting fact: enter the correct clarification, then review the updated
+  brief before external actions. Do not bypass an actual conflict for the video.
+- Call connecting/uncertain: keep the existing attempt and refresh its status.
+  Do not authorize another call until the first attempt is resolved.
+- Transcript pending: wait for a later poll; do not claim a returned document
+  request until the actual recipient's words are visible.
+- AAA site unavailable, regional routing, login or CAPTCHA: show the saved
+  packet and stop the public-site portion. Never substitute a fake live page.
+
+Acceptance before saying the rehearsal passed
+[ ] Insurance analysis completes with no unresolved contradictions.
+[ ] Prepared brief includes vehicle, incident date/location and observed damage.
+[ ] Authorization identifies the reviewed participant, purpose and time limit.
+[ ] Exactly one live call is dispatched after the user's Place live call action.
+[ ] Actual call results and transcript appear in this same case.
+[ ] Recipient's document request is visibly attributed to the recipient.
+[ ] Both evidence files appear once; updated brief survives reopening the case.
+[ ] Claim/payment outcome remains unknown/unverified; nothing is submitted.
+[ ] AAA public page is shown separately; no sample data reaches its forms.
+
+Verification scope
+The combined insurance-demo regression exercises the real services, SQLite,
+revision handling, private evidence storage, call-result extraction and reload
+recovery with mocked extraction and Dial transport. It covers a late transcript,
+duplicate request replay, unchanged unknown outcome and no automatic second call.
+Run: npx vitest run tests/workflows/insurance-demo.test.ts
+This is not proof of a completed live website rehearsal or AAA form support.
+
+Real model intake and upload have been verified separately on the sample packet.
+The latest run took 4.438s for intake and 4.366s for photo/estimate analysis,
+with zero conflicts. An earlier intake omitted the claimant role, so the public
+prefill now labels each field explicitly. Earlier runs also required clarification
+or model retry. These checks do not make model output or timing deterministic.
+Reproduce (paid model use; no calls or external submission):
 LIVE_WORKFLOW_SMOKE=1 WORKFLOW_SMOKE_SCENARIO=insurance-preparation node --env-file=.env.local node_modules/vite-node/vite-node.mjs --config vitest.config.ts scripts/workflow-model-smoke.ts
-The saved local-browser permission has prevented full visual/end-to-end website
-verification. Do not describe these two complete journeys as rehearsed yet.
-For a short presentation, prepare and review both briefs before starting; show
-the real call and follow-up upload during the presentation. External timing is
-variable; the previous human call lasted 67 seconds. Model requests can take up
-to 90 seconds each. Do not promise a fixed total runtime.
+Prior separate live calls to a consenting human returned real transcripts and
+recordings; that history is not a new website call. Check the above acceptance
+items during this manual rehearsal before recording the final submission video.
 
 Sample provenance
 auto-insurance-intake.txt and auto-repair-estimate.txt are authored sample text.
 auto-damage-sample.png is generated illustrative imagery with permanent labels.
-None of these are real customer evidence. Keep the presenter's real Amazon
-order screenshot and personal prefill outside the shared repository.
+None is real loss evidence. AAA portals depend on the correct regional insurer,
+policy and login; viewing a public page establishes no coverage or claim approval.

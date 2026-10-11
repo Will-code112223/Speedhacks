@@ -389,8 +389,8 @@ function ThreadEntry(props: ThreadEntryProps) {
       return (
         <li className={[styles.assistant, groupedClass].join(" ")}>
           {grouped ? null : <MessageMeta who="Recourse" at={item.at} />}
-          {controller.workflow ? <WorkflowPanel controller={controller.workflow} onAction={onWorkflowAction} onRetry={onRetryWorkflow} /> : null}
-          <p className={styles.text}>Case details</p>
+          {controller.workflow ? <WorkflowPanel controller={controller.workflow} evidence={caseData.evidence} onAction={onWorkflowAction} onRetry={onRetryWorkflow} /> : null}
+          {controller.workflow?.workflow?.kind !== "auto_insurance" ? <><p className={styles.text}>Case details</p>
           <FactsCard
             key={session.reloads}
             caseData={caseData}
@@ -408,7 +408,7 @@ function ThreadEntry(props: ThreadEntryProps) {
             onReload={controller.reloadCase}
             onDirtyChange={(dirty) => onFactsDirty(session.key, dirty)}
             onStartNewCase={startNewCase}
-          />
+          /></> : null}
           {controller.workflow?.workflow?.kind !== "auto_insurance" ? <CaseDocuments
             caseData={caseData}
             fixture={fixture}
