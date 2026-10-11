@@ -82,6 +82,7 @@ Without a token in simulated mode the check reads the same synthetic customers f
 ```bash
 # 1. sign up, send "#SpeedHacks" in the in-app chat, create an API key and an access token, put them in .env.local
 npm run keewano:seed                       # backfill the synthetic charge history (idempotent per customer)
+npm run keewano:demo-cases -- --count 24   # generate synthetic cases over the HTTP API (own next dev, simulated calls) so the mirror fills Keewano; --seed, --concurrency, BASE_URL
 npm run keewano:sql -- --tools             # what the MCP server offers (set KEEWANO_SQL_TOOL/ARG if the guess is wrong)
 npm run keewano:sql -- --charges sam@example.com   # the exact query the duplicate check runs (--raw to see the tool result)
 npm run keewano:sql -- "SELECT count(DISTINCT user_id) AS entities, count(*) AS events FROM events"

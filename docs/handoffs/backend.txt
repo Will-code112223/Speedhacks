@@ -189,3 +189,4 @@ KEEWANO (optional sponsor integration; nothing in the shared contract changed)
 - New dependency: @modelcontextprotocol/sdk (MCP client). T1: nothing to do; the timeline already carries the finding.
   Judging criteria from the quickstart: Keewano must be load-bearing (here: the brief changes with the finding) and at
   least one live query must run in the demo (here: the check on case creation / review screen).
+- Demo data: npm run keewano:demo-cases [-- --count 24 --seed 1 --concurrency 3] creates synthetic cases over the HTTP API (create → authorize → call → poll; own next dev on a free port with DATA_DIR=./data-demo unless BASE_URL is set) with a planned outcome mix per merchant (src/integrations/keewano/demo-plan.ts; scenario = last four digits of supportPhone), so the mirror fills Keewano for "which merchants approve" / "where do cases stall" queries.
