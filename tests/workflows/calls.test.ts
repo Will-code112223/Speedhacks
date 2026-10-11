@@ -56,6 +56,18 @@ describe("durable live information call boundary (mock provider)", () => {
     expect(h.startCall).toHaveBeenCalledWith(expect.objectContaining({ to: auth.to, brief: auth.brief, authorizationId: auth.id }));
     expect((await h.cases.getCase(OWNER, h.c.id)).outcome.decision).toBe("unknown");
   });
+  it("asks how to file the specific claim while preserving the no-submission boundary", async () => {
+    const h = await harness(); const auth = h.approve();
+    expect(auth.brief).toContain("helping prepare an auto insurance claim");
+    expect(auth.brief).toContain("Immediately summarize the known vehicle, damage, date and location");
+    expect(auth.brief).toContain("How should the customer file an auto insurance claim for the specific vehicle damage");
+    expect(auth.brief).toContain("Answer the representative's follow-up questions using only those approved facts");
+    expect(auth.brief).toContain("Do not ask the representative to open a claim");
+    expect(auth.brief).not.toContain("ask general requirements only");
+    expect(h.startCall).not.toHaveBeenCalled();
+    await h.service.start(OWNER, h.c.id, { requestId: randomUUID(), authorizationId: auth.id });
+    expect(h.startCall).toHaveBeenCalledWith(expect.objectContaining({ brief: auth.brief }));
+  });
   it.each([true, false])("freezes known loss date/location without guessing absent facts or exposing identity (known: %s)", async known => {
     const h = await harness();
     const w = h.workflow.get(OWNER, h.c.id).workflow;
