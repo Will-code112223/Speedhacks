@@ -9,12 +9,12 @@
  */
 
 import { useId, useState } from "react";
-import type { CallV1, CaseV1 } from "../../../contracts/case";
+import type { CallV1, CaseChanges, CaseV1 } from "../../../contracts/case";
 import { UI_CALL_PURPOSES, type UiCallPurpose } from "../api/types";
-import { Banner, Button, KeyValueList, Mono, Pill } from "../ui/primitives";
+import { Banner, Button, Field, KeyValueList, Mono, Pill } from "../ui/primitives";
 import { formatClock, formatMoney, formatPhone } from "../ui/format";
 import type { UiError } from "../state/errors";
-import { labelForServerField } from "../state/facts";
+import { factKeyForServerField, labelForServerField } from "../state/facts";
 import { blockingMissingFields, initialPurpose, PURPOSE_LABELS, purposeNeedsAmount } from "../state/purpose";
 import styles from "./ApprovalCard.module.css";
 
@@ -39,6 +39,11 @@ export interface ApprovalCardProps {
   error: UiError | null;
   /** Calls are blocked while the facts card has unsaved edits or a conflict. */
   blockedReason: string | null;
+  /**
+   * Saves facts the chosen purpose still needs, from the inline form in this card.
+   * Absent: the card only names the missing facts and points at the facts card above.
+   */
+  onSaveFacts?: (changes: CaseChanges, expectedRevision: number) => Promise<CaseV1 | null>;
   onApprove: (purpose: UiCallPurpose) => void;
   /** Offered when the server says the case belongs to a different mode. */
   onStartNewCase?: () => void;
@@ -102,8 +107,118 @@ function provenance(source: CaseV1["merchant"]["source"]): string {
   return `${parts.join(", ")}. Confirm it matches the number on your ID card.`;
 }
 
+type InlineKind = "text" | "tel" | "date" | "number" | "textarea";
+
+interface InlineField {
+  /** The server's field name, as missingFields reports it. */
+  field: string;
+  label: string;
+  kind: InlineKind;
+  hint?: string;
+  wide?: boolean;
+  /** Not required on its own (the policy number and the name stand in for each other). */
+  optional?: boolean;
+}
+
+/** The inline controls for the facts a purpose still needs, in the server's order. */
+function inlineFields(missing: string[], caseData: CaseV1): InlineField[] {
+  const out: InlineField[] = [];
+  const add = (f: InlineField) => {
+    if (!out.some((o) => o.field === f.field)) out.push(f);
+  };
+  for (const field of missing) {
+    switch (field) {
+      case "policyNumber":
+        add({ field, label: labelForServerField(field), kind: "text", hint: "From your declarations page or insurance ID card, or add your name instead.", optional: true });
+        if (!caseData.customer.name?.trim()) add({ field: "customer.name", label: labelForServerField("customer.name"), kind: "text", hint: "The policyholder the agent calls for.", optional: true });
+        break;
+      case "merchant.supportPhone":
+        add({ field, label: labelForServerField(field), kind: "tel", hint: "Any number, for example the one on your insurance ID card." });
+        break;
+      case "amountMinor":
+        add({ field, label: labelForServerField(field), kind: "number", hint: "In dollars." });
+        break;
+      case "incidentDate":
+        add({ field, label: labelForServerField(field), kind: "date" });
+        break;
+      case "lossDescription":
+        add({ field, label: labelForServerField(field), kind: "textarea", wide: true, hint: "What happened and what was damaged, in your words." });
+        break;
+      case "reason":
+        add({ field, label: labelForServerField(field), kind: "textarea", wide: true });
+        break;
+      case "currency":
+        add({ field, label: labelForServerField(field), kind: "text", hint: "Three-letter code, for example USD." });
+        break;
+      default:
+        add({ field, label: labelForServerField(field), kind: "text" });
+    }
+  }
+  return out;
+}
+
+/** A typed North American number becomes E.164; anything else is sent as typed for the server to judge. */
+function inlinePhone(raw: string): string {
+  const trimmed = raw.trim();
+  if (trimmed.startsWith("+")) return `+${trimmed.slice(1).replace(/\D/g, "")}`;
+  const digits = trimmed.replace(/\D/g, "");
+  if (digits.length === 10) return `+1${digits}`;
+  if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
+  return trimmed;
+}
+
+/** The CaseChanges the inline form produces; untouched fields are left out so nothing else changes. */
+function inlineChanges(fields: InlineField[], values: Record<string, string>, caseData: CaseV1): CaseChanges {
+  const changes: CaseChanges = {};
+  for (const f of fields) {
+    const v = values[f.field]?.trim();
+    if (!v) continue;
+    switch (f.field) {
+      case "customer.name":
+        changes.customer = { name: v, email: caseData.customer.email };
+        break;
+      case "merchant.name":
+        changes.merchant = { name: v, supportPhone: changes.merchant?.supportPhone ?? caseData.merchant.supportPhone };
+        break;
+      case "merchant.supportPhone":
+        changes.merchant = { name: changes.merchant?.name ?? caseData.merchant.name, supportPhone: inlinePhone(v) };
+        break;
+      case "amountMinor": {
+        const amount = Number(v.replace(/[^0-9.]/g, ""));
+        if (Number.isFinite(amount)) changes.amountMinor = Math.round(amount * 100);
+        break;
+      }
+      case "currency":
+        changes.currency = v.toUpperCase();
+        break;
+      case "reason":
+        changes.reason = v;
+        break;
+      case "policyNumber":
+        changes.policyNumber = v;
+        break;
+      case "incidentDate":
+        changes.incidentDate = v;
+        break;
+      case "lossDescription":
+        changes.lossDescription = v;
+        break;
+      case "claimType":
+        changes.claimType = v;
+        break;
+      default:
+        break;
+    }
+  }
+  return changes;
+}
+
 export default function ApprovalCard(props: ApprovalCardProps) {
-  const { caseData, placedCall, current, live = false, requestText, busy, stage, error, blockedReason, onApprove, onStartNewCase, onPurposeChange } = props;
+  const { caseData, placedCall, current, live = false, requestText, busy, stage, error, blockedReason, onApprove, onStartNewCase, onPurposeChange, onSaveFacts } = props;
+  // Values typed into the inline form for facts the chosen purpose still needs, keyed by server field.
+  const [inline, setInline] = useState<Record<string, string>>({});
+  const [inlineSaving, setInlineSaving] = useState(false);
+  const [inlineError, setInlineError] = useState<string | null>(null);
   const checkboxId = useId();
   const headingId = useId();
   const purposeName = useId();
@@ -186,14 +301,93 @@ export default function ApprovalCard(props: ApprovalCardProps) {
         Fill in the missing facts above ({missing.map(labelForServerField).join(", ").toLowerCase()}), then {verb} the call here.
       </p>
     );
-    if (!anotherReady) return waiting;
+    if (!onSaveFacts) {
+      if (!anotherReady) return waiting;
+      return (
+        <section className={styles.card} aria-labelledby={headingId}>
+          <h3 id={headingId} className={styles.title}>
+            What should the call to {merchant} do?
+          </h3>
+          {purposePicker}
+          {waiting}
+        </section>
+      );
+    }
+
+    // The server says "policyNumber" when neither the policy number nor the name is known: offer both.
+    const fields = inlineFields(missing, caseData);
+    const value = (field: string) => inline[field] ?? "";
+    const filled = (field: string) => value(field).trim().length > 0;
+    const complete = fields.every((f) => (f.optional ? true : filled(f.field))) && (!fields.some((f) => f.field === "policyNumber") || filled("policyNumber") || filled("customer.name"));
+
+    const saveInline = async () => {
+      if (!complete || inlineSaving) return;
+      setInlineSaving(true);
+      setInlineError(null);
+      try {
+        const saved = await onSaveFacts(inlineChanges(fields, inline, caseData), caseData.revision);
+        if (saved) setInline({});
+        else setInlineError("Could not save these facts. Check the facts card above and try again.");
+      } finally {
+        setInlineSaving(false);
+      }
+    };
+
     return (
-      <section className={styles.card} aria-labelledby={headingId}>
+      <section className={styles.card} aria-labelledby={headingId} data-testid="approval-missing-facts">
         <h3 id={headingId} className={styles.title}>
-          What should the call to {merchant} do?
+          {live ? "Place the call" : "Approve the call"} to {merchant}
+          {phone ? (
+            <>
+              {" "}
+              at <Mono>{phone}</Mono>
+            </>
+          ) : null}
         </h3>
         {purposePicker}
-        {waiting}
+        <p className={styles.inlineLead}>
+          To {PURPOSE_LABELS[purpose].toLowerCase()}, the agent still needs {fields.length === 1 ? "one fact" : `${fields.length} facts`}. Add {fields.length === 1 ? "it" : "them"} here and the plan above updates.
+        </p>
+        <div className={styles.inlineForm}>
+          {fields.map((f) => (
+            <div key={f.field} className={f.wide ? styles.inlineWide : undefined}>
+              {f.kind === "textarea" ? (
+                <Field
+                  as="textarea"
+                  label={f.label}
+                  rows={3}
+                  value={value(f.field)}
+                  hint={f.hint}
+                  disabled={inlineSaving || busy}
+                  onChange={(event) => setInline((prev) => ({ ...prev, [f.field]: event.target.value }))}
+                  data-testid={`approval-missing-${f.field}`}
+                />
+              ) : (
+                <Field
+                  label={f.label}
+                  type={f.kind}
+                  inputMode={f.kind === "number" ? "decimal" : f.kind === "tel" ? "tel" : undefined}
+                  step={f.kind === "number" ? "0.01" : undefined}
+                  min={f.kind === "number" ? "0" : undefined}
+                  autoComplete="off"
+                  value={value(f.field)}
+                  hint={f.hint}
+                  disabled={inlineSaving || busy}
+                  onChange={(event) => setInline((prev) => ({ ...prev, [f.field]: event.target.value }))}
+                  data-testid={`approval-missing-${f.field}`}
+                />
+              )}
+            </div>
+          ))}
+        </div>
+        {inlineError ? <p className={styles.note}>{inlineError}</p> : null}
+        {blockedReason ? <p className={styles.note}>{blockedReason}</p> : null}
+        <div className={styles.inlineActions}>
+          <Button variant="primary" onClick={saveInline} disabled={!complete || blockedReason !== null} busy={inlineSaving} busyLabel="Saving" data-testid="approval-missing-save">
+            Save and continue
+          </Button>
+          <span className={styles.inlineLead}>Then confirm and {verb} the call here.</span>
+        </div>
       </section>
     );
   }
