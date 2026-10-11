@@ -109,3 +109,7 @@ Verdict logic:
 - **PASS:** otherwise.
 
 See [docs/architecture.md](docs/architecture.md) for the design and the roadmap.
+
+## Contributing
+
+New to the repo? Set up Alike first so your coding agent shares decisions with the team: see [docs/alike-workflow.md](docs/alike-workflow.md), then run `./scripts/setup-alike.sh`.
