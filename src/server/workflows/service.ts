@@ -14,7 +14,7 @@ import { ApiHttpError, badRequest, notFound } from "@/server/http/errors";
 import type { Db } from "@/server/persistence/db";
 import type { CaseRepository, CaseRow } from "@/server/persistence/repository";
 import { workflowContacts } from "./contacts";
-import { caseFacts, FACT_KEYS, FACT_LABELS, initialKind } from "./facts";
+import { caseFacts, e164Phone, FACT_KEYS, FACT_LABELS, initialKind, isPhoneKey, refinedValue, samePhone } from "./facts";
 import { parseWorkflowExtraction, WorkflowModelError, type WorkflowExtractor, type WorkflowExtraction } from "./extractor";
 import { nextAssistantMessage, rebuildWorkflow } from "./planning";
 import { WorkflowStore, type WorkflowOperation } from "./store";
@@ -230,9 +230,12 @@ export class WorkflowService {
       const source = sources.get(candidate.sourceId);
       if (!source || (source.text !== null && !normal(source.text).includes(normal(candidate.quote))) || !normal(candidate.quote).includes(normal(candidate.value))) continue;
       const existing = next.facts[candidate.key];
-      const proposed: WorkflowFact = { label: FACT_LABELS[candidate.key], value: candidate.value, source: source.source, sourceRefs: [candidate.sourceId] };
+      const value = isPhoneKey(candidate.key) ? e164Phone(candidate.value) : candidate.value;
+      const proposed: WorkflowFact = { label: FACT_LABELS[candidate.key], value, source: source.source, sourceRefs: [candidate.sourceId] };
       if (!existing?.value) { next.facts[candidate.key] = proposed; continue; }
-      const same = normal(existing.value) === normal(candidate.value) || (candidate.key === "amount" && amountMinor(existing.value) !== null && amountMinor(existing.value) === amountMinor(candidate.value));
+      const same = normal(existing.value) === normal(candidate.value) ||
+        (candidate.key === "amount" && amountMinor(existing.value) !== null && amountMinor(existing.value) === amountMinor(candidate.value)) ||
+        (isPhoneKey(candidate.key) && samePhone(existing.value, candidate.value));
       if (same) { existing.sourceRefs = [...new Set([...existing.sourceRefs, candidate.sourceId])]; continue; }
       const explicitIntent = candidate.key === "desiredOutcome" && source.source === "user" && candidate.sourceId === latestUserId && /\b(?:want|need|request|seek|please|help|get|prepare)\b/i.test(source.text ?? "");
       const explicitCorrection = source.source === "user" && candidate.sourceId === latestUserId && candidate.resolvesConflict &&
@@ -243,6 +246,12 @@ export class WorkflowService {
       if ((candidate.key === "issue" || candidate.key === "incidentDescription") &&
         (normal(existing.value).includes(normal(candidate.value)) || normal(candidate.value).includes(normal(existing.value)))) {
         if (candidate.value.length > existing.value.length) existing.value = candidate.value;
+        existing.sourceRefs = [...new Set([...existing.sourceRefs, candidate.sourceId])]; continue;
+      }
+      // One source naming the fact more fully than another is agreement, not a conflict to put back to the person.
+      const refined = refinedValue(candidate.key, existing.value, candidate.value);
+      if (refined !== null) {
+        existing.value = refined;
         existing.sourceRefs = [...new Set([...existing.sourceRefs, candidate.sourceId])]; continue;
       }
       const conflict = `${candidate.key}: ${FACT_LABELS[candidate.key]} was recorded as “${existing.value}”, but another source says “${candidate.value}”. Which is correct?`;

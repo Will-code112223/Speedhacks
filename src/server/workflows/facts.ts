@@ -30,3 +30,48 @@ export function requiredFor(kind: WorkflowKind): WorkflowFactKey[] {
   return ["issue", "desiredOutcome"];
 }
 export function value(workflow: Pick<CaseWorkflow, "facts">, key: WorkflowFactKey): string | null { return workflow.facts[key]?.value?.trim() || null; }
+
+const PHONE_KEYS: ReadonlySet<WorkflowFactKey> = new Set<WorkflowFactKey>(["supportPhone", "otherPartyPhone"]);
+/** Descriptive keys, where a longer value that carries every word of a shorter one is the same fact stated more fully. */
+const REFINABLE_KEYS: ReadonlySet<WorkflowFactKey> = new Set<WorkflowFactKey>([
+  "customerName", "merchantName", "product", "issue", "desiredOutcome", "lossLocation", "vehicle",
+  "incidentDescription", "insuranceProvider", "claimantRole", "otherPartyName", "lossDate", "purchaseDate",
+]);
+export function isPhoneKey(key: WorkflowFactKey): boolean { return PHONE_KEYS.has(key); }
+/** "+19495200007" and "+1 (949) 520-0007" are one number; a leading US country code does not make two numbers. */
+const nationalDigits = (s: string): string => { const d = s.replace(/\D/g, ""); return d.length === 11 && d.startsWith("1") ? d.slice(1) : d; };
+export function samePhone(a: string, b: string): boolean {
+  const da = nationalDigits(a);
+  return da.length >= 7 && da === nationalDigits(b);
+}
+/** A phone number as the dialer needs it: E.164 for a North American number written any usual way, else as given. */
+export function e164Phone(value: string): string {
+  const d = nationalDigits(value.trim());
+  return d.length === 10 && /^\+?1?[\s().-]*\d/.test(value.trim()) ? `+1${d}` : value.trim();
+}
+const ROLE_SYNONYMS: [RegExp, string][] = [
+  [/\b(?:policy ?holder|named insured|the insured|insured|owner|customer)\b/, "policyholder"],
+  [/\b(?:other|third) party\b|\bclaimant against\b/, "other party"],
+  [/\bhelping|on behalf|representative|family member\b/, "helper"],
+];
+const canonicalRole = (s: string): string | null => ROLE_SYNONYMS.find(([re]) => re.test(s.toLowerCase()))?.[1] ?? null;
+const words = (s: string): string[] => s.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+/**
+ * The value to keep when two sources agree in substance but not in wording: the longer one, once
+ * every word of the shorter appears in it ("AAA" within "AAA Insurance (CSAA Insurance Group)",
+ * "red 2021 Toyota Camry" within "2021 Toyota Camry SE, red, 4-door sedan"). Null when they differ,
+ * and always null for identifiers, amounts, emails and phone numbers, which never refine this way.
+ */
+export function refinedValue(key: WorkflowFactKey, existing: string, candidate: string): string | null {
+  if (key === "claimantRole") {
+    const role = canonicalRole(existing);
+    return role !== null && role === canonicalRole(candidate) ? existing : null;
+  }
+  if (!REFINABLE_KEYS.has(key)) return null;
+  const a = words(existing), b = words(candidate);
+  if (a.length === 0 || b.length === 0) return null;
+  const candidateIsLonger = b.length >= a.length;
+  const [shorter, longer] = candidateIsLonger ? [a, b] : [b, a];
+  const pool = new Set(longer);
+  return shorter.every(w => pool.has(w)) ? (candidateIsLonger ? candidate : existing) : null;
+}

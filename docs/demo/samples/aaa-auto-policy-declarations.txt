@@ -1,0 +1,37 @@
+SAMPLE DOCUMENT FOR DEMO USE ONLY. Not a real policy. All names, numbers and amounts are invented.
+
+AAA Insurance (CSAA Insurance Group) - Personal Auto Policy - Declarations Page
+
+Named insured: Jordan Avery
+Mailing address: 1480 Market Street, Apt 12, San Francisco, CA 94102
+Policy number: CAA 0931 4471
+Policy period: March 14, 2026 to March 14, 2027, 12:01 a.m. standard time
+AAA membership number: 620 123 4471 9
+
+Insured vehicle
+  2021 Toyota Camry SE, red, 4-door sedan
+  VIN: 4T1G11AK5MU000000 (sample)
+  License plate: 7ABC123 (California)
+  Garaging location: San Francisco, CA 94102
+  Use: commute, under 15 miles each way
+
+Coverages and limits
+  Bodily injury liability: $100,000 each person / $300,000 each accident
+  Property damage liability: $50,000 each accident
+  Uninsured / underinsured motorist bodily injury: $100,000 / $300,000
+  Medical payments: $5,000 each person
+  Collision: actual cash value less $500 deductible
+  Comprehensive: actual cash value less $250 deductible
+  Rental reimbursement: $40 per day, up to 30 days
+  Towing and roadside: included with AAA membership
+
+Premium
+  Six-month premium: $842.00, paid in full on March 10, 2026
+
+Claims
+  Report a claim 24 hours a day.
+  Claims line for this demo: +1 (949) 520-0007
+  Have ready: policy number, date and location of loss, the other driver's plate and insurer, photos of the damage.
+
+Agent of record
+  AAA San Francisco branch, (415) 555-0150 (sample)
