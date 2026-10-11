@@ -36,6 +36,8 @@ export interface ChatColumnProps {
   callBar: ReactNode;
   /** The metrics strip shown above the composer once a call exists. */
   metrics: ReactNode;
+  /** Browser tasks do not enter the call authorization flow. */
+  allowCallApproval?: boolean;
 }
 
 const ASSISTANT_KINDS: ReadonlySet<ThreadItem["kind"]> = new Set(["assistant", "understood", "approval", "result"]);
@@ -45,7 +47,7 @@ const SAMPLE_PROMPTS = [
   "Help me prepare a car insurance claim.",
 ] as const;
 
-export default function ChatColumn({ controller, fixture, phoneHint, callBar, metrics }: ChatColumnProps) {
+export default function ChatColumn({ controller, fixture, phoneHint, callBar, metrics, allowCallApproval = true }: ChatColumnProps) {
   const session = controller.active;
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const draftKey = session?.key ?? "new";
@@ -137,6 +139,7 @@ export default function ChatColumn({ controller, fixture, phoneHint, callBar, me
               phoneHint={phoneHint}
               factsDirty={dirtyFacts[session.key] ?? false}
               onFactsDirty={reportFactsDirty}
+              allowCallApproval={allowCallApproval}
             />
           ) : null}
         </div>
@@ -175,6 +178,7 @@ function Thread({
   phoneHint,
   factsDirty,
   onFactsDirty,
+  allowCallApproval,
 }: {
   session: CaseSession;
   controller: CaseSessionController;
@@ -182,6 +186,7 @@ function Thread({
   phoneHint: string | null;
   factsDirty: boolean;
   onFactsDirty: (key: string, dirty: boolean) => void;
+  allowCallApproval: boolean;
 }) {
   const caseData = session.caseData;
   const call = currentCall(caseData, session.startedCall);
@@ -206,6 +211,7 @@ function Thread({
             phoneHint={phoneHint}
             factsDirty={factsDirty}
             onFactsDirty={onFactsDirty}
+            allowCallApproval={allowCallApproval}
           />
         );
       })}
@@ -300,6 +306,7 @@ interface ThreadEntryProps {
   phoneHint: string | null;
   factsDirty: boolean;
   onFactsDirty: (key: string, dirty: boolean) => void;
+  allowCallApproval: boolean;
 }
 
 function lockedReason(session: CaseSession, caseData: CaseV1, call: CallV1 | null): string | null {
@@ -311,7 +318,7 @@ function lockedReason(session: CaseSession, caseData: CaseV1, call: CallV1 | nul
 }
 
 function ThreadEntry(props: ThreadEntryProps) {
-  const { item, grouped, session, caseData, call, currentApprovalId, controller, fixture, phoneHint, factsDirty, onFactsDirty } = props;
+  const { item, grouped, session, caseData, call, currentApprovalId, controller, fixture, phoneHint, factsDirty, onFactsDirty, allowCallApproval } = props;
   const startNewCase = () => controller.selectCase(null);
   const groupedClass = grouped ? styles.grouped : "";
 
@@ -358,6 +365,7 @@ function ThreadEntry(props: ThreadEntryProps) {
             reloadError={session.reload.error}
             flaggedFields={session.approval.error?.kind === "missing_facts" ? session.approval.error.fieldKeys : []}
             phoneHint={phoneHint}
+            forCall={allowCallApproval}
             onSave={controller.saveFacts}
             onReload={controller.reloadCase}
             onDirtyChange={(dirty) => onFactsDirty(session.key, dirty)}
@@ -373,6 +381,7 @@ function ThreadEntry(props: ThreadEntryProps) {
       );
     case "approval": {
       if (!caseData) return null;
+      if (!allowCallApproval && item.callId === null) return null;
       const placed = item.callId
         ? (caseData.calls.find((candidate) => candidate.id === item.callId) ??
           (session.startedCall?.id === item.callId ? session.startedCall : null))

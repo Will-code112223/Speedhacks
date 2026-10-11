@@ -1,19 +1,20 @@
 import type { Mode } from "@/contracts/case";
+import { createHash } from "node:crypto";
 import type { VoiceAdapter } from "@/contracts/voice";
 import { createDialAdapter, type DialDependencies } from "@/integrations/dial";
 import { CaseService } from "@/server/cases/service";
 import { createSimulatedVoiceAdapter } from "@/server/cases/simulated-voice";
-import { type AppConfig, loadConfig } from "@/server/config";
+import { type AppConfig, assertLiveLlmConfig, assertModeValid, liveDialMissingConfig, loadConfig } from "@/server/config";
 import { type Extractor, HeuristicExtractor, OpenAIExtractor } from "@/server/documents/extractor";
 import { UploadStore } from "@/server/documents/storage";
 import { ApiHttpError } from "@/server/http/errors";
 import { openDatabase } from "@/server/persistence/db";
-import { CaseRepository } from "@/server/persistence/repository";
+import { createProductCaseRepository } from "@/integrations/keewano/product";
 
 /**
  * Composition root. Live voice is teammate 3's Dial adapter (src/integrations/dial,
- * handoff in docs/handoffs/dial.txt); simulated mode uses T2's own adapter so the
- * demo never depends on provider credentials.
+ * handoff in docs/handoffs/dial.txt). Explicit test mode retains offline adapters;
+ * the product uses real providers and exposes missing configuration.
  */
 const liveVoiceFactory: ((opts: { mode: Mode }, deps?: DialDependencies) => VoiceAdapter) | null = createDialAdapter;
 
@@ -23,11 +24,15 @@ export interface CompositionOverrides {
 }
 
 function buildExtractor(config: AppConfig): Extractor {
-  if (config.mode === "live" && config.llm.model && config.llm.apiKey) {
-    return new OpenAIExtractor({ model: config.llm.model, apiKey: config.llm.apiKey, baseUrl: config.llm.baseUrl });
-  }
-  // In live mode without LLM config, createCase fails visibly before this is used.
-  return new HeuristicExtractor();
+  if (config.mode === "simulated") return new HeuristicExtractor();
+  let extractor: OpenAIExtractor | null = null;
+  // Lazy validation keeps reads of existing cases available without extraction
+  // credentials. Even an unconfigured live service never contains a heuristic.
+  return { kind: "openai", async extract(input) {
+    assertLiveLlmConfig(config);
+    extractor ??= new OpenAIExtractor({ model: config.llm.model!, apiKey: config.llm.apiKey!, baseUrl: config.llm.baseUrl });
+    return extractor.extract(input);
+  } };
 }
 
 function buildVoiceResolver(config: AppConfig, overrides: CompositionOverrides = {}): () => VoiceAdapter {
@@ -41,19 +46,10 @@ function buildVoiceResolver(config: AppConfig, overrides: CompositionOverrides =
     // Dispatch and provider reads need the key and sending number. The webhook signing secret is
     // only required by the webhook route (see CaseService.handleWebhook), so a live call can be
     // placed and reconciled by polling before a receiver/subscription exists.
-    const missing: string[] = [];
-    if (!config.dial.apiKey) missing.push("DIAL_API_KEY");
-    if (!config.dial.fromNumber) missing.push("DIAL_FROM_NUMBER");
+    const missing = liveDialMissingConfig(config);
     if (missing.length > 0) {
-      throw new ApiHttpError(503, "LIVE_CONFIGURATION_MISSING", `Live voice requires ${missing.join(", ")}`, missing);
-    }
-    if (config.dial.maxCallDurationInvalid !== null) {
-      throw new ApiHttpError(
-        503,
-        "LIVE_CONFIGURATION_MISSING",
-        `DIAL_MAX_CALL_DURATION_SECONDS must be an integer from 60 to 3600 (got "${config.dial.maxCallDurationInvalid}")`,
-        ["DIAL_MAX_CALL_DURATION_SECONDS"],
-      );
+      const durationHelp = missing.includes("DIAL_MAX_CALL_DURATION_SECONDS") ? "; duration must be an integer from 60 to 3600 seconds" : "";
+      throw new ApiHttpError(503, "LIVE_CONFIGURATION_MISSING", `Live voice requires valid ${missing.join(", ")}${durationHelp}`, missing);
     }
     if (!liveVoiceFactory) {
       throw new ApiHttpError(503, "LIVE_CONFIGURATION_MISSING", "Live voice adapter is not wired yet (teammate 3 handoff pending)");
@@ -84,10 +80,11 @@ function buildVoiceResolver(config: AppConfig, overrides: CompositionOverrides =
 }
 
 export function buildCaseService(config: AppConfig = loadConfig(), overrides: CompositionOverrides = {}): CaseService {
+  assertModeValid(config);
   const db = openDatabase(config.dataDir);
   return new CaseService({
     config,
-    repo: new CaseRepository(db),
+    repo: createProductCaseRepository(db),
     uploads: new UploadStore(config.dataDir),
     extractor: buildExtractor(config),
     voice: buildVoiceResolver(config, overrides),
@@ -100,7 +97,9 @@ const globalCache = globalThis as unknown as { __refundService?: Cache };
 /** Process-wide service; survives Next dev reloads via globalThis. */
 export function getCaseService(): CaseService {
   const config = loadConfig();
-  const key = `${config.mode}|${config.dataDir}`;
+  // Readiness and the cached service must agree after a configuration change.
+  // Hash instead of retaining credentials in the diagnostic/cache key.
+  const key = createHash("sha256").update(JSON.stringify([config, process.env.KEEWANO_API_KEY, process.env.KEEWANO_LIVE_PROJECT_CONFIRMED])).digest("hex");
   const cached = globalCache.__refundService;
   if (cached && cached.key === key) return cached.service;
   const service = buildCaseService(config);

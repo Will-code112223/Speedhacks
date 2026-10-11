@@ -1,0 +1,233 @@
+LIVE PRODUCT SETUP — 2026-10-11
+
+This handoff supersedes older setup instructions that default to simulation.
+Normal development and production servers default to REFUND_MODE=live, including
+an omitted or blank value. REFUND_MODE=simulated is rejected unless NODE_ENV=test.
+Offline fixtures and simulated adapters remain available to automated tests;
+they are not a runtime fallback for failed credentials or provider requests.
+
+SETUP
+
+1. Use the repository's Node version (.nvmrc: 24), install the locked dependencies
+   with npm ci, and install the browser once with:
+     npx playwright install chromium
+   This installs an executable; it does not start a browser or verify any insurer.
+
+2. Create .env.local from .env.example without overwriting an existing local file.
+   Keep real values out of git and out of NEXT_PUBLIC_* variables. Configure:
+     REFUND_MODE=live
+     LLM_PROVIDER=openai
+     LLM_MODEL=<a model your account can use for the implemented Responses request>
+     OPENAI_API_KEY=<server-side account key>
+     BROWSER_ENABLED=true
+     BROWSER_HEADLESS=false
+   The extraction implementation uses Responses API structured JSON output and
+   PDF/image inputs. Model access, input support, billing and rate limits must be
+   verified with the account; a nonempty model name does not establish those.
+   OPENAI_BASE_URL is optional and defaults to https://api.openai.com/v1. A custom
+   endpoint must support the same Responses request; do not put credentials in
+   its URL. LLM_PROVIDER values other than openai are not implemented.
+
+3. The existing private file ~/.config/speedhacks/dial.env supplies Dial settings
+   on this machine. Next does not discover that path automatically. Start with:
+     npm run dev:live
+   This loads the private file before starting Next; Next also loads .env.local.
+   Existing exported environment variables take precedence, so remove stale
+   conflicting values before startup. The scripts select real behavior through
+   the live default, not through the suffix in their names. Restart after editing
+   env files. For an already built application use npm run start:live.
+   On another machine, configure DIAL_API_KEY and DIAL_FROM_NUMBER in its private
+   server environment or .env.local and use npm run dev / npm run start.
+
+4. Verify configuration without contacting providers:
+     curl -s http://127.0.0.1:3000/api/runtime
+   GET /api/runtime returns exactly:
+     {"mode":"live","extraction":{"ready":true,"missing":[]},
+      "calls":{"ready":true,"missing":[]},
+      "browser":{"ready":true,"missing":[]}}
+   Each capability is independent. Missing/invalid configuration is reported
+   using fixed environment names only; no credentials, model names, phone
+   numbers, filesystem paths or provider responses are returned. The endpoint
+   is uncached, sends no provider requests, places no calls and launches no
+   browser. ready means locally configured, not live account/behavior verified.
+   PLAYWRIGHT_CHROMIUM means the default installed binary was not found. If
+   BROWSER_EXECUTABLE_PATH is explicitly set, it must point to a browser file;
+   the readiness check cannot establish that the file launches successfully.
+
+ACCOUNT AND AUTHORIZATION REQUIREMENTS
+
+Dial needs an enabled account, calling permission, an account-owned sending
+number (ID, E.164 number or nickname), sufficient allowance/credits, and a
+per-call duration compatible with the account's actual limits. Server config
+accepts DIAL_MAX_CALL_DURATION_SECONDS=60..3600; absent/blank defaults to 300.
+That default is not authorization to spend credits or to call any recipient.
+Every call still requires the case's reviewed destination and frozen revision
+authorization. Durable dispatch deduplication and dispatch_unknown locking
+remain owned by the case service. An uncertain dispatch must not be redialed.
+
+DIAL_WEBHOOK_SECRET is optional for dispatch and GET-based reconciliation, so
+its absence does not turn calls.ready false. The webhook route requires the
+real subscription signing secret and rejects missing configuration. Deployment
+of a public HTTPS receiver and a configured Dial subscription remain separate
+prerequisites for live webhook delivery. Do not replace the secret with a
+placeholder. No deployment or subscription is performed by this setup.
+
+Browser execution requires BROWSER_ENABLED=true, the LLM settings, and Chromium
+or an explicit BROWSER_EXECUTABLE_PATH. A visible local browser is the default;
+a headless host must explicitly choose BROWSER_HEADLESS=true. Account login,
+MFA, CAPTCHA, provider permissions and actual claim authorization are still
+human/account prerequisites. Exact allowed hosts and each proposed action must
+be reviewed in the browser workflow. Browser setup is not permission to file a
+claim, submit a form, accept terms or purchase anything. The browser agent is
+separate from the Dial call and from the read-only insurer knowledge base.
+
+PRODUCT LIMITS
+
+The existing case engine and VoiceAdapter V1 remain refund-oriented. Changing
+the runtime default does not add insurance policy adjudication, a universal
+claim data model or Jonathan's unmerged purpose-aware authorization work. The
+current case packet is a text preparation draft/evidence index, not an official
+insurer form or a submitted claim. Provider KB facts are reference material;
+the customer's actual policy, plan, jurisdiction and evidence determine their
+applicability. Live extraction failures retain unknown fields and display an
+extraction_failed timeline entry, allowing explicit manual correction; they do
+not substitute regex/heuristic facts or pretend that the model succeeded.
+
+The server uses SQLite and local private upload files under DATA_DIR. Run on a
+persistent trusted host; ephemeral serverless storage is not a supported durable
+deployment. Browser runs and their actual execution have additional process and
+host requirements documented with the browser implementation. The current case
+session cookie is local-browser ownership, not a production multiuser account
+system. Existing HEIC plan uploads are not accepted by the backend case upload
+allowlist; use PDF, PNG, JPEG or WebP for actual extraction (text/Markdown/CSV
+are also accepted by the case API).
+
+VERIFICATION BOUNDARY
+
+This change's automated checks use synthetic environment values, mock network
+responses and temporary local storage. They verify live defaults, explicit
+test-only simulation, sanitized readiness, no network/launch from readiness,
+failure without heuristic fallback, and refreshed service config. They do not
+verify real document extraction, insurer browser automation, webhook delivery,
+claim acceptance or payment.
+
+Separately, the lead verified the configured OpenAI account with a real planner
+structured-output smoke request using gpt-5.4-mini. The no-authorized-task probe
+returned blocked as expected. Chromium is installed. This establishes model
+connectivity/schema compatibility and local binary installation, not a browser
+launch, insurance form completion, or an end-to-end product run. No browser or
+phone call was executed by that model smoke request.
+
+Earlier separately authorized Dial work did establish an outgoing real call
+and authenticated transcript retrieval. The GEICO information-only inquiry
+ended after 221 seconds without opening a claim; it confirmed no document
+requirements. See docs/handoffs/dial.txt for the dated evidence and limitations.
+Those calls are historical evidence, not authorization for another call or proof
+that the integrated browser/claim workflow has been completed live.
+
+KEEWANO REUSE AND REMAINING READ BOUNDARY
+
+The product reuses Jonathan's event registry, REST ingest client, debounced sink
+and repository mirror from origin/codex/case-engine (5304b44). It does not import
+his demo generator, seed data, fixture readers, MCP dependency, customer-history
+lookup, merchant statistics, or unrelated V1.1 case-engine changes.
+
+Optional setup: create/select a fresh Keewano project reserved for real product
+activity, then set KEEWANO_API_KEY and KEEWANO_LIVE_PROJECT_CONFIRMED=true in the
+private server environment. Restart the server. The confirmation is an operator
+attestation, not an automated inspection of remote project contents. Leave it
+false for the project used for synthetic hackathon history. A missing/invalid
+key or absent confirmation uses the ordinary local repository and sends nothing;
+this optional analytics configuration does not affect extraction/call readiness.
+
+Only committed live cases are mirrored, after SQLite transaction success. The
+payload contains random case UUID, reviewed timeline type, derived status, live
+call state, outcome enum, timestamps, and supported USD amounts. Free-form
+merchant names are deliberately omitted because they may contain personal data.
+Customer name/email/phone, session ID, reason, document contents, draft, call
+transcript, provider ID, reference number and supporting quote are not exported.
+Amounts/times/case UUIDs remain potentially identifying operational metadata;
+restrict Keewano account access and apply the appropriate retention policy.
+
+Writes use the fixed official HTTPS ingress endpoint and refuse redirects. All
+retries retain the original batch identity and payload; registration and send
+failures have bounded retries and sanitized logs. The queue remains in memory,
+so crashes/shutdown can lose events. Partial acceptance is counted and not blindly
+resent. Keewano is supplementary telemetry, never the authoritative case state,
+proof of payment, or a durable dispatch deduplication store. Tests use an injected
+offline transport; this integration has not been live-ingestion verified here.
+
+Do not enable upstream history/statistics unchanged: customer history currently
+uses guessable email/name-derived UUIDs without binding to authenticated ownership,
+and merchant-outcome SQL has no live/synthetic filter. Existing seeded project
+records can appear as source=keewano even though they are fictional. Read-side
+reuse requires authenticated customer/entity binding, explicit provenance filters,
+a reviewed project, bounded complete result semantics, and unavailable results
+rather than invented or fixture-derived numbers. No MCP/PAT credential is read by
+the current product mirror. A separately built adversary Dial CLI is a testing
+counterpart, not this product's outbound customer agent.
+
+BROWSER WORKFLOW AND LIMITS
+
+Create a case using the HTTP product, then select Browser beside the chat. A
+browser task does not require call authorization, a refund amount, or a support
+number. Enter its task and an exact HTTPS starting URL. Amazon cases suggest
+the order-history URL; other providers require a reviewed URL. Add any required
+login/CDN hosts explicitly after reviewing them. The initial Start action opens
+the requested URL. Subsequent navigation, clicks, fills, selections and uploads
+pause with their exact target/value for approval. Call support remains separate.
+
+The adjacent read-only viewer polls actual JPEG captures while visible. Password
+and verification screens pause capture/planning; all input fields are masked.
+Complete sign-in in the local Chromium window and explicitly Resume. A completed
+run displays its final retained frame once. The browser is closed on completion;
+the frame is not a live view afterward. Frames exist only in bounded process
+memory and are unavailable after restart. Provider downloads, new windows,
+dialogs, WebSockets, service workers and iframe form actions are not supported.
+Sites relying on these features may need manual completion. No site has been
+certified compatible by the offline tests.
+
+Each run creates a downloadable request.txt using recorded facts and explicit
+unknowns. Existing evidence is hash-checked before reuse and uploads show the
+artifact hash. This is a preparation document, not an official claim form.
+Browser outcome text never updates the financial case outcome or fabricates a
+submission receipt. The user must verify provider confirmation independently.
+
+An approval is journaled before dispatch and cannot replay after a lost response.
+The backend rechecks the case revision and page fingerprint before execution,
+including a final port-side check after screenshots/async case reads. A changed
+page requires a new approval. This is not atomic control of a third-party site's
+JavaScript: it can still change during browser actionability checks. Review the
+actual target and provider confirmation; do not treat a click as proof of success.
+The approved action briefly permits same-host background HTTP writes as well as
+its own requests; login handoff permits writes on the reviewed hosts. That is a
+site-level permission window, not a semantic guarantee about each HTTP request.
+
+All routed requests use public IPv4 DNS validation and pinned HTTPS transport;
+redirects must re-enter the host guard. Run cancellation interrupts pending DNS
+and in-flight HTTP, but cannot undo requests already delivered. Restart, lost
+connections or action timeouts produce an uncertain run without automatic retry.
+An uncertain run blocks a new run for the same case; no reconciliation UI is
+implemented yet. Verify externally and reconcile through an operator-reviewed
+process rather than deleting the journal or retrying the same external action.
+This worker supports one active run per browser owner and four per process,
+30 planner steps, four consecutive read-only inspections and a ten-minute run.
+It is single-process only; shared multi-worker orchestration is not implemented.
+
+CHECKS COMPLETED FOR THIS CHANGE
+
+- npm test -- --reporter=dot: 560 tests passed across 40 files.
+- npm run typecheck: passed.
+- npm run build: passed without warnings after excluding runtime DATA_DIR from
+  Turbopack tracing. Seventeen trace manifests contained zero .env or private
+  data entries. Runtime data must be provisioned separately on the persistent host.
+- Browser security/planner/port/transport/session/viewer tests use mocked browser,
+  DNS, HTTPS and model responses. No Playwright browser was launched by those tests.
+- Real OpenAI planner smoke: updated local key succeeded; expected blocked result
+  for a task with no authorized customer action. No real customer data was sent.
+- Keewano: 19 offline regressions; no live ingestion or remote project inspection.
+- No new phone calls, submissions, deployment, or live browser walkthrough.
+
+Current browser-access restriction prevented visual/end-to-end verification;
+that remains a separate acceptance step. Jonathan's adversary source/interface
+request remains unanswered; no replacement outbound call agent has been invented.

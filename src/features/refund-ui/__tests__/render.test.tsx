@@ -228,6 +228,13 @@ describe("server render of each stage", () => {
     expect(html).not.toContain('data-testid="approve-button"');
     expect(html).not.toContain('data-testid="outcome-card"');
   });
+  it("does not require call approval or call-only missing fields in the browser workflow", async () => {
+    const s = stage("needs_evidence");
+    s.begin("Help with a return form"); await s.create("Help with a return form");
+    const html = renderToString(<ChatColumn controller={s.controller()} fixture={false} phoneHint={null} planCount={0} callBar={null} metrics={null} allowCallApproval={false} />);
+    expect(html).toContain('data-testid="facts-card"'); expect(html).toContain('data-testid="case-documents"');
+    expect(html).not.toContain('data-testid="approve-button"'); expect(html).not.toContain('data-testid="missing-list"');
+  });
 
   it("keeps a completed request for information visible without treating initial missing facts as an outcome", async () => {
     const s = stage("duplicate_charge", { v2: false });

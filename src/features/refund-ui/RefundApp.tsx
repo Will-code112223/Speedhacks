@@ -9,14 +9,13 @@
  * a sheet over the chat; under 768px the rail opens from a menu button. Tokens
  * live in RefundApp.module.css; see design.md.
  *
- * The API mode is read from the URL (?api=fixture or ?api=http, default http),
- * so the shell waits for the browser before rendering the workspace.
+ * Runtime requests always use the real HTTP API. Test fixtures are not a
+ * user-selectable runtime mode.
  */
 
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import type { Mode } from "../../contracts/case";
-import { detectApiMode } from "./api/client";
-import type { ApiMode } from "./api/types";
+import BrowserPanel from "./browser/BrowserPanel";
 import CallBar from "./call/CallBar";
 import CallScreen from "./call/CallScreen";
 import ChatColumn from "./chat/ChatColumn";
@@ -24,13 +23,13 @@ import MetricsStrip from "./metrics/MetricsStrip";
 import PlansManager from "./plans/PlansManager";
 import { usePlans, type PlansController } from "./plans/usePlans";
 import Rail from "./rail/Rail";
-import { useDocumentTitle, useLocationSearch, useMediaQuery } from "./state/browser";
+import { useDocumentTitle, useMediaQuery } from "./state/browser";
 import { caseTitle } from "./state/call";
 import type { CaseSessionController } from "./state/controller";
 import { decisionForCallScreen, type CaseSession } from "./state/session";
 import { useCaseSession } from "./state/useCaseSession";
 import { CloseIcon, MenuIcon } from "./ui/icons";
-import { Button, SkeletonRows, VisuallyHidden } from "./ui/primitives";
+import { Button, SkeletonRows } from "./ui/primitives";
 import styles from "./RefundApp.module.css";
 
 export interface RefundAppProps {
@@ -39,11 +38,9 @@ export interface RefundAppProps {
 }
 
 export default function RefundApp(_props: RefundAppProps) {
-  const search = useLocationSearch();
   const plans = usePlans();
-  if (search === null || plans.status === "loading") return <BootShell />;
-  const apiMode = detectApiMode(search, "http");
-  return <Workspace key={apiMode} apiMode={apiMode} plans={plans} />;
+  if (plans.status === "loading") return <BootShell />;
+  return <Workspace plans={plans} />;
 }
 
 // ---------------------------------------------------------------------------
@@ -87,14 +84,13 @@ function BootShell() {
 type View = "chat" | "plans";
 
 interface WorkspaceProps {
-  apiMode: ApiMode;
   plans: PlansController;
 }
 
-function Workspace({ apiMode, plans }: WorkspaceProps) {
+function Workspace({ plans }: WorkspaceProps) {
   const [view, setView] = useState<View>("chat");
   const onboarding = !plans.onboarded;
-  const controller = useCaseSession({ apiMode, plans: plans.plans, measuring: !onboarding && view === "chat" });
+  const controller = useCaseSession({ apiMode: "http", plans: plans.plans, measuring: !onboarding && view === "chat" });
   const wide = useMediaQuery("(min-width: 1024px)");
   const narrow = useMediaQuery("(max-width: 767px)");
 
@@ -103,19 +99,23 @@ function Workspace({ apiMode, plans }: WorkspaceProps) {
   const sheetTitleId = useId();
   const [railOpen, setRailOpen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [sideTab, setSideTab] = useState<"browser" | "call">("browser");
 
   const active = controller.active;
   const call = controller.call;
   const caseData = active?.caseData ?? null;
   const hasCall = active !== null && caseData !== null && call !== null;
-  const showCallColumn = hasCall && wide;
-  const showSheet = hasCall && !wide && sheetOpen && view === "chat";
+  const hasBrowserCase = caseData?.mode === "live";
+  const selectedTool = hasBrowserCase ? sideTab : "call";
+  const hasTool = hasBrowserCase || hasCall;
+  const showToolColumn = hasTool && wide && view === "chat";
+  const showSheet = hasTool && !wide && sheetOpen && view === "chat";
   const railOverlay = narrow && railOpen && !onboarding;
 
   // A call placed from this tab opens the call sheet on narrow screens.
   const startedCallId = active?.startedCall?.id ?? null;
   useEffect(() => {
-    if (startedCallId !== null) setSheetOpen(true);
+    if (startedCallId !== null) { setSideTab("call"); setSheetOpen(true); }
   }, [startedCallId]);
 
   const closeRail = useCallback(() => {
@@ -160,10 +160,14 @@ function Workspace({ apiMode, plans }: WorkspaceProps) {
   };
   const startNewCase = () => {
     controller.selectCase(null);
+    setSheetOpen(false);
+    setSideTab("browser");
     openChat();
   };
   const selectCase = (key: string) => {
     controller.selectCase(key);
+    setSheetOpen(false);
+    setSideTab("browser");
     openChat();
   };
   const managePlans = () => {
@@ -172,7 +176,7 @@ function Workspace({ apiMode, plans }: WorkspaceProps) {
     if (railOpen) closeRail();
   };
 
-  const fixture = apiMode === "fixture";
+  const fixture = false;
   const crumb = onboarding ? null : view === "plans" ? "Plans" : active ? caseTitle(caseData, active.summary) : null;
 
   const callScreen = (headingId?: string) =>
@@ -205,16 +209,25 @@ function Workspace({ apiMode, plans }: WorkspaceProps) {
         needsAnswer={pending !== null}
         onOpen={() => {
           setRailOpen(false);
+          setSideTab("call");
           setSheetOpen(true);
         }}
       />
     ) : null;
 
   const metrics = hasCall ? <MetricsStrip activeMs={controller.activeMs} live={controller.live} /> : null;
+  const toolContent = <>
+    <div className={styles.toolTabs} role="group" aria-label="Case tools">
+      {hasBrowserCase ? <Button variant="ghost" size="small" aria-pressed={selectedTool === "browser"} onClick={() => setSideTab("browser")}>Browser</Button> : null}
+      {hasTool ? <Button variant="ghost" size="small" aria-pressed={selectedTool === "call"} onClick={() => setSideTab("call")}>Call support</Button> : null}
+    </div>
+    {selectedTool === "browser" && hasBrowserCase && caseData ? <BrowserPanel key={caseData.id} caseData={caseData} visible={view === "chat" && (wide || sheetOpen)} /> : hasCall ? callScreen() : <div className={styles.callGuide}><h2>Call support</h2><p>Review the contact and request in chat, then approve the call when you are ready.</p></div>}
+  </>;
+
 
   return (
     <div className={styles.app}>
-      <header className={styles.header}>
+      <header className={styles.header} inert={showSheet || undefined}>
         <div className={styles.headerInner}>
           {!onboarding ? (
             <Button
@@ -240,6 +253,7 @@ function Workspace({ apiMode, plans }: WorkspaceProps) {
               </span>
             </span>
           ) : null}
+          {!onboarding && hasBrowserCase && view === "chat" ? <div className={styles.headerRight}><Button size="small" onClick={() => { setRailOpen(false); setSideTab("browser"); setSheetOpen(true); }}>Browser task</Button></div> : null}
         </div>
       </header>
 
@@ -248,7 +262,7 @@ function Workspace({ apiMode, plans }: WorkspaceProps) {
           <PlansManager plans={plans} mode="onboarding" onDone={plans.completeOnboarding} />
         </main>
       ) : (
-        <div className={[styles.body, showCallColumn ? styles.bodyWithCall : ""].join(" ")}>
+        <div className={[styles.body, showToolColumn ? selectedTool === "browser" ? styles.bodyWithBrowser : styles.bodyWithCall : ""].join(" ")}>
           {railOverlay ? <div className={styles.scrim} onClick={closeRail} aria-hidden="true" /> : null}
           <nav
             id={railId}
@@ -274,24 +288,25 @@ function Workspace({ apiMode, plans }: WorkspaceProps) {
                 controller={controller}
                 fixture={fixture}
                 phoneHint={null}
+                allowCallApproval={selectedTool === "call" || hasCall}
                 planCount={plans.plans.length}
                 callBar={callBar}
                 metrics={metrics}
               />
             )}
           </main>
-          {showCallColumn ? (
-            <aside className={styles.callColumn} aria-label="Call">
-              {callScreen()}
+          {showToolColumn ? (
+            <aside className={styles.callColumn} aria-label="Case tools">
+              {toolContent}
             </aside>
           ) : null}
         </div>
       )}
 
       {showSheet ? (
-        <CallSheet titleId={sheetTitleId} onClose={closeSheet}>
-          {callScreen(sheetTitleId)}
-        </CallSheet>
+        <ActionSheet titleId={sheetTitleId} title={selectedTool === "browser" ? "Browser task" : "Call"} browser={selectedTool === "browser"} onClose={closeSheet}>
+          {toolContent}
+        </ActionSheet>
       ) : null}
 
       <Announcer controller={controller} />
@@ -303,7 +318,7 @@ function Workspace({ apiMode, plans }: WorkspaceProps) {
 // Call sheet (under 1024px)
 // ---------------------------------------------------------------------------
 
-function CallSheet({ titleId, onClose, children }: { titleId: string; onClose: () => void; children: ReactNode }) {
+function ActionSheet({ titleId, title, browser, onClose, children }: { titleId: string; title: string; browser: boolean; onClose: () => void; children: ReactNode }) {
   const panelRef = useRef<HTMLDivElement | null>(null);
 
   // Focus moves into the sheet and returns where it was when the sheet closes.
@@ -318,12 +333,19 @@ function CallSheet({ titleId, onClose, children }: { titleId: string; onClose: (
   return (
     <>
       <div className={styles.scrim} onClick={onClose} aria-hidden="true" />
-      <div className={styles.sheet} role="dialog" aria-labelledby={titleId} ref={panelRef} tabIndex={-1}>
+      <div className={[styles.sheet, browser ? styles.browserSheet : ""].join(" ")} role="dialog" aria-modal="true" aria-labelledby={titleId} ref={panelRef} tabIndex={-1} onKeyDown={(event) => {
+        if (event.key !== "Tab") return;
+        const controls = Array.from(panelRef.current?.querySelectorAll<HTMLElement>('button:not(:disabled), a[href], input:not(:disabled), textarea:not(:disabled), summary, [tabindex="0"]') ?? []);
+        const first = controls[0]; const last = controls.at(-1);
+        if (!first || !last) { event.preventDefault(); return; }
+        if (event.shiftKey && (document.activeElement === first || document.activeElement === panelRef.current)) { event.preventDefault(); last.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+      }}>
         <div className={styles.sheetHeader}>
           <h2 id={titleId} className={styles.sheetTitle}>
-            Call
+            {title}
           </h2>
-          <Button variant="ghost" className={styles.iconButton} aria-label="Close call" onClick={onClose}>
+          <Button variant="ghost" className={styles.iconButton} aria-label={`Close ${title.toLowerCase()}`} onClick={onClose}>
             <CloseIcon />
           </Button>
         </div>
