@@ -15,6 +15,15 @@ export function isOutcomeStatus(status: CaseStatus): boolean {
   return OUTCOME_STATUSES.includes(status);
 }
 
+/** A request for information is a result only after a completed call. */
+export function hasCallOutcome(caseData: CaseV1, call: CallV1 | null): boolean {
+  return isOutcomeStatus(caseData.status) || (
+    caseData.status === "needs_information" &&
+    caseData.outcome.decision === "needs_information" &&
+    call?.state === "completed"
+  );
+}
+
 /** Call states that are still moving or unresolved (mirrors ACTIVE_CALL_STATES in the contract). */
 const ACTIVE_STATES: readonly CallState[] = ["dispatch_pending", "queued", "in_progress", "dispatch_unknown"];
 

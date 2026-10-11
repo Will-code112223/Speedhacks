@@ -58,8 +58,12 @@ export default function Rail(props: RailProps) {
 
   return (
     <div className={styles.rail}>
+      <div className={styles.workspace}>
+        <span className={styles.workspaceLabel}>Personal workspace</span>
+        <span className={styles.workspaceTitle}>Your cases</span>
+      </div>
       <Button
-        variant="secondary"
+        variant="primary"
         className={styles.newCase}
         onClick={onNewCase}
         aria-current={newCaseCurrent ? "page" : undefined}
@@ -74,9 +78,10 @@ export default function Rail(props: RailProps) {
           <h2 id={casesHeadingId} className={styles.heading}>
             Cases
           </h2>
+          <span className={styles.count}>{sessions.length.toString().padStart(2, "0")}</span>
         </div>
         {sessions.length === 0 ? (
-          <p className={styles.empty}>Cases you start appear here.</p>
+          <p className={styles.empty}>A place for every request.<br />Start a case to keep it in view.</p>
         ) : (
           <ul className={styles.list}>
             {sessions.map((session) => {
@@ -119,7 +124,7 @@ export default function Rail(props: RailProps) {
           </Button>
         </div>
         {plans.length === 0 ? (
-          <p className={styles.empty}>Add an insurance plan so claims can cite it.</p>
+          <p className={styles.empty}>Keep your policy documents ready for your next case.</p>
         ) : (
           <ul className={styles.list}>
             {plans.map((plan) => {
@@ -147,7 +152,11 @@ export default function Rail(props: RailProps) {
         )}
       </section>
 
-      {footer ? <div className={styles.footer}>{footer}</div> : null}
+      <div className={styles.footer}>
+        {footer}
+        <p className={styles.controlNote}>You approve. Then we call.</p>
+        <p className={styles.localNote}>Cases stay in this tab.<br />Plans stay in this browser.</p>
+      </div>
     </div>
   );
 }

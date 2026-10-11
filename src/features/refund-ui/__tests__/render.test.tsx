@@ -217,6 +217,35 @@ describe("server render of each stage", () => {
     const html = chat(s.controller());
     expect(html).toContain('data-testid="missing-list"');
     expect(html).not.toContain('data-testid="approve-button"');
+    expect(html).not.toContain('data-testid="outcome-card"');
+  });
+
+  it("keeps a completed request for information visible without treating initial missing facts as an outcome", async () => {
+    const s = stage("duplicate_charge", { v2: false });
+    s.begin("duplicate charge");
+    await s.create("duplicate charge");
+    await s.approve();
+    const previous = s.session().caseData!;
+    const completed = {
+      ...previous,
+      status: "needs_information" as const,
+      calls: previous.calls.map((call) => ({ ...call, state: "completed" as const, transcript: "Support: Please send your receipt." })),
+      outcome: {
+        ...previous.outcome,
+        decision: "needs_information" as const,
+        nextAction: "Send the original receipt for review.",
+        supportingQuote: "Please send your receipt.",
+      },
+    };
+    const update: SessionAction = { type: "case/received", key: KEY, caseData: completed, liveCapable: false, at: new Date().toISOString() };
+    s.run(update);
+    s.run(update);
+    const html = chat(s.controller());
+    expect(s.session().thread.filter((item) => item.kind === "result")).toHaveLength(1);
+    expect(html).toContain('data-testid="outcome-card"');
+    expect(html).toContain("Send the original receipt for review.");
+    expect(html).toContain("Money received has not been verified");
+    expect(html).not.toContain('data-testid="approve-button"');
   });
 
   it("renders the live call at each phase, with the decision on top while it waits", async () => {

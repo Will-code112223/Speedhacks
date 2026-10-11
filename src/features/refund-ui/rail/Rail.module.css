@@ -2,14 +2,23 @@
 .rail {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 28px;
   min-height: 100%;
-  padding: 16px 16px 24px 0;
+  padding: 28px 22px 24px;
 }
+
+.workspace { display: grid; gap: 7px; }
+.workspaceLabel { color: var(--rc-ink-3); text-transform: uppercase; letter-spacing: .09em; font: 10px var(--rc-mono); }
+.workspaceTitle { font-size: 20px; font-weight: 550; letter-spacing: -.04em; }
+.count { color: var(--rc-ink-3); font: 11px var(--rc-mono); }
+.controlNote { color: var(--rc-ink); font-size: 12px; font-weight: 500; margin: 16px 0 6px; }
+.localNote { color: var(--rc-ink-3); font-size: 11px; line-height: 1.7; margin: 0; }
 
 .rail .newCase {
   width: 100%;
   justify-content: flex-start;
+  min-height: 42px;
+  gap: 12px;
 }
 
 .section {
@@ -29,9 +38,9 @@
 
 .heading {
   margin: 0;
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 500;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
   color: var(--rc-ink-3);
 }
@@ -45,10 +54,11 @@
   font-size: 12px;
   color: var(--rc-ink-3);
   text-wrap: pretty;
+  line-height: 1.8;
 }
 
 .list {
-  margin: 0 0 0 -8px;
+  margin: 0;
   padding: 0;
   list-style: none;
   display: flex;
@@ -62,8 +72,8 @@
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 2px;
-  padding: 6px 8px 6px 6px;
+  gap: 6px;
+  padding: 12px 8px;
   border: 0;
   border-left: 2px solid transparent;
   border-radius: 0 var(--rc-radius) var(--rc-radius) 0;
@@ -83,8 +93,8 @@
 /* Selected: the tint, the accent edge and heavier text together, never the tint alone. */
 .rowSelected,
 .rowSelected:hover {
-  background: var(--rc-accent-tint);
-  border-left-color: var(--rc-accent);
+  background: var(--rc-canvas);
+  border-left-color: var(--rc-ink);
 }
 
 .rowSelected .rowTitle {
@@ -159,4 +169,5 @@
   margin-top: auto;
   padding-top: 16px;
   border-top: 1px solid var(--rc-border);
+  margin-bottom: 24px;
 }

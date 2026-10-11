@@ -1,11 +1,11 @@
 .app {
   --rc-canvas: #ffffff;
-  --rc-surface: #f7f8fa;
-  --rc-border: #e3e6ea;
-  --rc-border-strong: #8b9098;
-  --rc-ink: #141821;
-  --rc-ink-2: #4b5563;
-  --rc-ink-3: #697282;
+  --rc-surface: #f3f4f4;
+  --rc-border: #dfe3e2;
+  --rc-border-strong: #858d8a;
+  --rc-ink: #202625;
+  --rc-ink-2: #505a57;
+  --rc-ink-3: #64706b;
   --rc-accent: #2457e6;
   --rc-accent-hover: #1d49c4;
   --rc-accent-tint: #eaf0ff;
@@ -22,9 +22,9 @@
   --rc-fast: 120ms;
   --rc-default: 200ms;
   --rc-ease: cubic-bezier(0.2, 0, 0, 1);
-  --rc-radius: 6px;
-  --rc-radius-panel: 8px;
-  --rc-header: 48px;
+  --rc-radius: 4px;
+  --rc-radius-panel: 6px;
+  --rc-header: 68px;
 
   height: 100vh;
   height: 100dvh;
@@ -34,33 +34,11 @@
   background: var(--rc-canvas);
   color: var(--rc-ink);
   font-family: var(--rc-font);
-  font-size: 13px;
-  line-height: 1.45;
+  font-size: 14px;
+  line-height: 1.5;
+  color-scheme: light;
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
-}
-
-@media (prefers-color-scheme: dark) {
-  .app {
-    --rc-canvas: #0b0c0e;
-    --rc-surface: #141619;
-    --rc-border: #262a30;
-    --rc-border-strong: #5e646d;
-    --rc-ink: #f1f3f5;
-    --rc-ink-2: #a7afbb;
-    --rc-ink-3: #77808e;
-    --rc-accent: #6f93ff;
-    --rc-accent-hover: #86a6ff;
-    --rc-accent-tint: #172349;
-    --rc-on-accent: #0b0c0e;
-    --rc-success: #4ade80;
-    --rc-success-tint: #0f2a1a;
-    --rc-warning: #fbbf24;
-    --rc-warning-tint: #2d2008;
-    --rc-danger: #f87171;
-    --rc-danger-tint: #2b1111;
-    --rc-scrim: rgb(0 0 0 / 0.5);
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -77,7 +55,7 @@
 
 /* Keep a control that receives focus clear of the sticky header. */
 .app :is(a, button, input, select, textarea, summary, [tabindex]) {
-  scroll-margin-top: 56px;
+  scroll-margin-top: 76px;
 }
 
 .app :is(button, a, input, select, textarea) {
@@ -96,10 +74,9 @@
 }
 
 .headerInner {
-  max-width: 1440px;
   height: 100%;
   margin: 0 auto;
-  padding: 0 32px;
+  padding: 0 28px;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -117,10 +94,41 @@
 
 .wordmark {
   flex: none;
-  font-size: 15px;
+  font-size: 21px;
   font-weight: 600;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.055em;
   color: var(--rc-ink);
+}
+
+.brand { display: flex; align-items: center; gap: 10px; flex: none; }
+.brandMark { width: 28px; height: 28px; }
+.brandLabel {
+  margin-left: 18px;
+  padding-left: 24px;
+  border-left: 1px solid var(--rc-border);
+  color: var(--rc-ink-3);
+  font: 10px var(--rc-mono);
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+.demoNote { font-size: 12px; color: var(--rc-ink-2); }
+.demoSettings { position: relative; margin-right: 12px; }
+.demoSettings summary {
+  padding: 10px 4px;
+  font-size: 12px;
+  color: var(--rc-ink-2);
+  cursor: pointer;
+}
+.demoPopover {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  width: 280px;
+  padding: 20px;
+  background: var(--rc-canvas);
+  border: 1px solid var(--rc-border-strong);
+  border-radius: var(--rc-radius);
+  box-shadow: 0 12px 32px rgb(20 28 24 / .1);
 }
 
 .crumb {
@@ -155,21 +163,20 @@
 /* Body: rail, chat, call                                                     */
 /* ------------------------------------------------------------------------- */
 
-/* Up to 1440px wide with 32px gutters; the chat track takes what the rail and call column leave. */
+/* Full workspace, with readable widths controlled within each pane. */
 .body {
   width: 100%;
-  max-width: 1440px;
   min-height: 0;
   margin: 0 auto;
-  padding: 0 32px;
+  padding: 0;
   display: grid;
-  grid-template-columns: 240px minmax(0, 1fr);
+  grid-template-columns: 256px minmax(0, 1fr);
   /* One row exactly as tall as the body, so each region scrolls inside itself. */
   grid-template-rows: minmax(0, 1fr);
 }
 
 .bodyWithCall {
-  grid-template-columns: 240px minmax(0, 1fr) 360px;
+  grid-template-columns: 256px minmax(0, 1fr) 344px;
 }
 
 .rail {
@@ -177,7 +184,7 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   border-right: 1px solid var(--rc-border);
-  background: var(--rc-canvas);
+  background: var(--rc-surface);
 }
 
 .main {
@@ -192,6 +199,7 @@
   display: flex;
   flex-direction: column;
   border-left: 1px solid var(--rc-border);
+  background: var(--rc-surface);
 }
 
 .focused {
@@ -319,8 +327,9 @@
     padding: 0 24px;
   }
   .body {
-    padding: 0 24px;
+    padding: 0;
   }
+  .brandLabel { display: none; }
   .boot {
     padding: 32px 24px;
   }
@@ -328,7 +337,7 @@
 
 @media (max-width: 1023px) {
   .bodyWithCall {
-    grid-template-columns: 240px minmax(0, 1fr);
+    grid-template-columns: 256px minmax(0, 1fr);
   }
 }
 
@@ -354,7 +363,7 @@
     bottom: 0;
     z-index: 35;
     width: min(280px, 85vw);
-    padding-left: 16px;
+    padding-left: 0;
     animation: slideFromLeft var(--rc-default) var(--rc-ease);
   }
   .railClosed {
@@ -366,6 +375,13 @@
 }
 
 @media (max-width: 480px) {
+  .app { --rc-header: 60px; }
+  .brand { gap: 7px; }
+  .brandMark { width: 22px; height: 22px; }
+  .wordmark { font-size: 18px; }
+  .demoNote { max-width: 52px; font-size: 10px; line-height: 1.3; }
+  .headerRight { flex-direction: column; align-items: flex-end; gap: 2px; }
+  .crumb { display: none; }
   .caseName {
     display: none;
   }

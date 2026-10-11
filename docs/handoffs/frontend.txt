@@ -1,4 +1,25 @@
-FRONTEND HANDOFF — teammate 1 (Recourse UI)
+FRONTEND POLISH CHECKPOINT — 2026-10-11
+Branch: codex/frontend-polish, based on main 602069a.
+The user requested publication of this checkpoint to main before the next demo work.
+
+- Palantir/OptimizedHQ reference pass: light workspace, graphite actions, stronger
+  reading hierarchy, quieter demo controls, clearer case rail and call result.
+- Responsive header labels stack on narrow screens; call panels can scroll when short.
+- Results distinguish support decisions from payment evidence. Completed calls that
+  request more information retain their result card; initial missing facts do not.
+- Local follow-up notes are identified as conversation-only, not sent to the voice agent.
+- Existing V1 requests and capability-gated V2 fixture controls remain unchanged.
+- Typecheck and 332 tests across 22 frontend/backend files passed using an external
+  Vitest config including both tests/**/*.test.ts and src/features/refund-ui/**/*.test*.
+  The repository Vitest include still omits frontend tests; no root config was edited.
+- Production build passed; existing DATA_DIR dynamic filesystem tracing warning remains.
+- Desktop empty state, onboarding, case creation, and approval were visually checked
+  in fixture mode. Final responsive/browser checks were blocked by a saved browser
+  access preference. No live calls were made as part of the frontend polish.
+- Real insurer form automation and visible generated claim documents are next work,
+  not features supplied by this visual checkpoint. No deployment performed.
+
+ORIGINAL FRONTEND HANDOFF — teammate 1 (historical branch snapshot)
 Branch: codex/frontend
 Base: db5f311 (T2 scaffold and contracts). No teammate branch is merged into this branch.
 Commit: see git log -1 --format=%H -- src/features/refund-ui docs/handoffs/frontend.txt

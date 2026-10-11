@@ -4,8 +4,8 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  height: 32px;
-  padding: 0 12px;
+  min-height: 38px;
+  padding: 0 14px;
   border-radius: var(--rc-radius);
   border: 1px solid transparent;
   font: inherit;
@@ -28,11 +28,11 @@
   cursor: progress;
 }
 .primary {
-  background: var(--rc-accent);
-  color: var(--rc-on-accent);
+  background: var(--rc-ink);
+  color: var(--rc-canvas);
 }
 .primary:hover:not(:disabled):not([aria-disabled="true"]) {
-  background: var(--rc-accent-hover);
+  background: #3c4843;
 }
 .secondary {
   background: var(--rc-canvas);

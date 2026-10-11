@@ -72,13 +72,22 @@ function ApiModePill({ apiMode }: { apiMode: ApiMode }) {
       testId="api-mode-pill"
     >
       <VisuallyHidden>Data source: </VisuallyHidden>
-      {apiMode === "fixture" ? "Fixture" : "Live backend"}
+      {apiMode === "fixture" ? "Fixture" : "Backend"}
     </Pill>
   );
 }
 
 function Wordmark() {
-  return <span className={styles.wordmark}>Recourse</span>;
+  return (
+    <span className={styles.brand}>
+      <svg className={styles.brandMark} viewBox="0 0 28 28" fill="none" aria-hidden="true">
+        <path d="M5 22V6h9a6 6 0 0 1 0 12H8M15 18l7 5" stroke="currentColor" strokeWidth="2.5" />
+        <path d="M1 6V1h5M22 1h5v5M27 22v5h-5M6 27H1v-5" stroke="currentColor" />
+      </svg>
+      <span className={styles.wordmark}>Recourse</span>
+      <span className={styles.brandLabel}>Claims workspace</span>
+    </span>
+  );
 }
 
 /** Painted at once on the server and while the browser state loads, so nothing jumps. */
@@ -303,9 +312,14 @@ function Workspace({ serverMode, apiMode, plans }: WorkspaceProps) {
             </span>
           ) : null}
           <div className={styles.headerRight}>
-            {pickerInHeader ? fixturePicker("inline") : null}
+            {pickerInHeader ? (
+              <details className={styles.demoSettings}>
+                <summary>Demo controls</summary>
+                <div className={styles.demoPopover}>{fixturePicker("stacked")}</div>
+              </details>
+            ) : null}
             <ApiModePill apiMode={apiMode} />
-            <ServerModePill serverMode={serverMode} />
+            {fixture ? <span className={styles.demoNote}>No real calls</span> : <ServerModePill serverMode={serverMode} />}
           </div>
         </div>
       </header>

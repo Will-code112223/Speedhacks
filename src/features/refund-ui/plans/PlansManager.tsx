@@ -54,14 +54,27 @@ export default function PlansManager({ plans, mode, onDone }: PlansManagerProps)
 
   return (
     <section className={onboarding ? styles.onboarding : styles.manage} aria-labelledby={headingId}>
+      {onboarding ? (
+        <aside className={styles.guide} aria-label="How Recourse works">
+          <span className={styles.eyebrow}>Recourse / Getting started</span>
+          <h2>Your next step,<br />with less paperwork.</h2>
+          <p>Bring the documents. We’ll help you organize the request and prepare for the call.</p>
+          <ol className={styles.steps}>
+            <li><span>01</span><div><strong>Build the case</strong><p>Add your documents and describe what happened.</p></div></li>
+            <li><span>02</span><div><strong>Review the facts</strong><p>Check the details and approve what the agent can ask.</p></div></li>
+            <li><span>03</span><div><strong>Keep the record</strong><p>Review the call transcript and the next action.</p></div></li>
+          </ol>
+        </aside>
+      ) : null}
       <div className={styles.inner}>
         <header className={styles.intro}>
+          {onboarding ? <span className={styles.eyebrow}>01 / Your documents</span> : null}
           <h1 id={headingId} className={styles.title}>
             {onboarding ? "Add your insurance plans" : "Your plans"}
           </h1>
           <p className={styles.lead}>
-            Recourse reads your policies when it files a claim or calls your insurer. Add a PDF or a photo of each plan,
-            then fill in what you know. Every detail is optional.
+            Add a policy PDF or photo to keep with your case. You can review every detail before authorizing a call.
+            No documents yet? Start with a description instead.
           </p>
         </header>
 

@@ -13,7 +13,7 @@ import type { CallV1, CaseV1 } from "../../../contracts/case";
 import { Banner, Button, Disclosure, KeyValueList, Mono, MonoBlock, Pill, SourcePill, type Tone } from "../ui/primitives";
 import { DownloadIcon } from "../ui/icons";
 import { formatDateTime, statusWord } from "../ui/format";
-import { isOutcomeStatus } from "../state/call";
+import { hasCallOutcome } from "../state/call";
 import type { RequestState } from "../state/session";
 import styles from "./ResultBlock.module.css";
 
@@ -51,7 +51,7 @@ function decisionTone(decision: Decision): Tone {
 function decisionNote(decision: Decision): string {
   switch (decision) {
     case "approved":
-      return "They approved it on the call.";
+      return "Support approved the request on the call.";
     case "requested":
       return "Requested on the call. Not approved yet.";
     case "denied":
@@ -59,7 +59,7 @@ function decisionNote(decision: Decision): string {
     case "needs_information":
       return "They need more information first.";
     case "unknown":
-      return "The call did not settle it.";
+      return "There is not enough evidence to confirm a decision.";
     default: {
       const unreachable: never = decision;
       return unreachable;
@@ -72,7 +72,7 @@ function paymentNote(status: PaymentStatus): string {
     case "confirmed":
       return "Payment is confirmed.";
     case "unverified":
-      return "No payment evidence yet. Check your account before you count on it.";
+      return "Money received has not been verified. Check your account or statement.";
     default: {
       const unreachable: never = status;
       return unreachable;
@@ -139,8 +139,8 @@ export default function ResultBlock({ caseData, call, latest, fixture, packet, o
           <SourcePill fixture={fixture} simulated={call.mode === "simulated"} />
         </div>
         <p className={styles.uncertainText}>
-          We will not redial automatically. The stored attempt is checked with the calling provider before any new
-          attempt, so you are never called about the same request twice.
+          The call may have started. We will not redial automatically. Verify this stored attempt with the
+          calling provider before starting another.
         </p>
         {call.error ? <p className={styles.uncertainText}>{call.error}</p> : null}
         <AttemptIds call={call} />
@@ -151,7 +151,7 @@ export default function ResultBlock({ caseData, call, latest, fixture, packet, o
     );
   }
 
-  const showOutcome = latest && isOutcomeStatus(caseData.status);
+  const showOutcome = latest && hasCallOutcome(caseData, call);
 
   if (call && (call.state === "failed" || call.state === "cancelled") && !showOutcome) {
     return (
@@ -159,7 +159,7 @@ export default function ResultBlock({ caseData, call, latest, fixture, packet, o
         <div className={styles.failedHeader}>
           <Pill tone="danger">{statusWord(call.state)}</Pill>
           <h3 id={headingId} className={styles.failedTitle}>
-            The call did not go through.
+            {call.state === "cancelled" ? "The call was cancelled." : "The call did not go through."}
           </h3>
         </div>
         {call.error ? <p className={styles.failedText}>{call.error}</p> : null}
@@ -184,15 +184,16 @@ export default function ResultBlock({ caseData, call, latest, fixture, packet, o
   return (
     <section className={styles.outcome} aria-labelledby={headingId} data-testid="outcome-card">
       <div className={styles.outcomeHeader}>
-        <h3 id={headingId} className={styles.outcomeTitle}>
-          Call result
-        </h3>
+        <div>
+          <p className={styles.eyebrow}>Outcome record</p>
+          <h3 id={headingId} className={styles.outcomeTitle}>Call result</h3>
+        </div>
         <SourcePill fixture={fixture} simulated={caseData.mode === "simulated"} />
       </div>
 
       <dl className={styles.ledger}>
         <div className={styles.ledgerRow} data-testid="outcome-approval">
-          <dt>Approval</dt>
+          <dt>Support decision</dt>
           <dd>
             <Pill tone={decisionTone(outcome.decision)}>{statusWord(outcome.decision)}</Pill>
             <span className={styles.ledgerNote}>{decisionNote(outcome.decision)}</span>
@@ -207,6 +208,13 @@ export default function ResultBlock({ caseData, call, latest, fixture, packet, o
         </div>
       </dl>
 
+      {outcome.supportingQuote ? (
+        <figure className={styles.quote}>
+          <figcaption>Supporting statement</figcaption>
+          <blockquote>{outcome.supportingQuote}</blockquote>
+        </figure>
+      ) : null}
+
       <KeyValueList
         items={[
           { key: "Case status", value: statusWord(caseData.status) },
@@ -218,13 +226,15 @@ export default function ResultBlock({ caseData, call, latest, fixture, packet, o
               </span>
             ),
           },
-          { key: "Next action", value: outcome.nextAction },
-          {
-            key: "Supporting quote",
-            value: outcome.supportingQuote ? <q className={styles.quote}>{outcome.supportingQuote}</q> : null,
-          },
         ]}
       />
+
+      {outcome.nextAction ? (
+        <div className={styles.nextStep}>
+          <h4 className={styles.nextLabel}>Next step</h4>
+          <p>{outcome.nextAction}</p>
+        </div>
+      ) : null}
 
       <div className={styles.actions}>
         <PacketButton packet={packet} onDownloadPacket={onDownloadPacket} />
@@ -232,10 +242,10 @@ export default function ResultBlock({ caseData, call, latest, fixture, packet, o
 
       <div className={styles.disclosures}>
         <Disclosure summary="Show transcript" testId="transcript-toggle">
-          {call?.transcript ? (
+          {call?.transcript?.trim() ? (
             <MonoBlock caption="Call transcript">{call.transcript}</MonoBlock>
           ) : (
-            <p className={styles.muted}>The transcript is not available yet.</p>
+            <p className={styles.muted}>The transcript is not available yet. Use Refresh transcript in the call panel to check again.</p>
           )}
         </Disclosure>
         {timeline.length > 0 ? (

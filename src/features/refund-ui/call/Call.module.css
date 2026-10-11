@@ -1,5 +1,5 @@
 /* ------------------------------------------------------------------------- */
-/* Call screen: a phone's in-call view inside a 360px column                  */
+/* Call record: identity, live evidence, then available actions.             */
 /* ------------------------------------------------------------------------- */
 
 .screen {
@@ -7,48 +7,54 @@
   flex-direction: column;
   height: 100%;
   min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--rc-canvas);
 }
 
 .decisionSlot {
   flex: none;
-  padding: 16px 16px 0;
+  padding: 20px 20px 0;
 }
 
 .identity {
   flex: none;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: 24px 16px 8px;
-  text-align: center;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 24px 20px 20px;
+  border-bottom: 1px solid var(--rc-border);
 }
 
 .identityTop {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  flex-wrap: wrap;
   gap: 8px;
   min-height: 22px;
-  margin-bottom: 4px;
+  margin-bottom: 12px;
 }
 
 .eyebrow,
 .sectionLabel {
   margin: 0;
-  font-size: 12px;
-  font-weight: 500;
-  letter-spacing: 0.04em;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--rc-ink-3);
+  color: var(--rc-ink-2);
 }
 
 .name {
   margin: 0;
   max-width: 100%;
-  font-size: 18px;
+  font-size: 28px;
   font-weight: 600;
-  line-height: 1.3;
-  letter-spacing: -0.01em;
+  line-height: 1.15;
+  letter-spacing: -0.035em;
   text-wrap: balance;
   overflow-wrap: anywhere;
 }
@@ -58,15 +64,16 @@
 }
 
 .phone code {
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .status {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  margin: 8px 0 0;
-  font-weight: 500;
+  margin: 12px 0 0;
+  font-size: 14px;
+  font-weight: 600;
   color: var(--rc-ink);
 }
 
@@ -87,7 +94,14 @@
 }
 
 .dot_accent {
-  background: var(--rc-accent);
+  background: var(--rc-ink);
+}
+
+.updated {
+  margin: 0;
+  font-size: 12px;
+  color: var(--rc-ink-2);
+  font-variant-numeric: tabular-nums;
 }
 
 .dot_warning {
@@ -100,20 +114,21 @@
 
 .clock {
   flex: none;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: 2px;
-  padding: 8px 16px 4px;
+  gap: 8px 12px;
+  padding: 20px;
+  border-bottom: 1px solid var(--rc-border);
 }
 
 /* The one memorable detail: a large tabular timer that never jitters. */
 .timer {
   font-family: var(--rc-mono);
-  font-size: 28px;
+  font-size: 36px;
   font-weight: 500;
   line-height: 1.2;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.045em;
   font-variant-numeric: tabular-nums;
   color: var(--rc-ink);
 }
@@ -123,6 +138,7 @@
 }
 
 .hold {
+  grid-column: 1 / -1;
   font-size: 12px;
   color: var(--rc-ink-2);
 }
@@ -135,10 +151,14 @@
 .counterpartRow {
   flex: none;
   display: flex;
-  justify-content: center;
+  justify-content: flex-start;
   min-height: 24px;
-  padding: 8px 16px 16px;
+  padding: 12px 20px;
   border-bottom: 1px solid var(--rc-border);
+}
+
+.counterpartRow:empty {
+  display: none;
 }
 
 .badgeWrap {
@@ -152,7 +172,7 @@
   gap: 6px;
   height: 24px;
   padding: 0 10px;
-  border-radius: 999px;
+  border-radius: 4px;
   border: 1px solid var(--rc-border-strong);
   font-size: 12px;
   font-weight: 500;
@@ -160,16 +180,16 @@
   cursor: default;
 }
 
-/* Human: neutral ink. Automated agent: the accent tint, paired with its text label. */
+/* Counterpart labels carry meaning without competing with warning states. */
 .badgeHuman {
   color: var(--rc-ink);
   background: var(--rc-canvas);
 }
 
 .badgeAgent {
-  color: var(--rc-accent);
-  background: var(--rc-accent-tint);
-  border-color: var(--rc-accent);
+  color: var(--rc-ink);
+  background: var(--rc-surface);
+  border-color: var(--rc-border-strong);
 }
 
 .badgeNeutral {
@@ -191,7 +211,7 @@
 
 .tooltip {
   position: absolute;
-  left: 50%;
+  left: 0;
   top: calc(100% + 6px);
   z-index: 5;
   padding: 4px 8px;
@@ -199,17 +219,17 @@
   background: var(--rc-ink);
   color: var(--rc-canvas);
   font-size: 12px;
-  white-space: nowrap;
+  max-width: min(280px, 70vw);
   pointer-events: none;
   opacity: 0;
-  transform: translate(-50%, -2px);
+  transform: translateY(-2px);
   transition: opacity var(--rc-fast) var(--rc-ease), transform var(--rc-fast) var(--rc-ease);
 }
 
 .badgeWrap:hover .tooltip,
 .badge:focus-visible + .tooltip {
   opacity: 1;
-  transform: translate(-50%, 0);
+  transform: translateY(0);
 }
 
 .liveError {
@@ -218,8 +238,8 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 8px 16px;
-  font-size: 12px;
+  padding: 12px 20px;
+  font-size: 13px;
   color: var(--rc-warning);
   background: var(--rc-warning-tint);
 }
@@ -239,8 +259,8 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 16px 16px 8px;
+  gap: 16px;
+  padding: 20px;
 }
 
 .noteList {
@@ -253,23 +273,34 @@
   overscroll-behavior: contain;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 0;
 }
 
 .note {
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr);
-  gap: 8px;
-  line-height: 1.5;
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: 12px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--rc-border);
+  font-size: 14px;
+  line-height: 1.6;
   animation: noteIn var(--rc-default) var(--rc-ease);
+}
+
+.note:first-child {
+  padding-top: 0;
+}
+
+.note:last-child {
+  border-bottom: 0;
 }
 
 .noteTime {
   font-family: var(--rc-mono);
   font-size: 12px;
   font-variant-numeric: tabular-nums;
-  color: var(--rc-ink-3);
-  padding-top: 1px;
+  color: var(--rc-ink-2);
+  padding-top: 2px;
 }
 
 .noteText {
@@ -283,9 +314,20 @@
   overflow-y: auto;
 }
 
+.transcript pre {
+  font-family: var(--rc-font);
+  font-size: 14px;
+  line-height: 1.7;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
 .muted {
   margin: 0;
-  color: var(--rc-ink-3);
+  color: var(--rc-ink-2);
+  font-size: 14px;
+  line-height: 1.6;
 }
 
 .controls {
@@ -293,28 +335,40 @@
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 8px;
-  padding: 12px 16px 16px;
+  gap: 12px;
+  padding: 20px;
   border-top: 1px solid var(--rc-border);
 }
 
 .controls > button {
   width: 100%;
-  height: 36px;
+  min-height: 40px;
 }
 
 .controlNote {
   margin: 0;
   font-size: 12px;
   color: var(--rc-ink-2);
-  text-align: center;
+  line-height: 1.6;
+}
+
+.capabilityNote {
+  display: grid;
+  gap: 6px;
+}
+
+.controlTitle {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--rc-ink);
 }
 
 .controlError {
   margin: 0;
   font-size: 12px;
   color: var(--rc-danger);
-  text-align: center;
+  line-height: 1.5;
 }
 
 /* ------------------------------------------------------------------------- */

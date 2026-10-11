@@ -1,17 +1,18 @@
 .wrap {
   flex: none;
-  padding: 8px 24px 12px;
+  padding: 16px 32px 16px;
   background: var(--rc-canvas);
 }
 
 /* The composer is an interactive container. */
 .composer {
-  display: flex;
-  align-items: flex-end;
-  gap: 8px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 8px 16px;
   max-width: 720px;
   margin: 0 auto;
-  padding: 6px 6px 6px 12px;
+  padding: 16px;
   border: 1px solid var(--rc-border-strong);
   border-radius: var(--rc-radius-panel);
   background: var(--rc-canvas);
@@ -33,26 +34,24 @@
 }
 
 .label {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
+  grid-column: 1 / -1;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--rc-ink);
 }
 
 .input {
-  flex: 1;
+  width: 100%;
   min-width: 0;
-  min-height: 32px;
+  min-height: 44px;
   max-height: 168px;
-  padding: 6px 0;
+  padding: 4px 0;
   border: 0;
   background: transparent;
   color: var(--rc-ink);
   font: inherit;
-  line-height: 1.45;
+  font-size: 15px;
+  line-height: 1.5;
   resize: none;
   overflow-y: auto;
 }
@@ -67,19 +66,25 @@
 
 .send {
   flex: none;
-  width: 32px;
-  height: 32px;
-  padding: 0;
+  min-width: 44px;
+  height: 44px;
+  padding: 0 14px;
+}
+
+.sendLabel {
+  font-size: 12px;
 }
 
 .hint {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   gap: 12px;
   max-width: 720px;
-  margin: 6px auto 0;
-  font-size: 12px;
-  color: var(--rc-ink-3);
+  margin: 10px auto 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--rc-ink-2);
 }
 
 .keys {
@@ -99,6 +104,15 @@
 @media (max-width: 767px) {
   .wrap {
     padding: 8px 16px 12px;
+  }
+  .composer {
+    padding: 12px;
+  }
+  .send {
+    padding: 0;
+  }
+  .sendLabel {
+    display: none;
   }
   .keys {
     display: none;

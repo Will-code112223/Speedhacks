@@ -75,7 +75,7 @@ export default function Composer({ value, onChange, onSend, busy, busyLabel, pla
         }}
       >
         <label htmlFor={inputId} className={styles.label}>
-          Message
+          Your message
         </label>
         <textarea
           id={inputId}
@@ -84,7 +84,7 @@ export default function Composer({ value, onChange, onSend, busy, busyLabel, pla
           rows={1}
           value={value}
           placeholder={placeholder}
-          aria-describedby={hint ? hintId : undefined}
+          aria-describedby={hintId}
           autoComplete="off"
           onChange={(event) => onChange(event.target.value)}
           onKeyDown={onKeyDown}
@@ -102,6 +102,7 @@ export default function Composer({ value, onChange, onSend, busy, busyLabel, pla
           data-testid="composer-send"
         >
           {busy ? null : <SendIcon />}
+          <span className={styles.sendLabel}>{busy ? "Sending" : "Send"}</span>
         </Button>
       </form>
       <p id={hintId} className={styles.hint}>

@@ -29,7 +29,7 @@ import { browserSessionStorage, getOrCreateRequestId } from "../api/request-id";
 import type { ApiMode, CaseApi, CaseApiCapabilities, CreateCaseInput, FixtureScenario, LiveCallV2 } from "../api/types";
 import type { PlanRecord } from "../plans/store";
 import { attachmentsFor } from "./attachments";
-import { currentCall, isOutcomeStatus } from "./call";
+import { currentCall } from "./call";
 import type { CaseSessionController, FixtureSettings } from "./controller";
 import { toUiError } from "./errors";
 import { createLocalId } from "./ids";
@@ -75,10 +75,8 @@ function canHaveLiveRecord(call: CallV1): boolean {
 }
 
 /** The local acknowledgement for a message sent after the case exists. */
-function noteReply(session: CaseSession): string {
-  const call = currentCall(session.caseData, session.startedCall);
-  const over = session.caseData !== null && (isOutcomeStatus(session.caseData.status) || call?.state === "dispatch_unknown");
-  return over ? "Noted. The call is over, so this stays here with the case." : "Noted. I will use this on the call.";
+function noteReply(): string {
+  return "Saved in this conversation. To update the call brief, edit the case facts above.";
 }
 
 function packetFileName(session: CaseSession): string {
@@ -289,7 +287,7 @@ export function useCaseSession({ apiMode, plans, measuring }: UseCaseSessionOpti
       }
 
       // No chat endpoint exists in the contract, so the note stays in this browser.
-      dispatch({ type: "note/added", key: session.key, text: trimmed, reply: noteReply(session), at });
+      dispatch({ type: "note/added", key: session.key, text: trimmed, reply: noteReply(), at });
       return true;
     },
     [create],

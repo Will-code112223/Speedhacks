@@ -1,10 +1,22 @@
 .onboarding {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(280px, 400px) minmax(0, 560px);
   justify-content: center;
-  padding: 48px 24px 64px;
+  align-content: start;
+  gap: clamp(32px, 7vw, 112px);
+  padding: clamp(48px, 8vh, 88px) 40px 64px;
   overflow-y: auto;
   height: 100%;
 }
+.guide { min-width: 0; padding-top: 4px; }
+.eyebrow { display: block; margin-bottom: 18px; color: var(--rc-ink-3); font: 10px var(--rc-mono); text-transform: uppercase; letter-spacing: .11em; }
+.guide h2 { margin: 0 0 20px; font-size: clamp(32px, 3.7vw, 48px); line-height: 1.08; font-weight: 500; letter-spacing: -.055em; }
+.guide > p { color: var(--rc-ink-2); line-height: 1.8; max-width: 38ch; }
+.steps { list-style: none; padding: 0; margin: 38px 0 0; }
+.steps li { display: flex; gap: 18px; padding: 16px 0; border-top: 1px solid var(--rc-border); }
+.steps li > span { padding-top: 2px; font: 11px var(--rc-mono); color: var(--rc-ink-3); }
+.steps strong { font-size: 13px; font-weight: 550; }
+.steps p { color: var(--rc-ink-2); margin: 5px 0 0; font-size: 12px; line-height: 1.7; }
 
 .manage {
   padding: 32px 24px 48px;
@@ -30,9 +42,9 @@
 
 .title {
   margin: 0;
-  font-size: 22px;
-  font-weight: 600;
-  letter-spacing: -0.015em;
+  font-size: 28px;
+  font-weight: 500;
+  letter-spacing: -0.04em;
   line-height: 1.25;
   text-wrap: balance;
 }
@@ -46,6 +58,7 @@
   max-width: 56ch;
   color: var(--rc-ink-2);
   text-wrap: pretty;
+  line-height: 1.8;
 }
 
 /* Drop zone: the whole area is the label for the hidden file input. */
@@ -53,7 +66,7 @@
   position: relative;
   border: 1px dashed var(--rc-border-strong);
   border-radius: var(--rc-radius-panel);
-  background: var(--rc-canvas);
+  background: var(--rc-surface);
   transition: border-color var(--rc-fast) var(--rc-ease), background-color var(--rc-fast) var(--rc-ease);
 }
 
@@ -86,15 +99,18 @@
   display: grid;
   justify-items: center;
   gap: 4px;
-  padding: 32px 16px;
+  padding: 48px 16px;
   text-align: center;
   cursor: pointer;
 }
 
 .dropIcon {
   display: inline-flex;
-  margin-bottom: 4px;
-  color: var(--rc-ink-3);
+  margin-bottom: 14px;
+  color: var(--rc-ink);
+  padding: 14px;
+  border: 1px solid var(--rc-border);
+  background: var(--rc-canvas);
 }
 
 .dropText {
@@ -207,6 +223,7 @@
   margin: 0;
   font-size: 12px;
   color: var(--rc-ink-3);
+  max-width: 34ch;
 }
 
 .actions {
@@ -248,6 +265,13 @@
     flex-basis: 100%;
     margin: 0 0 4px 24px;
   }
+}
+
+@media (max-width: 850px) {
+  .onboarding { grid-template-columns: minmax(0, 560px); padding: 36px 24px; gap: 32px; }
+  .guide h2 { font-size: 34px; }
+  .guide > p { max-width: none; }
+  .steps { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {

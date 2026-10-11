@@ -75,6 +75,8 @@ export default function CallScreen(props: CallScreenProps) {
   const liveSupported = capabilities?.liveCall ?? null;
   const awaitingLive = live === null && liveSupported === true && callIsLive;
   const stepInSupported = capabilities?.stepIn ?? false;
+  const hasTranscript = Boolean(call.transcript?.trim());
+  const canRefreshTranscript = call.state === "completed" && !hasTranscript;
   // Joining needs someone on the line: the backend refuses while dialing or ringing.
   const connecting = live === null || live.phase === "dialing" || live.phase === "ringing";
   const stepInHint =
@@ -102,7 +104,7 @@ export default function CallScreen(props: CallScreenProps) {
 
       <div className={styles.identity}>
         <div className={styles.identityTop}>
-          <span className={styles.eyebrow}>{callIsLive ? "Calling" : "Called"}</span>
+          <span className={styles.eyebrow}>Support call</span>
           <SourcePill fixture={fixture} simulated={call.mode === "simulated"} />
         </div>
         <h2 id={props.headingId ? undefined : headingId} className={styles.name}>
@@ -116,6 +118,9 @@ export default function CallScreen(props: CallScreenProps) {
         <p className={styles.status} data-testid="call-phase">
           <span className={[styles.statusDot, styles[`dot_${dot}`] ?? ""].join(" ")} aria-hidden="true" />
           {status}
+        </p>
+        <p className={styles.updated}>
+          Updated <time dateTime={call.updatedAt}>{formatClock(call.updatedAt)}</time>
         </p>
       </div>
 
@@ -155,7 +160,7 @@ export default function CallScreen(props: CallScreenProps) {
         <CallNotes live={live} />
       ) : awaitingLive ? (
         <div className={styles.notes}>
-          <h3 className={styles.sectionLabel}>Notes</h3>
+          <h3 className={styles.sectionLabel}>Call activity</h3>
           <p className={styles.muted} data-testid="call-notes">
             The agent&apos;s notes appear here once the call connects.
           </p>
@@ -163,11 +168,15 @@ export default function CallScreen(props: CallScreenProps) {
       ) : (
         <div className={styles.transcript}>
           <h3 className={styles.sectionLabel}>Transcript</h3>
-          {call.transcript ? (
+          {hasTranscript ? (
             <MonoBlock caption="Call transcript">{call.transcript}</MonoBlock>
           ) : (
             <p className={styles.muted}>
-              {callIsLive ? "The transcript arrives when the call ends." : "No transcript was returned for this call."}
+              {callIsLive
+                ? "The transcript will appear here when it is available."
+                : canRefreshTranscript
+                  ? "The call ended, but its transcript is not available yet."
+                  : "No transcript was returned for this call."}
             </p>
           )}
         </div>
@@ -182,7 +191,7 @@ export default function CallScreen(props: CallScreenProps) {
                 Leave the call
               </Button>
             </>
-          ) : (
+          ) : stepInSupported ? (
             <>
               <Button
                 variant="primary"
@@ -201,16 +210,35 @@ export default function CallScreen(props: CallScreenProps) {
                 </p>
               ) : null}
             </>
+          ) : (
+            <div className={styles.capabilityNote}>
+              <p className={styles.controlTitle}>Call monitoring</p>
+              <p className={styles.controlNote}>
+                {capabilities === null
+                  ? "Checking available call controls."
+                  : "Joining the call: Not available with this backend. You can follow its status here."}
+              </p>
+            </div>
           )
         ) : (
           <p className={styles.controlNote}>
-            {live?.endedAt
+            {call.state === "dispatch_unknown"
+              ? "The call may have started. Verify this attempt before placing another call."
+              : live?.endedAt
               ? live.startedAt
                 ? `The call ended at ${formatClock(live.endedAt)}.`
                 : "The call did not connect."
               : "The call is not active."}
           </p>
         )}
+        {canRefreshTranscript ? (
+          <>
+            <p className={styles.controlNote}>A transcript can arrive after the call ends. Refreshing checks this call without placing another.</p>
+            <Button variant="secondary" onClick={props.onRetryUpdates} data-testid="refresh-transcript-button">
+              Refresh transcript
+            </Button>
+          </>
+        ) : null}
         {join.error ? (
           <p className={styles.controlError} role="alert">
             {join.error.message}
@@ -227,6 +255,7 @@ function CallClock({ live }: { live: LiveCallV2 }) {
   const elapsed = secondsBetween(live.startedAt, live.endedAt, now);
   return (
     <div className={styles.clock}>
+      <span className={styles.sectionLabel}>{live.startedAt ? "Call duration" : "Awaiting connection"}</span>
       <span
         className={[styles.timer, live.startedAt ? "" : styles.timerIdle].join(" ")}
         role="timer"
@@ -282,7 +311,7 @@ function CallNotes({ live }: { live: LiveCallV2 }) {
 
   return (
     <div className={styles.notes}>
-      <h3 className={styles.sectionLabel}>Notes</h3>
+      <h3 className={styles.sectionLabel}>Call activity</h3>
       {count === 0 ? (
         <p className={styles.muted} data-testid="call-notes">
           The agent&apos;s notes appear here as the call goes.

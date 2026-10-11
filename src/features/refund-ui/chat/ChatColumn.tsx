@@ -12,7 +12,7 @@
 import { useCallback, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import type { CallV1, CaseV1 } from "../../../contracts/case";
 import { Banner, Button, SkeletonRows } from "../ui/primitives";
-import { FileIcon } from "../ui/icons";
+import { AlertIcon, ChevronRightIcon, FileIcon, PhoneIcon } from "../ui/icons";
 import { formatClock } from "../ui/format";
 import DecisionCard from "../ui/DecisionCard";
 import { caseTitle, currentCall, isCallActive, isOutcomeStatus } from "../state/call";
@@ -37,9 +37,27 @@ export interface ChatColumnProps {
 }
 
 const EXAMPLES = [
-  "File an insurance claim against Northwind for the water damage on Oct 3, about $1,200",
-  "Get a refund for a duplicate $49.99 charge from Ridgeline Outfitters",
-  "Ridgeline charged me twice but I lost the receipt",
+  {
+    text: "Get a refund for a duplicate $49.99 charge from Ridgeline Outfitters",
+    title: "Recover a duplicate charge",
+    detail: "Ridgeline Outfitters · $49.99 charged twice",
+    icon: PhoneIcon,
+    fixtureOnly: false,
+  },
+  {
+    text: "File an insurance claim against Northwind for the water damage on Oct 3, about $1,200",
+    title: "Explore an insurance claim",
+    detail: "Northwind · $1,200 water damage · Fictional policy",
+    icon: FileIcon,
+    fixtureOnly: true,
+  },
+  {
+    text: "Ridgeline charged me twice but I lost the receipt",
+    title: "Start with missing evidence",
+    detail: "A duplicate charge with a missing receipt",
+    icon: AlertIcon,
+    fixtureOnly: false,
+  },
 ];
 
 const ASSISTANT_KINDS: ReadonlySet<ThreadItem["kind"]> = new Set(["assistant", "understood", "approval", "result"]);
@@ -108,23 +126,18 @@ export default function ChatColumn({ controller, fixture, phoneHint, planCount, 
   };
 
   const caseData = session?.caseData ?? null;
-  const call = currentCall(caseData, session?.startedCall ?? null);
-  const finished = caseData !== null && (isOutcomeStatus(caseData.status) || call?.state === "dispatch_unknown");
-
-  const placeholder = !session
-    ? "Describe what you are owed, in your own words…"
-    : caseData
-      ? finished
-        ? "Add a note to this case…"
-        : "Add a detail for the agent…"
-      : "Describe what you are owed, in your own words…";
+  const placeholder = caseData
+    ? "Add a note to this case…"
+    : "Who charged you, what happened, and how much are you owed?";
 
   const hint =
-    !caseData && planCount > 0
+    caseData
+      ? "Notes stay in this browser. Edit the facts above to update the call brief."
+      : fixture && planCount > 0
       ? planCount === 1
         ? "Your plan is attached when you describe an insurance claim."
         : "Your plans are attached when you describe an insurance claim."
-      : null;
+      : "You review the facts and approve before a call starts.";
 
   return (
     <section className={styles.column} aria-label="Conversation">
@@ -142,7 +155,7 @@ export default function ChatColumn({ controller, fixture, phoneHint, planCount, 
               onFactsDirty={reportFactsDirty}
             />
           ) : (
-            <EmptyState onExample={chooseExample} planCount={planCount} />
+            <EmptyState onExample={chooseExample} planCount={planCount} fixture={fixture} />
           )}
         </div>
         {unseen ? (
@@ -168,29 +181,41 @@ export default function ChatColumn({ controller, fixture, phoneHint, planCount, 
   );
 }
 
-function EmptyState({ onExample, planCount }: { onExample: (text: string) => void; planCount: number }) {
+function EmptyState({ onExample, planCount, fixture }: { onExample: (text: string) => void; planCount: number; fixture: boolean }) {
   return (
     <div className={styles.empty}>
+      <p className={styles.eyebrow}>{fixture ? "Your claims & refund assistant" : "Your refund assistant"}</p>
       <h2 className={styles.emptyTitle}>What are you owed?</h2>
       <p className={styles.emptyText}>
-        Describe the charge or the claim in your own words. Recourse lays out the facts for you to check, asks you to
-        approve the call, then makes it. You can listen in or step in at any time.
+        {fixture
+          ? "Describe a refund or explore a fictional claim. Recourse prepares the facts, calls with your approval, and keeps the outcome here."
+          : "Describe a duplicate charge. Recourse prepares the facts, calls with your approval, and keeps the outcome here."}
       </p>
-      {planCount === 0 ? (
-        <p className={styles.emptyNote}>No plans yet. Add one from the rail if this is an insurance claim.</p>
-      ) : null}
+      <ol className={styles.steps} aria-label="How Recourse works">
+        <li><span className={styles.stepNumber}>01</span><span><strong>Review the facts</strong><span>Check the details and evidence.</span></span></li>
+        <li><span className={styles.stepNumber}>02</span><span><strong>Approve the call</strong><span>You choose what happens next.</span></span></li>
+        <li><span className={styles.stepNumber}>03</span><span><strong>Review the outcome</strong><span>See the transcript and next steps.</span></span></li>
+      </ol>
       <div className={styles.examples}>
-        <span className={styles.examplesLabel}>Try</span>
+        <div className={styles.examplesHeading}>
+          <span className={styles.examplesLabel}>Start with an example</span>
+          <span className={styles.exampleDisclaimer}>Fictional cases</span>
+        </div>
         <ul className={styles.exampleList}>
-          {EXAMPLES.map((text) => (
+          {EXAMPLES.filter((example) => fixture || !example.fixtureOnly).map(({ text, title, detail, icon: Icon }) => (
             <li key={text}>
-              <button type="button" className={styles.example} onClick={() => onExample(text)}>
-                {text}
+              <button type="button" className={styles.example} onClick={() => onExample(text)} aria-label={`${title}. ${text}`}>
+                <span className={styles.exampleIcon}><Icon /></span>
+                <span className={styles.exampleContent}><strong>{title}</strong><span>{detail}</span></span>
+                <span className={styles.exampleArrow}><ChevronRightIcon /></span>
               </button>
             </li>
           ))}
         </ul>
       </div>
+      {fixture && planCount === 0 ? (
+        <p className={styles.emptyNote}><FileIcon /> Have a policy to review? Add it under Plans.</p>
+      ) : null}
     </div>
   );
 }

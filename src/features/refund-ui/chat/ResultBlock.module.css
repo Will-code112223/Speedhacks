@@ -2,62 +2,119 @@
 .outcome {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding-top: 4px;
+  gap: 20px;
+  padding: 24px 0 8px;
+  border-top: 1px solid var(--rc-border-strong);
 }
 
 .outcomeHeader,
 .uncertainHeader {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
 }
 
+.eyebrow {
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--rc-ink-2);
+}
+
 .outcomeTitle {
   margin: 0;
-  font-size: 15px;
+  font-size: 24px;
   font-weight: 600;
-  letter-spacing: -0.005em;
+  letter-spacing: -0.035em;
+  line-height: 1.2;
   text-wrap: balance;
 }
 
 .ledger {
   margin: 0;
   display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   border-top: 1px solid var(--rc-border);
+  border-bottom: 1px solid var(--rc-border);
 }
 
 .ledgerRow {
   display: grid;
-  grid-template-columns: 96px minmax(0, 1fr);
-  align-items: center;
+  align-content: start;
   gap: 12px;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--rc-border);
+  padding: 20px 20px 20px 0;
+  min-width: 0;
+}
+
+.ledgerRow + .ledgerRow {
+  padding-left: 20px;
+  padding-right: 0;
+  border-left: 1px solid var(--rc-border);
 }
 
 .ledgerRow dt {
-  font-weight: 500;
-  color: var(--rc-ink);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--rc-ink-2);
 }
 
 .ledgerRow dd {
   margin: 0;
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 4px 10px;
+  display: grid;
+  justify-items: start;
+  align-content: start;
+  gap: 10px;
   min-width: 0;
 }
 
 .ledgerNote {
   color: var(--rc-ink-2);
+  font-size: 14px;
+  line-height: 1.6;
 }
 
 .quote {
+  margin: 0;
+  display: grid;
+  gap: 10px;
   color: var(--rc-ink);
-  line-height: 1.6;
+}
+
+.quote figcaption {
+  color: var(--rc-ink-2);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.quote blockquote {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.55;
+  letter-spacing: -0.015em;
+  overflow-wrap: anywhere;
+}
+
+.quote blockquote::before {
+  content: open-quote;
+}
+
+.quote blockquote::after {
+  content: close-quote;
+}
+
+.nextStep {
+  display: grid;
+  gap: 8px;
+}
+
+.nextStep p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--rc-ink);
 }
 
 .actions {
@@ -70,8 +127,8 @@
 .disclosures {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding-top: 4px;
+  gap: 0;
+  border-top: 1px solid var(--rc-border);
 }
 
 .history {
@@ -79,56 +136,71 @@
   padding: 0;
   list-style: none;
   display: grid;
-  gap: 6px;
+  gap: 0;
 }
 
 .history li {
   display: grid;
   grid-template-columns: 120px minmax(0, 1fr);
-  gap: 12px;
+  gap: 20px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--rc-border);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.history li:last-child {
+  border-bottom: 0;
+}
+
+.history li > span {
+  overflow-wrap: anywhere;
 }
 
 .historyTime {
   font-family: var(--rc-mono);
   font-size: 12px;
   font-variant-numeric: tabular-nums;
-  color: var(--rc-ink-3);
+  color: var(--rc-ink-2);
 }
 
 .muted {
   margin: 0;
-  color: var(--rc-ink-3);
+  color: var(--rc-ink-2);
+  line-height: 1.6;
 }
 
 /* dispatch_unknown: an explicit warning the person cannot miss. */
 .uncertain {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 14px 16px;
-  border-radius: var(--rc-radius-panel);
+  gap: 16px;
+  padding: 20px;
+  border-radius: 4px;
   border: 1px solid var(--rc-warning);
   background: var(--rc-warning-tint);
 }
 
 .uncertainTitle {
   margin: 0;
-  font-size: 15px;
+  font-size: 18px;
   font-weight: 600;
   color: var(--rc-warning);
+  line-height: 1.35;
   text-wrap: balance;
 }
 
 .uncertainText {
   margin: 0;
   color: var(--rc-ink);
+  line-height: 1.6;
 }
 
 .failed {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 12px 0;
+  gap: 14px;
+  padding: 20px 0;
   border-top: 1px solid var(--rc-border);
   border-bottom: 1px solid var(--rc-border);
 }
@@ -141,16 +213,20 @@
 
 .failedTitle {
   margin: 0;
-  font-size: 13px;
+  font-size: 18px;
   font-weight: 600;
+  line-height: 1.35;
 }
 
 .failedText {
   margin: 0;
   color: var(--rc-ink-2);
+  line-height: 1.6;
 }
 
 .nextLabel {
+  margin: 0;
+  font-size: 13px;
   font-weight: 600;
   color: var(--rc-ink);
 }
@@ -158,7 +234,7 @@
 .ids {
   margin: 0;
   display: grid;
-  gap: 4px;
+  gap: 10px;
 }
 
 .ids div {
@@ -178,6 +254,20 @@
 }
 
 @media (max-width: 560px) {
+  .ledger {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ledgerRow,
+  .ledgerRow + .ledgerRow {
+    padding: 16px 0;
+    border-left: 0;
+  }
+
+  .ledgerRow + .ledgerRow {
+    border-top: 1px solid var(--rc-border);
+  }
+
   .ledgerRow,
   .ids div,
   .history li {

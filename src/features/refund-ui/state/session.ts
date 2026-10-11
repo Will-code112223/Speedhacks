@@ -15,6 +15,7 @@ import {
   callStateEventText,
   counterpartEventText,
   currentCall,
+  hasCallOutcome,
   isOutcomeStatus,
   phaseEventText,
 } from "./call";
@@ -233,7 +234,7 @@ function applyCase(session: CaseSession, next: CaseV1, liveCapable: boolean, at:
   // One result item per finished, failed or uncertain call.
   if (call) {
     const finished =
-      call.state === "dispatch_unknown" || call.state === "failed" || call.state === "cancelled" || isOutcomeStatus(next.status);
+      call.state === "dispatch_unknown" || call.state === "failed" || call.state === "cancelled" || hasCallOutcome(next, call);
     if (finished && !thread.some((item) => item.kind === "result" && item.callId === call.id)) {
       append({ kind: "result", id: createLocalId(), at, callId: call.id });
     }

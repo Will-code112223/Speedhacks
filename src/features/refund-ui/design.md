@@ -3,6 +3,31 @@
 Read this before writing any component under `src/features/refund-ui`.
 It follows the Refero skill in `.agents/skills/refero-design` with its bundled craft references, since the live Refero MCP needs a paid token we do not have.
 
+## October 11 visual refinement
+
+The user requested a parallel improvement pass against the published frontend at
+602069a, referencing https://optimizedhq.com and https://www.palantir.com.
+The build target is the existing working Recourse UI, not a new marketing site.
+Live browser captures of both references and the baseline workspace inform this pass.
+
+Primary direction: Palantir's precise monochrome hierarchy and crisp geometry,
+adapted to a light product workspace. Preserve white surfaces, near-black primary
+actions, fine rules, direct sans-serif headings and purposeful information density.
+Borrow OptimizedHQ's clear statement of the task and ordered explanation of the work.
+Keep the existing chat, fact review, authorization and call flow. Do not copy either
+site's assets or claims. This pass uses code-native marks and existing icons only.
+
+| Decision | Source | Role | Reason |
+| --- | --- | --- | --- |
+| Deterministic light workspace with a quiet grey rail | User references; Refero anti-slop guide | Working canvas | Keeps documents readable and avoids the baseline's nearly black empty screen |
+| Graphite primary buttons, cobalt focus and links | Palantir reference; existing accessible tokens | Action hierarchy | One clear action without saturating the workspace |
+| Larger task heading and numbered workflow | OptimizedHQ reference; user brief | First-use guidance | Explain review, approval and calling before asking for input |
+| Compact expandable demo settings | Baseline screenshot critique | Secondary controls | Keep simulation visible while moving test switches out of the primary path |
+| Structured call record and explicit result evidence | Shared contract and provider verification | Call and outcome | Do not imply live transcripts, arbitrary takeover or verified payment |
+
+This refinement supersedes the original automatic dark-theme and 13px-everywhere
+choices below. The remaining contract, ownership and accessibility rules still apply.
+
 ## Brief
 
 Designing a claims and refund assistant for a person who is owed money, on desktop web, usable at tablet width.
