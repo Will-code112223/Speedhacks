@@ -148,10 +148,11 @@ export default function ChatColumn({ controller, fixture, phoneHint, planCount, 
       <div className={styles.scroller} ref={scrollerRef} onScroll={onScroll}>
         <div className={styles.thread}>
           <ActivityGraph
+            key={caseData?.id ?? "new-case-graph"}
             caseData={caseData}
             call={controller.call}
             fixture={fixture}
-            defaultExpanded={false}
+            defaultExpanded
           />
           {session ? (
             <Thread

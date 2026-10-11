@@ -91,7 +91,11 @@ describe("activity graph snapshot projection", () => {
 
   it("exposes keyboard-operable node controls and labels workflow limitations", () => {
     const html = renderToStaticMarkup(<ActivityGraph caseData={null} call={null} fixture={false} />);
-    expect(html.match(/aria-pressed=/g)).toHaveLength(6);
+    expect(html.match(/aria-pressed=/g)).toHaveLength(7);
+    expect(html).toContain("Interactive case relationship graph");
+    expect(html).toContain('aria-label="Zoom in"');
+    expect(html).toContain('aria-label="Zoom out"');
+    expect(html).toContain("Reset view");
     expect(html).toContain("Agent activity map");
     expect(html).toContain('aria-expanded="true"');
     expect(html).toContain("not a live event trace");
@@ -103,5 +107,13 @@ describe("activity graph snapshot projection", () => {
     const html = renderToStaticMarkup(<ActivityGraph caseData={makeCase({ timeline })} call={null} fixture defaultExpanded />);
     expect(html.indexOf("First event")).toBeLessThan(html.indexOf("Second event"));
     expect(timeline[0]?.id).toBe("2");
+  });
+
+  it("keeps the mode header consistent when a supplied live call belongs to another case", () => {
+    const html = renderToStaticMarkup(<ActivityGraph caseData={makeCase()} call={makeCall()} fixture={false} />);
+    expect(html).not.toContain("Live call record");
+    expect(html).toContain("Simulated");
+    expect(html).toContain("Dial call: Not started");
+    expect(html).toContain("Inspect node");
   });
 });

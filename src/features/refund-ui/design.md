@@ -120,6 +120,25 @@ Simulated and fixture modes are always labelled where the data appears.
 
 ## Decision ledger
 
+### Activity network correction
+
+The user's requested graph is a spatial node-and-edge network, not numbered cards.
+Keep the existing Palantir-derived monochrome workspace and code-native icons.
+Place the case agent at a branching junction between request, evidence, brief and
+call records. Directed, labeled edges describe relationships in the case snapshot;
+solid lines mean recorded relationships, dashed lines mean pending relationships.
+Historical calls must not attach to the current approval. No animated traffic is
+implied. Use a dotted coordinate canvas, movable circular nodes, pan, zoom, reset,
+keyboard controls and a text inspector. This follows the user's graph correction
+and Refero's craft guidance for visible focus and non-drag interaction alternatives.
+
+| Decision | Source | Role | Why |
+| --- | --- | --- | --- |
+| Spatial branches and circular nodes | User graph correction | Relationship visualization | Makes connections inspectable rather than presenting another card sequence |
+| Fine lines and graphite agent node | Existing reference lock | Canvas and hierarchy | Preserves the current operations workspace |
+| Edge labels and solid/dashed states | Canonical case records | Evidence | Separates available relationships from planned work |
+| Keyboard movement, zoom and reset | Refero craft guidance | Interaction | Keeps the graph usable without dragging |
+
 | Decision | Source | Role | Why |
 | --- | --- | --- | --- |
 | White canvas, cool neutrals | Refero color guide, anti-slop tells 3 and 4 | canvas | work tool, dense data, light baseline |
