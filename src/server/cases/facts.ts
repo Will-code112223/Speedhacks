@@ -1,5 +1,7 @@
 import type { CaseChanges, CaseV1 } from "@/contracts/case";
+import { CALL_PLAN_ACTIONS } from "@/contracts/voice";
 import { historyBriefLines, type HistoryCheck } from "@/server/cases/history";
+import { merchantRecordLines, type FrozenMerchantRecord } from "@/server/cases/insights";
 import type { CaseDoc } from "@/server/persistence/repository";
 
 /** E.164 with at least 8 digits, matching the Dial adapter's own validation so dispatch never fails on format. */
@@ -154,19 +156,9 @@ export function buildDraft(facts: Facts, evidence: CaseV1["evidence"]): CaseV1["
   return { subject, body };
 }
 
-export const PERMITTED_ACTIONS = [
-  "Identify yourself as calling on behalf of the customer about a duplicate charge.",
-  "Request a refund of the duplicate charge for the exact amount stated.",
-  "Ask for a reference or confirmation number and the expected refund timeline.",
-  "Answer verification questions only with the facts listed; say you do not know otherwise.",
-];
-
-export const FORBIDDEN_ACTIONS = [
-  "Do not agree to new charges, upgrades, or retention offers.",
-  "Do not change the amount, the merchant, or the reason.",
-  "Do not share or request payment card numbers, passwords, or one-time codes.",
-  "Do not make commitments on the customer's behalf beyond requesting this refund.",
-];
+// V1 brief wording = the V1.1 server-owned constants for request_refund, so the brief and plan never drift.
+export const PERMITTED_ACTIONS = CALL_PLAN_ACTIONS.request_refund.permitted;
+export const FORBIDDEN_ACTIONS = CALL_PLAN_ACTIONS.request_refund.forbidden;
 
 /** Immutable factual call brief frozen with the authorization. */
 export function buildBrief(input: {
@@ -180,6 +172,8 @@ export function buildBrief(input: {
   evidence: CaseV1["evidence"];
   /** Transaction-history check for this exact revision, if one ran. */
   history?: HistoryCheck | null;
+  /** Merchant track record for this exact revision, if one was captured. */
+  merchantRecord?: FrozenMerchantRecord | null;
 }): string {
   const amount = formatAmount(input.amountMinor, input.currency);
   return [
@@ -194,6 +188,7 @@ export function buildBrief(input: {
     `- Reason given by the customer: ${input.reason}`,
     `- Evidence on file: ${input.evidence.length > 0 ? input.evidence.map((e) => e.name).join(", ") : "none"}`,
     ...(input.history ? ["", ...historyBriefLines(input.history)] : []),
+    ...(input.merchantRecord ? ["", ...merchantRecordLines(input.merchantRecord)] : []),
     "",
     "Permitted actions:",
     ...PERMITTED_ACTIONS.map((a) => `- ${a}`),

@@ -14,7 +14,7 @@ import {
   type Facts,
 } from "@/server/cases/facts";
 import { evaluateHistory, unavailableHistory, type HistoryCheck, type TransactionHistory } from "@/server/cases/history";
-import type { MerchantInsights, MerchantInsightsResult } from "@/server/cases/insights";
+import { merchantRecordSummary, type FrozenMerchantRecord, type MerchantInsights, type MerchantInsightsResult } from "@/server/cases/insights";
 import { analyzeTranscript, unknownOutcome } from "@/server/cases/outcome";
 import { type AppConfig, assertLiveLlmConfig, assertModeValid } from "@/server/config";
 import type { ExtractedFields, Extractor } from "@/server/documents/extractor";
@@ -213,7 +213,7 @@ export class CaseService {
     const missing = missingFields(facts);
     const evidenceList = evidence.map((e) => ({ id: e.id, name: e.name, mimeType: e.mimeType }));
     // Pre-authorization transaction-history check (Keewano or the labeled fixture). Bounded; never blocks.
-    const history = await this.checkHistory(facts, 1);
+    const [history, merchantRecord] = await Promise.all([this.checkHistory(facts, 1), this.checkMerchant(facts, 1)]);
     const doc: CaseDoc = {
       ...facts,
       missingFields: missing,
@@ -222,8 +222,10 @@ export class CaseService {
       outcome: { decision: "unknown", referenceNumber: null, nextAction: null, paymentStatus: "unverified", supportingQuote: null },
       timeline,
       history,
+      merchantRecord,
     };
     if (history) doc.timeline.push(this.historyEntry(history));
+    if (merchantRecord) doc.timeline.push(this.merchantEntry(merchantRecord));
     if (missing.length > 0) doc.timeline.push(this.entry("needs_information", `Missing: ${missing.join(", ")}.`));
     else doc.timeline.push(this.entry("ready_for_approval", "All required facts present; draft generated."));
 
@@ -241,7 +243,7 @@ export class CaseService {
   async getCase(ownerSession: string, id: string): Promise<CaseV1> {
     this.ownedRow(ownerSession, id);
     await this.reconcileDueCalls(id);
-    await this.ensureHistoryChecked(id);
+    await this.ensurePreAuthorizationChecks(id);
     return this.assemble(id);
   }
 
@@ -334,6 +336,7 @@ export class CaseService {
       const amountMinor = row.doc.amountMinor as number;
       // Only a check of this exact revision is frozen; a stale one is evidence about other facts.
       const history = row.doc.history && row.doc.history.revision === row.revision ? row.doc.history : null;
+      const merchantRecord = row.doc.merchantRecord && row.doc.merchantRecord.revision === row.revision ? row.doc.merchantRecord : null;
       const snapshot: AuthorizationSnapshot = {
         caseId: id,
         revision: row.revision,
@@ -353,9 +356,11 @@ export class CaseService {
           reason: row.doc.reason,
           evidence,
           history,
+          merchantRecord,
         }),
         permittedActions: [...PERMITTED_ACTIONS],
         history,
+        merchantRecord,
       };
       const authorization = { id: randomUUID(), caseId: id, revision: row.revision, approvedAt: now, snapshot };
       repo.insertAuthorization(authorization);
@@ -507,7 +512,8 @@ export class CaseService {
   packet(ownerSession: string, id: string): string {
     const row = this.ownedRow(ownerSession, id);
     const history = row.doc.history && row.doc.history.revision === row.revision ? row.doc.history : null;
-    return buildPacket(this.assemble(id), this.deps.repo.listEvidence(id), history);
+    const merchantRecord = row.doc.merchantRecord && row.doc.merchantRecord.revision === row.revision ? row.doc.merchantRecord : null;
+    return buildPacket(this.assemble(id), this.deps.repo.listEvidence(id), history, merchantRecord);
   }
 
   // -------------------------------------------------------------------------
@@ -613,25 +619,66 @@ export class CaseService {
     }
   }
 
-  /** Once per revision (a fact edit re-triggers it); an unavailable result is retried after a pause. */
-  private async ensureHistoryChecked(id: string): Promise<void> {
+  private merchantEntry(record: FrozenMerchantRecord): TimelineEntry {
+    return this.entry("merchant_record", merchantRecordSummary(record));
+  }
+
+  /** Merchant track record from mirrored cases; null when there is no source or it failed. Never blocks. */
+  private async checkMerchant(facts: Facts, revision: number): Promise<FrozenMerchantRecord | null> {
+    const source = this.deps.insights;
+    const merchantName = facts.merchant.name?.trim();
+    if (!source || !merchantName) return null;
+    try {
+      const record = await withTimeout(source.merchantRecord(merchantName), this.deps.config.keewano.timeoutMs, `${source.kind} merchant record`);
+      return { ...record, revision, checkedAt: this.nowIso() };
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Pre-authorization checks run once per revision (a fact edit re-triggers them): the
+   * transaction-history check (an unavailable result is retried after a pause) and the
+   * merchant track record. Results land on the timeline and are frozen at authorization.
+   */
+  private async ensurePreAuthorizationChecks(id: string): Promise<void> {
     const { repo, config } = this.deps;
-    if (!this.deps.history) return;
     const row = repo.getCase(id);
     if (!row) return;
     const prev = row.doc.history ?? null;
-    if (prev && prev.revision === row.revision) {
-      if (prev.status !== "unavailable") return;
-      if (Date.parse(this.nowIso()) - Date.parse(prev.checkedAt) < config.keewano.retryMs) return;
+    let needHistory = Boolean(this.deps.history);
+    if (needHistory && prev && prev.revision === row.revision) {
+      needHistory = prev.status === "unavailable" && Date.parse(this.nowIso()) - Date.parse(prev.checkedAt) >= config.keewano.retryMs;
     }
-    const check = await this.checkHistory(row.doc, row.revision);
-    if (!check) return;
+    const prevRecord = row.doc.merchantRecord ?? null;
+    const needMerchant = Boolean(this.deps.insights) && (!prevRecord || prevRecord.revision !== row.revision);
+    if (!needHistory && !needMerchant) return;
+    const [check, record] = await Promise.all([
+      needHistory ? this.checkHistory(row.doc, row.revision) : Promise.resolve(null),
+      needMerchant ? this.checkMerchant(row.doc, row.revision) : Promise.resolve(null),
+    ]);
+    if (!check && !record) return;
     repo.transaction(() => {
       const latest = repo.getCase(id);
-      if (!latest || latest.revision !== check.revision) return; // facts changed meanwhile; the next GET re-checks
-      const current = latest.doc.history ?? null;
-      if (current && current.revision === check.revision && (current.status !== "unavailable" || current.checkedAt === check.checkedAt)) return;
-      const doc: CaseDoc = { ...latest.doc, history: check, timeline: [...latest.doc.timeline, this.historyEntry(check)] };
+      if (!latest || latest.revision !== row.revision) return; // facts changed meanwhile; the next GET re-checks
+      const timeline = [...latest.doc.timeline];
+      const doc: CaseDoc = { ...latest.doc, timeline };
+      if (check) {
+        const current = latest.doc.history ?? null;
+        const fresh = current && current.revision === check.revision && (current.status !== "unavailable" || current.checkedAt === check.checkedAt);
+        if (!fresh) {
+          doc.history = check;
+          timeline.push(this.historyEntry(check));
+        }
+      }
+      if (record) {
+        const current = latest.doc.merchantRecord ?? null;
+        if (!current || current.revision !== record.revision) {
+          doc.merchantRecord = record;
+          timeline.push(this.merchantEntry(record));
+        }
+      }
+      if (timeline.length === latest.doc.timeline.length) return;
       repo.updateCase(id, { doc, updatedAt: this.nowIso() });
     });
   }

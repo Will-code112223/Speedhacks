@@ -1,5 +1,6 @@
 import type { CallState, CaseV1, Mode } from "@/contracts/case";
 import type { HistoryCheck } from "@/server/cases/history";
+import type { FrozenMerchantRecord } from "@/server/cases/insights";
 import type { Db } from "@/server/persistence/db";
 
 /** Mutable case fields stored as one JSON document; calls/evidence live in their own tables. */
@@ -16,6 +17,8 @@ export interface CaseDoc {
   timeline: CaseV1["timeline"];
   /** Pre-authorization transaction-history check (Keewano/fixture); absent on older rows. */
   history?: HistoryCheck | null;
+  /** Pre-authorization merchant track record (Keewano/fixture); absent on older rows. */
+  merchantRecord?: FrozenMerchantRecord | null;
 }
 
 export interface CaseRow {
@@ -65,6 +68,8 @@ export interface AuthorizationSnapshot {
   permittedActions: string[];
   /** History evidence frozen with the brief (same revision only). */
   history?: HistoryCheck | null;
+  /** Merchant track record frozen with the brief (same revision only). */
+  merchantRecord?: FrozenMerchantRecord | null;
 }
 
 export interface AuthorizationRow {

@@ -42,6 +42,39 @@ export interface OutcomeRow {
 /** What GET /api/insights/merchant returns: the record when a source answered, otherwise why not. */
 export type MerchantInsightsResult = ({ available: true } & MerchantRecord) | { available: false; merchant: string; error?: string };
 
+/** A record captured for one case revision and frozen with its authorization. */
+export type FrozenMerchantRecord = MerchantRecord & { revision: number; checkedAt: string };
+
+function pct(rate: number): string {
+  return `${Math.round(rate * 100)}%`;
+}
+
+/** One-line summary for the timeline and the packet. */
+export function merchantRecordSummary(r: MerchantRecord): string {
+  const label = `Merchant track record (${r.source})`;
+  if (r.cases === 0) return `${label}: no refund calls to ${r.merchant} on record yet.`;
+  const parts = [`${r.approved} of ${r.cases} refund requests approved${r.approvalRate !== null ? ` (${pct(r.approvalRate)} of decided)` : ""}`];
+  if (r.denied > 0) parts.push(`${r.denied} denied`);
+  if (r.needsInformation > 0) parts.push(`${r.needsInformation} needed more information`);
+  if (r.unresolved > 0) parts.push(`${r.unresolved} unresolved`);
+  return `${label}: ${r.merchant} — ${parts.join(", ")}${r.lastOutcomeAt ? `; last outcome ${r.lastOutcomeAt}` : ""}.`;
+}
+
+/** Lines frozen into the call brief: the numbers, then what they mean for this call. */
+export function merchantRecordLines(r: MerchantRecord): string[] {
+  const lines = ["Merchant track record:", `- ${merchantRecordSummary(r)}`];
+  if (r.cases === 0 || r.approvalRate === null) {
+    lines.push("- No prior decisions are known for this merchant; proceed on the facts above.");
+  } else if (r.approvalRate >= 0.6) {
+    lines.push("- This merchant usually approves refund requests like this one: ask directly for the refund and a reference number.");
+  } else if (r.approvalRate < 0.4) {
+    lines.push("- This merchant often declines: ask what evidence or process is required and record the answer for the customer.");
+  } else {
+    lines.push("- Outcomes are mixed: state the evidence clearly and ask for a reference number for whatever is decided.");
+  }
+  return lines;
+}
+
 export function emptyMerchantRecord(merchant: string, source: string): MerchantRecord {
   return { merchant, source, cases: 0, approved: 0, denied: 0, needsInformation: 0, unresolved: 0, approvalRate: null, lastOutcomeAt: null };
 }
