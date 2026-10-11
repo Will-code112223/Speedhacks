@@ -1,9 +1,16 @@
 import type { CaseV1 } from "@/contracts/case";
 import { formatAmount } from "@/server/cases/facts";
+import { historyBriefLines, type HistoryCheck } from "@/server/cases/history";
+import { merchantRecordSummary, type FrozenMerchantRecord } from "@/server/cases/insights";
 import type { EvidenceRow } from "@/server/persistence/repository";
 
 /** Plain-text refund request packet with an evidence index. PDF is optional later. */
-export function buildPacket(c: CaseV1, evidence: EvidenceRow[]): string {
+export function buildPacket(
+  c: CaseV1,
+  evidence: EvidenceRow[],
+  history: HistoryCheck | null = null,
+  merchantRecord: FrozenMerchantRecord | null = null,
+): string {
   const amount = formatAmount(c.amountMinor, c.currency);
   const lines: string[] = [];
   lines.push("REFUND REQUEST PACKET");
@@ -39,6 +46,16 @@ export function buildPacket(c: CaseV1, evidence: EvidenceRow[]): string {
     lines.push(`   type: ${e.mimeType}   size: ${e.sizeBytes} bytes   sha256: ${e.sha256.slice(0, 16)}…   id: ${e.id}`);
   });
   lines.push("");
+  if (history || merchantRecord) {
+    lines.push("TRANSACTION HISTORY AND MERCHANT RECORD");
+    lines.push("-".repeat(60));
+    if (history) {
+      lines.push(`Checked:  ${history.checkedAt}   source: ${history.source}   status: ${history.status}`);
+      for (const l of historyBriefLines(history).slice(1)) lines.push(l);
+    }
+    if (merchantRecord) lines.push(`Merchant: ${merchantRecordSummary(merchantRecord)}`);
+    lines.push("");
+  }
   lines.push("OUTCOME");
   lines.push("-".repeat(60));
   lines.push(`Decision:        ${c.outcome.decision}`);

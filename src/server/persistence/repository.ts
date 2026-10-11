@@ -1,4 +1,7 @@
-import type { CallState, CaseV1, Mode } from "@/contracts/case";
+import type { CallState, CaseV1, Mode, ProposedUpdateV1 } from "@/contracts/case";
+import type { CallPlanV1, CallPurpose } from "@/contracts/voice";
+import type { HistoryCheck } from "@/server/cases/history";
+import type { FrozenMerchantRecord } from "@/server/cases/insights";
 import type { Db } from "@/server/persistence/db";
 
 /** Mutable case fields stored as one JSON document; calls/evidence live in their own tables. */
@@ -13,6 +16,12 @@ export interface CaseDoc {
   authorization: CaseV1["authorization"];
   outcome: CaseV1["outcome"];
   timeline: CaseV1["timeline"];
+  /** Pre-authorization transaction-history check (Keewano/fixture); absent on older rows. */
+  history?: HistoryCheck | null;
+  /** Pre-authorization merchant track record (Keewano/fixture); absent on older rows. */
+  merchantRecord?: FrozenMerchantRecord | null;
+  /** V1.1 transcript answers awaiting review; absent on older rows. */
+  proposedUpdates?: ProposedUpdateV1[];
 }
 
 export interface CaseRow {
@@ -54,12 +63,21 @@ export interface AuthorizationSnapshot {
   revision: number;
   customer: CaseV1["customer"];
   merchant: { name: string; supportPhone: string };
-  amountMinor: number;
+  /** null only for a gather_information authorization (V1.1). */
+  amountMinor: number | null;
   currency: string;
   reason: string;
   evidence: CaseV1["evidence"];
   brief: string;
+  /** V1.1; absent on pre-V1.1 rows = request_refund. */
+  purpose?: CallPurpose;
+  /** V1.1 plan frozen with the brief; absent on pre-V1.1 rows (adapter then uses the brief). */
+  plan?: CallPlanV1;
   permittedActions: string[];
+  /** History evidence frozen with the brief (same revision only). */
+  history?: HistoryCheck | null;
+  /** Merchant track record frozen with the brief (same revision only). */
+  merchantRecord?: FrozenMerchantRecord | null;
 }
 
 export interface AuthorizationRow {

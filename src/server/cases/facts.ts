@@ -1,4 +1,7 @@
 import type { CaseChanges, CaseV1 } from "@/contracts/case";
+import { CALL_PLAN_ACTIONS, CALL_PLAN_LIMITS, type CallPlanV1, type CallPurpose } from "@/contracts/voice";
+import { historyBriefLines, type HistoryCheck } from "@/server/cases/history";
+import { merchantRecordLines, type FrozenMerchantRecord } from "@/server/cases/insights";
 import type { CaseDoc } from "@/server/persistence/repository";
 
 /** E.164 with at least 8 digits, matching the Dial adapter's own validation so dispatch never fails on format. */
@@ -17,12 +20,13 @@ export const REQUIRED_FIELDS = [
 
 export type Facts = Pick<CaseDoc, "customer" | "merchant" | "amountMinor" | "currency" | "reason">;
 
-export function missingFields(facts: Facts): string[] {
+/** Required facts for authorization. gather_information does not need an amount (V1.1). */
+export function missingFields(facts: Facts, purpose: CallPurpose = "request_refund"): string[] {
   const missing: string[] = [];
   if (!facts.customer.name?.trim()) missing.push("customer.name");
   if (!facts.merchant.name?.trim()) missing.push("merchant.name");
   if (!facts.merchant.supportPhone || !E164.test(facts.merchant.supportPhone)) missing.push("merchant.supportPhone");
-  if (!isValidAmountMinor(facts.amountMinor)) missing.push("amountMinor");
+  if (purpose === "request_refund" && !isValidAmountMinor(facts.amountMinor)) missing.push("amountMinor");
   if (!CURRENCY.test(facts.currency)) missing.push("currency");
   if (!facts.reason.trim()) missing.push("reason");
   return missing;
@@ -125,15 +129,40 @@ export function applyChanges(facts: Facts, changes: CaseChanges): { next: Facts;
   return { next, changed };
 }
 
-/** Refund request draft; null until every required fact is present. */
+/**
+ * Email draft. With an amount it is the V1 refund request (unchanged); without one it is a
+ * neutral information request, so an insurance or general question is never framed as a
+ * refund claim. null until the facts that purpose needs are present.
+ */
 export function buildDraft(facts: Facts, evidence: CaseV1["evidence"]): CaseV1["draft"] {
-  if (missingFields(facts).length > 0) return null;
-  const amount = formatAmount(facts.amountMinor, facts.currency);
-  const subject = `Refund request: duplicate charge of ${amount} at ${facts.merchant.name}`;
   const evidenceLines =
     evidence.length > 0
       ? evidence.map((e, i) => `  ${i + 1}. ${e.name} (${e.mimeType})`).join("\n")
       : "  (none attached)";
+  if (missingFields(facts).length > 0) {
+    if (missingFields(facts, "gather_information").length > 0) return null;
+    return {
+      subject: `Information request about a charge at ${facts.merchant.name}`,
+      body: [
+        `Hello ${facts.merchant.name} support,`,
+        "",
+        `My name is ${facts.customer.name}${facts.customer.email ? ` (${facts.customer.email})` : ""}.`,
+        "I have a question about a charge on my account and am not requesting a refund at this time.",
+        "",
+        `Details: ${facts.reason}`,
+        "",
+        "Documents attached:",
+        evidenceLines,
+        "",
+        "Please tell me what you need from me to resolve this, and any reference number for this inquiry.",
+        "",
+        "Thank you,",
+        facts.customer.name ?? "",
+      ].join("\n"),
+    };
+  }
+  const amount = formatAmount(facts.amountMinor, facts.currency);
+  const subject = `Refund request: duplicate charge of ${amount} at ${facts.merchant.name}`;
   const body = [
     `Hello ${facts.merchant.name} support,`,
     "",
@@ -153,19 +182,9 @@ export function buildDraft(facts: Facts, evidence: CaseV1["evidence"]): CaseV1["
   return { subject, body };
 }
 
-export const PERMITTED_ACTIONS = [
-  "Identify yourself as calling on behalf of the customer about a duplicate charge.",
-  "Request a refund of the duplicate charge for the exact amount stated.",
-  "Ask for a reference or confirmation number and the expected refund timeline.",
-  "Answer verification questions only with the facts listed; say you do not know otherwise.",
-];
-
-export const FORBIDDEN_ACTIONS = [
-  "Do not agree to new charges, upgrades, or retention offers.",
-  "Do not change the amount, the merchant, or the reason.",
-  "Do not share or request payment card numbers, passwords, or one-time codes.",
-  "Do not make commitments on the customer's behalf beyond requesting this refund.",
-];
+// V1 brief wording = the V1.1 server-owned constants for request_refund, so the brief and plan never drift.
+export const PERMITTED_ACTIONS = CALL_PLAN_ACTIONS.request_refund.permitted;
+export const FORBIDDEN_ACTIONS = CALL_PLAN_ACTIONS.request_refund.forbidden;
 
 /** Immutable factual call brief frozen with the authorization. */
 export function buildBrief(input: {
@@ -173,15 +192,25 @@ export function buildBrief(input: {
   revision: number;
   customer: CaseV1["customer"];
   merchant: { name: string; supportPhone: string };
-  amountMinor: number;
+  amountMinor: number | null;
   currency: string;
   reason: string;
   evidence: CaseV1["evidence"];
+  /** Transaction-history check for this exact revision, if one ran. */
+  history?: HistoryCheck | null;
+  /** Merchant track record for this exact revision, if one was captured. */
+  merchantRecord?: FrozenMerchantRecord | null;
+  /** V1.1; absent = request_refund (the V1 brief, byte-identical). */
+  purpose?: CallPurpose;
 }): string {
-  const amount = formatAmount(input.amountMinor, input.currency);
+  const purpose = input.purpose ?? "request_refund";
+  const amount = input.amountMinor === null ? "unknown" : formatAmount(input.amountMinor, input.currency);
+  const actions = CALL_PLAN_ACTIONS[purpose];
   return [
     `You are calling ${input.merchant.name} customer support on behalf of ${input.customer.name ?? "the customer"}.`,
-    `Purpose: request a refund of ${amount} for a duplicate charge.`,
+    purpose === "request_refund"
+      ? `Purpose: request a refund of ${amount} for a duplicate charge.`
+      : "Purpose: gather information about a charge. Do not request a refund or file a claim.",
     "",
     "Approved facts (do not alter):",
     `- Customer name: ${input.customer.name ?? "unknown"}`,
@@ -190,13 +219,80 @@ export function buildBrief(input: {
     `- Amount: ${amount}`,
     `- Reason given by the customer: ${input.reason}`,
     `- Evidence on file: ${input.evidence.length > 0 ? input.evidence.map((e) => e.name).join(", ") : "none"}`,
+    ...(input.history ? ["", ...historyBriefLines(input.history)] : []),
+    ...(input.merchantRecord ? ["", ...merchantRecordLines(input.merchantRecord)] : []),
     "",
     "Permitted actions:",
-    ...PERMITTED_ACTIONS.map((a) => `- ${a}`),
+    ...actions.permitted.map((a) => `- ${a}`),
     "",
     "Not permitted:",
-    ...FORBIDDEN_ACTIONS.map((a) => `- ${a}`),
+    ...actions.forbidden.map((a) => `- ${a}`),
     "",
     `Case reference: ${input.caseId} (revision ${input.revision}).`,
   ].join("\n");
+}
+
+/** Facts the agent may say aloud under V1.1: the same facts the V1 brief already carried. */
+const PLAN_DISCLOSURES: CallPlanV1["permittedDisclosures"] = [
+  "customerName",
+  "customerEmail",
+  "merchantName",
+  "amountMinor",
+  "currency",
+  "reason",
+  "evidenceNames",
+  "history",
+];
+
+/**
+ * V1.1 structured call plan, frozen with the authorization next to the brief. Built only
+ * from server-side facts; actions are the server constants for the purpose. Callers must
+ * run validateCallPlan before freezing it.
+ */
+export function buildCallPlan(input: {
+  purpose: CallPurpose;
+  caseId: string;
+  revision: number;
+  customer: CaseV1["customer"];
+  merchantName: string;
+  amountMinor: number | null;
+  currency: string;
+  reason: string;
+  evidence: CaseV1["evidence"];
+  history?: HistoryCheck | null;
+  merchantRecord?: FrozenMerchantRecord | null;
+}): CallPlanV1 {
+  const questions: CallPlanV1["questions"] =
+    input.purpose === "request_refund"
+      ? [
+          { id: "reference", text: "What is the reference or confirmation number for this refund request?" },
+          { id: "timeline", text: "When should the customer expect the refund to appear?" },
+        ]
+      : [
+          ...(input.amountMinor === null ? [{ id: "amount", text: "What amount was charged, and on what date?" }] : []),
+          { id: "requirements", text: "What does the customer need to provide to resolve this charge?" },
+          { id: "reference", text: "Is there a reference or case number for this inquiry?" },
+        ];
+  const duplicate = input.history?.status === "duplicate_found" ? input.history : null;
+  return {
+    version: 1,
+    purpose: input.purpose,
+    facts: {
+      customerName: input.customer.name?.trim() ? input.customer.name : null,
+      customerEmail: input.customer.email?.trim() ? input.customer.email : null,
+      merchantName: input.merchantName,
+      amountMinor: input.amountMinor,
+      currency: input.amountMinor === null ? null : input.currency,
+      reason: input.reason,
+      evidenceNames: input.evidence.map((e) => e.name),
+      // Only a duplicate finding may be cited; anything else stays out of the plan.
+      history: duplicate ? { status: duplicate.status, transactionRefs: duplicate.matches.map((m) => m.chargeId) } : null,
+    },
+    permittedDisclosures: [...PLAN_DISCLOSURES],
+    questions,
+    permittedActions: [...CALL_PLAN_ACTIONS[input.purpose].permitted],
+    forbiddenActions: [...CALL_PLAN_ACTIONS[input.purpose].forbidden],
+    caseRef: { caseId: input.caseId, revision: input.revision },
+    ...(input.merchantRecord ? { guidance: merchantRecordLines(input.merchantRecord).slice(1).map((l) => l.replace(/^- /, "").slice(0, CALL_PLAN_LIMITS.guidanceChars)) } : {}),
+  };
 }

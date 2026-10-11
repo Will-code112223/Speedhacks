@@ -40,13 +40,13 @@ Import with `@/contracts/case` and `@/contracts/voice`. Never change V1 silently
 
 ## HTTP API (T2 implements, T1 consumes)
 
-See `team-prompts/00-shared-contract.txt` → "SHARED HTTP API". Routes are under `src/app/api/**` and run on the Node runtime.
+See `team-prompts/00-shared-contract.txt` → "SHARED HTTP API". Routes are under `src/app/api/**` and run on the Node runtime. Three read-only routes outside V1 (`GET /api/capabilities`, `GET /api/cases/:id/history`, `GET /api/insights/merchant?name=`) are listed under "ADDITIVE ROUTES" in `docs/handoffs/backend.txt`.
 
 ## Modes
 
 `REFUND_MODE=simulated` (default) runs end to end with no credentials and labels everything as simulated. `REFUND_MODE=live` requires the provider configuration in `.env.example`; a missing value fails visibly (503) and never falls back to simulation.
 
-Simulated call scenarios are chosen by the last four digits of the merchant support number:
+Simulated calls run through the real Dial adapter (`src/integrations/dial`) against an in-process fake Dial server, so the demo uses the same request, response and webhook code as a live call. Scenarios are chosen by the last four digits of the merchant support number:
 
 | Suffix | Result |
 | --- | --- |
@@ -67,3 +67,42 @@ npm run build
 ```
 
 Tests use temporary SQLite files, synthetic fixtures and no network. See `docs/handoffs/backend.txt` for status, error codes and integration notes.
+
+## Keewano (optional sponsor integration)
+
+[Keewano](https://docs.keewano.com/getting-started/speedhacks-quickstart) stores ordered, typed events per entity and answers questions over MCP. It is an add-on: the refund flow works without it. Code lives in `src/integrations/keewano/`; the case engine only sees a `TransactionHistory` port (`src/server/cases/history.ts`).
+
+Two uses, both one-way and both outside the call:
+
+1. **Case mirror** (`KEEWANO_API_KEY`): every timeline entry, derived status change, merchant, amount, call state, outcome and history-check result is sent to Keewano as it is persisted, keyed by case id, with the entry's own timestamp (REST ingest, batched, best effort — a dead endpoint never breaks a case). Ask Keewano things like "which merchants approve refunds" or "where do cases stall".
+2. **Pre-authorization duplicate-charge check and merchant track record** (`KEEWANO_ACCESS_TOKEN`): when a case has a customer, merchant and amount, the server reads that customer's charge history from Keewano (SQL over MCP), looks for charges of the same merchant and amount within 24 hours, writes the finding to the timeline (`history_checked` / `history_unavailable`), and freezes it into the call brief at authorization. The agent may cite the transaction references only when a duplicate was found. At the same time the merchant's refund track record is read from the mirrored cases (`merchant_record` on the timeline, `GET /api/insights/merchant?name=`) and frozen into the brief as an instruction: usually approves, often declines, mixed, or no prior decisions. Facts never come from Keewano, authorization is never blocked, and nothing is queried mid-call (the brief is immutable once authorized).
+
+Without a token in simulated mode the check reads the same synthetic customers from a local fixture, labeled `fixture` everywhere it appears. `sam@example.com` has the duplicate (`COMPLETE_FIELDS` in the tests); see `src/integrations/keewano/seed/transactions.json`.
+
+```bash
+# 1. sign up, send "#SpeedHacks" in the in-app chat, create an API key and an access token, put them in .env.local
+npm run keewano:seed                       # backfill the synthetic charge history (idempotent per customer)
+npm run keewano:demo-cases -- --count 24   # generate synthetic cases over the HTTP API (own next dev, simulated calls) so the mirror fills Keewano; --seed, --concurrency, BASE_URL
+npm run keewano:sql -- --tools             # what the MCP server offers (set KEEWANO_SQL_TOOL/ARG if the guess is wrong)
+npm run keewano:sql -- --charges sam@example.com   # the exact query the duplicate check runs (--raw to see the tool result)
+npm run keewano:sql -- "SELECT count(DISTINCT user_id) AS entities, count(*) AS events FROM events"
+```
+
+### Questions judges can ask (verified live on 2026-10-11 after `npm run keewano:demo-cases`)
+
+```bash
+# Which merchants approve refunds? (one row per merchant, cases counted once)
+npm run keewano:sql -- "SELECT \"RefundMerchant\" AS merchant, count(DISTINCT user_id) AS cases, count(DISTINCT user_id) FILTER (WHERE \"RefundOutcome\" = 'approved') AS approved, count(DISTINCT user_id) FILTER (WHERE \"RefundOutcome\" = 'denied') AS denied FROM events WHERE \"RefundOutcome\" IS NOT NULL GROUP BY merchant ORDER BY cases DESC"
+# How far do cases get? (how many ever reached each status)
+npm run keewano:sql -- "SELECT \"RefundCaseStatus\" AS status, count(DISTINCT user_id) AS cases FROM events WHERE \"RefundCaseStatus\" IS NOT NULL GROUP BY status ORDER BY cases DESC"
+# Where do calls stall? (call state transitions)
+npm run keewano:sql -- "SELECT \"RefundCallState\" AS state, count(\"RefundCallState\") AS transitions FROM events WHERE \"RefundCallState\" IS NOT NULL GROUP BY state ORDER BY transitions DESC"
+# How often does the pre-authorization check find a duplicate?
+npm run keewano:sql -- "SELECT \"RefundHistoryCheck\" AS result, count(\"RefundHistoryCheck\") AS checks FROM events WHERE \"RefundHistoryCheck\" IS NOT NULL GROUP BY result ORDER BY checks DESC"
+# Any tool by name (projectId is filled in): the registered event columns, for ad-hoc questions
+npm run keewano:sql -- --tool list_event_types '{"nameFilter":"Refund"}'
+```
+
+For plain-language questions during judging, the same server can be attached to Claude Code (`claude mcp add --scope user --transport http keewano https://api.keewano.com/mcp --header "k-token: $KEEWANO_ACCESS_TOKEN"`).
+
+Verified live on 2026-10-11: the MCP tool is `run_sql_query({ projectId, sqlQuery })` returning `{ columns, rows }`; the project id is read from the SDK key (or `list_projects`), so nothing extra is needed. Keewano's event listing numbers custom events by position, so the registry in `events.ts` stays contiguous from 2000 (append only). Events become queryable 5–15 minutes after ingestion. The SpeedHacks project currently holds every fixture charge twice (the fixture was seeded once before and once after the registry was renumbered); the in-app check de-duplicates by charge id, but for clean aggregates use `count(DISTINCT "ChargeId")` or create a fresh Keewano project, put its SDK key in `.env.local`, and run the seed once.

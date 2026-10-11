@@ -79,6 +79,8 @@ STATUS
 - [x] Packet: GET /api/cases/:id/packet text/plain with facts, draft, evidence index (sha256), outcome, calls, timeline
 - [x] Session cookie ownership (refund_session, httpOnly); foreign/absent session -> 404
 - [x] T3 createDialAdapter wired (src/server/cases/composition.ts); its V1 mirror replaced by canonical re-exports
+- [x] Keewano (optional add-on, src/integrations/keewano): case mirror by case id + pre-authorization duplicate-charge
+      check frozen into the brief; fixture-backed in simulated mode without a token (see KEEWANO section)
 - [ ] Mount T1 RefundApp (waiting for docs/handoffs/frontend.txt)
 - [ ] Sparta merchant-side scenario (Codex, tests/sparta/**) — distinct from our consumer-side call integration
 - [ ] Live Dial smoke test: only with an explicitly consenting test recipient; never run in tests
@@ -96,9 +98,26 @@ ERROR CODES (ApiError.error.code)
 422 MISSING_REQUIRED_FACTS (fields) · 503 LIVE_CONFIGURATION_MISSING (fields = env names) | PROVIDER_UNAVAILABLE ·
 401 INVALID_WEBHOOK (webhook route only) · 500 INTERNAL
 
+ADDITIVE ROUTES (not in V1; safe to ignore)
+- GET /api/capabilities -> { liveCall: false, stepIn: false, decisions: false }. No session. The frontend's V2 probe
+  (frontend.txt "V2 PROPOSAL"); explicit false is the honest V1 answer, so the call screen degrades to V1 state.
+- GET /api/cases/:id/history -> { history: HistoryCheck | null, current: boolean }. Session-bound like GET /api/cases/:id
+  (404 for an unknown or foreign case). The stored pre-authorization transaction-history check (Keewano or fixture;
+  revision, checkedAt, source, status, summary, matches[], closestGapMinutes); current=false once the facts moved past
+  it (GET /api/cases/:id re-checks on read). Does not run a check itself.
+- GET /api/insights/merchant?name=<merchant> -> { available: true, merchant, source, cases, approved, denied,
+  needsInformation, unresolved, approvalRate (approved/(approved+denied), null when nothing decided), lastOutcomeAt }
+  from the cases mirrored into Keewano (one query, last outcome per case, merchant matched like the history check so
+  descriptors count), or { available: false, merchant, error? } when no source exists or the query failed/timed out
+  (KEEWANO_TIMEOUT_MS). Always 200 once the name is valid; 400 BAD_REQUEST when name is missing, blank or > 200 chars.
+  Aggregate reference data, no customer data, so no session cookie. Fixture-backed in simulated mode without a token
+  (same switch as the history check). Port: src/server/cases/insights.ts; Keewano/fixture: src/integrations/keewano/insights.ts.
+  Tests: tests/backend/insights.test.ts.
+
 MODES AND ENVIRONMENT (.env.example)
 - REFUND_MODE=simulated (default): no credentials; case.mode === "simulated"; heuristic extraction; T2's simulated
-  voice adapter. Scenario by destination suffix: …0001 rejected before dispatch, …0002 dispatch_unknown,
+  voice adapter = T3's createDialAdapter in its live code path against an in-process fake Dial server (injected
+  fetch/now; no network), results relabeled mode "simulated". Scenario by destination suffix: …0001 rejected before dispatch, …0002 dispatch_unknown,
   …0003 completed/denied, …0004 completed/needs information, …0005 failed, …0006 cancelled, else completed/approved
   with a reference number. Timings: SIMULATED_QUEUED_MS (2000), SIMULATED_IN_PROGRESS_MS (6000).
 - REFUND_MODE=live: requires LLM_MODEL + OPENAI_API_KEY (POST /api/cases is 503 otherwise) and DIAL_API_KEY,
@@ -124,6 +143,14 @@ T1: git fetch origin && git checkout -b <branch> origin/codex/case-engine. Creat
     ("use client", default export). Poll GET /api/cases/:id every 2–3 s while status is "calling" or a call is
     queued/in_progress; stop on terminal. Reuse requestId on retries. The server sets the session cookie on
     POST /api/cases; send credentials on every request. Tell T2 when ready; T2 mounts it in src/app/page.tsx.
+T1 (after the main merge, 2026-10-11): RefundApp is mounted; your suite runs under `npm test`. One proposal for the
+    approval step, your files, your call: the Keewano/fixture transaction-history finding lands on the timeline as a
+    `history_checked` (or `history_unavailable`) entry BEFORE authorization, but the UI only shows the timeline inside
+    "Show case history" after the call. Rendering the latest `history_*` entry on the ApprovalCard (e.g. a row
+    "Transaction history" with the entry message; tone success when the message starts with "Transaction history" and
+    contains "closest", neutral otherwise) would show the judge the live Keewano evidence at the moment it matters. A
+    structured alternative is GET /api/cases/:id/history (additive route, see ADDITIVE ROUTES) with {history:{status,
+    summary, matches[]}, current}.
 T3: merged (3ef5066). verifyWebhook errors with code INVALID_WEBHOOK -> 401, MISSING_CONFIG -> 503.
     T2 webhook route reads request.arrayBuffer() with a 1 MiB cap before verification.
 
@@ -151,6 +178,77 @@ INSURER KNOWLEDGE BASE (T2, Claude lane) — src/server/insurers/**
 - Tests: tests/backend/insurers.test.ts (seed validation, E.164, lookup, no regional auto-fill). Typecheck clean.
 - HTTP (read-only, no session needed; reference data only): GET /api/insurers -> { insurers: InsurerSummary[] } for the insurance-plan onboarding pick-list; GET /api/insurers?name=Geico -> { insurer: InsurerLookup } (404 NOT_FOUND when unknown or ambiguous, 400 BAD_REQUEST when name > 200 chars). Route: src/app/api/insurers/route.ts.
 - For T1 (insurance-first onboarding per your pivot): use GET /api/insurers to list, then ?name= for the chosen plan's terms and lines. For T3: the server-generated call brief can carry the insurer's terms; no change to the voice contract.
-- Upstream research report (Jonathan, 2026-10-11; not independently reverified during this integration): 158 phone lines confirmed, 18 kept with purposeVerified=false and one downgraded to reported. Lines with purposeVerified=false are never returned as supportPhone/claimsPhone.
-- Upstream seed coverage reports 29/33 insurers with verified national customer-service entries, 173 sourced term values, 261 unknown values, 15 regulatory defaults and 148 open questions. These counts describe source data, not safe automatic dialing destinations: national entries may still have product/plan restrictions in notes.
+- Verification (2026-10-11): every verified_official phone line was re-fetched by an independent skeptic agent: 158 confirmed on their cited page with a matching label; 18 kept with purposeVerified=false (digits present but the page labels them as corporate switchboards, pharmacy/web-help/employer lines, or an unrelated purpose) and one downgraded to reported (Lincoln 800-487-1485 absent from the cited loans page). Lines with purposeVerified=false are never returned as supportPhone/claimsPhone.
+- Coverage: 29/33 insurers have a verified national customer-service line; 4 do not and need the customer's plan/region: First American (corporate switchboard only; claims line verified), Elevance/Anthem and Aetna (number on the member ID card), Kaiser (regional lines recorded). 173 term facts have sourced values, 261 are recorded as unknown; 15 regulatory defaults; 148 open questions in the seed (listOpenQuestions()).
 - Integration guards on codex/voice preserve the seed but withhold multiple matching insurers and distinct tied best phone candidates, request clarification, and exclude unknown/regulatory-default phone confidence. See tests/backend/insurer-boundary.test.ts and docs/handoffs/dial.txt for actual checks. Keewano was not imported with this KB-only update.
+
+KEEWANO (optional sponsor integration; nothing in the shared contract changed)
+- Code: src/integrations/keewano/** (events registry, REST ingest, batching sink, MirroredCaseRepository, MCP client,
+  KeewanoTransactionHistory + FixtureTransactionHistory, seed.mts / sql.mts CLIs). Port: src/server/cases/history.ts
+  (TransactionHistory, evaluateHistory, historyBriefLines). Wired in src/server/cases/composition.ts via createKeewano().
+- Mirror (KEEWANO_API_KEY): every timeline entry (own timestamp), derived status change, merchant, amount, call state,
+  outcome and history-check status → Keewano custom events 2000–2013, entity = case id. One-way, batched, best effort.
+- Duplicate-charge check (KEEWANO_ACCESS_TOKEN; fixture in simulated mode otherwise; KEEWANO_FIXTURE_HISTORY=off disables):
+  runs in createCase and once per revision on GET (so an edit re-checks); bounded by KEEWANO_TIMEOUT_MS (6000);
+  "unavailable" is retried after KEEWANO_RETRY_MS (30000). Result → timeline "history_checked" / "history_unavailable",
+  CaseDoc.history (internal, not on CaseV1), AuthorizationSnapshot.history + a "Transaction history evidence" section in
+  the frozen brief (same revision only), and a TRANSACTION HISTORY section in the packet. Never a source of facts; never
+  blocks authorization; never queried mid-call. Statuses: duplicate_found | recurring_only | single_charge | no_match |
+  no_history | unavailable.
+- Merchant track record (same checks, same timing): src/server/cases/insights.ts port; Keewano reads the mirrored cases'
+  last RefundOutcome per case (src/integrations/keewano/insights.ts), fixture otherwise. Timeline "merchant_record",
+  CaseDoc.merchantRecord, AuthorizationSnapshot.merchantRecord, "Merchant track record" section in the brief with one
+  instruction line (usually approves / often declines / mixed / no prior decisions), and a line in the packet.
+  Live 2026-10-11 after npm run keewano:demo-cases: Acme Streaming 5 of 7 approved; README lists verified judge queries.
+- DEMO: create the case as Sam Rivera / sam@example.com / Acme Streaming / 4999 USD. Charges are stored under the
+  email-derived entity; a name-only case falls back to the name-derived entity, so "Sam Rivera" without an email also
+  resolves, but any other spelling or customer returns no_history (honest, but not the demo moment).
+- Synthetic data only: src/integrations/keewano/seed/transactions.json (sam@example.com = the duplicate). npm run
+  keewano:seed backfills it (idempotent per customer); npm run keewano:sql -- --tools | --charges <email> | "<SQL>" [--raw].
+- Verified live 2026-10-11 (credentials in .env.local, git-ignored): /custom + /in accept the registry and the seed
+  (all batches accepted); MCP tool is run_sql_query({projectId, sqlQuery, maxRows}) → structuredContent {columns, rows};
+  projectId comes from KEEWANO_PROJECT_ID, else the SDK key's JWT claim, else list_projects. Keewano's listing numbers
+  custom events by position (list_event_types showed 2000..2011) while ingestion maps ids via the registry hash; EVENT_TYPES
+  is kept contiguous (guarded at load) so both agree. Because the fixture was seeded before and after that renumbering,
+  the SpeedHacks project holds each of the 16 fixture charges twice (32 ChargeId events, 16 distinct). The check
+  de-duplicates by ChargeId; for clean aggregates use count(DISTINCT "ChargeId") or seed a fresh project once.
+  Full simulated case ran against the dev server twice: the check returned duplicate_found from live Keewano and the
+  mirrored case (25 events) is queryable. One ingest POST timed out at 6 s, so ingest now has its own timeout
+  (KEEWANO_INGEST_TIMEOUT_MS, 20000) and the sink retries a failed batch with backoff (3 attempts) before dropping.
+- New dependency: @modelcontextprotocol/sdk (MCP client). T1: nothing to do; the timeline already carries the finding.
+  Judging criteria from the quickstart: Keewano must be load-bearing (here: the brief changes with the finding) and at
+  least one live query must run in the demo (here: the check on case creation / review screen).
+- Demo data: npm run keewano:demo-cases [-- --count 24 --seed 1 --concurrency 3] creates synthetic cases over the HTTP API (create → authorize → call → poll; own next dev on a free port with DATA_DIR=./data-demo unless BASE_URL is set) with a planned outcome mix per merchant (src/integrations/keewano/demo-plan.ts; scenario = last four digits of supportPhone), so the mirror fills Keewano for "which merchants approve" / "where do cases stall" queries.
+
+VOICE CONTRACT V1.1 (agreed with T3, Alike reply 4383d1e6, 2026-10-11) — canonical types only, no behavior change yet
+- src/contracts/voice.ts: CALL_PURPOSES / CallPurpose ("request_refund" | "gather_information"), CallPlanV1, CallPlanFacts,
+  CALL_PLAN_ACTIONS (server-owned constants per purpose; gather_information forbids requesting a refund or filing a claim),
+  CALL_PLAN_LIMITS, validateCallPlan(plan) → string[] (strict keys, bounded text/arrays, constant actions, refund needs
+  amount+currency), planForProvider(plan) (drops undisclosed fact values from serialized data; null still = unknown).
+  AuthorizedCallInput.plan?: CallPlanV1 (optional; brief stays required as the V1 rendering).
+- src/contracts/case.ts: AuthorizeCaseRequest.purpose?, CaseV1.authorization.purpose?, CaseV1.proposedUpdates?:
+  ProposedUpdateV1[] bound to callId + authorizationId + revision; never auto-applied.
+- facts.ts PERMITTED_ACTIONS/FORBIDDEN_ACTIONS now alias CALL_PLAN_ACTIONS.request_refund (identical text).
+- Deferred: status events/SSE (slice 3). Next T2: build/freeze plan at authorization, purpose-aware missing facts.
+  Next T3: render planForProvider output after a purpose-conditional mandatory instruction.
+V1.1 IMPLEMENTED (T2 + T3 adapter, Jonathan took ownership of the adapter part; Benjamin reviews adversarially)
+- Adapter (6a2d609): input.plan validated (validateCallPlan + caseRef.caseId === caseId), cloned before any await, and sent
+  as a purpose-conditional mandatory instruction + planForProvider(plan) INSTEAD of the brief. No plan → V1 bytes unchanged.
+  INSTRUCTION constant untouched (codex/claims-demo edits it). Contract: optional CallPlanV1.guidance (≤6×400, server-made).
+- Server: POST /api/cases/:id/authorize accepts purpose ("request_refund" default | "gather_information"; other → 400).
+  gather_information skips amountMinor in the authorize gate only; plan built by buildCallPlan, validated, frozen in the
+  snapshot (snapshot.purpose/plan; amountMinor may be null) and sent with the brief. Same revision + different purpose →
+  409 AUTHORIZATION_CONFLICT. CaseV1.authorization.purpose is set. Brief/outcome text never says "[amount missing]".
+- T1 note: CaseV1.missingFields/status keep V1 semantics (a case without an amount shows needs_information) even though
+  it can be authorized for gather_information. Not yet built: slice 2 behavior (transcript answers → proposedUpdates).
+V1.1 SLICE 2 (proposed updates) + purpose-neutral creation
+- ea08e7d: a case with no amount gets an information-request draft ("not requesting a refund"); the live extraction
+  prompt no longer assumes a refund or duplicate charge. With an amount the V1 refund draft is unchanged.
+- src/server/cases/answers.ts proposeUpdates(): deterministic answers to the plan's approved questions from LABELED
+  support-side transcript lines only (reference, timeline, requirements; amount → fact amountMinor only when the plan
+  had it as null). Verbatim quote, status "pending". Stored on CaseDoc.proposedUpdates once per call, only when the call
+  belongs to the current authorization AND revision (in-time and late-transcript paths). Nothing is applied.
+- POST /api/cases/:id/proposed-updates/:updateId {decision: "accept"|"reject", expectedRevision}: reject records only;
+  accepting a question answer records only; accepting a fact is patchCase (new revision, authorization cleared) and
+  requires the proposal's revision === current revision (409 otherwise). Already-reviewed → 400.
+- T1: CaseV1.proposedUpdates (optional) is ready to render with quote + accept/reject.

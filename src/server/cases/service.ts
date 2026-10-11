@@ -1,17 +1,21 @@
 import { randomUUID } from "node:crypto";
 import { TERMINAL_CALL_STATES, type CallV1, type CaseChanges, type CaseV1, type TimelineEntry } from "@/contracts/case";
-import type { VoiceAdapter, VoiceSnapshot } from "@/contracts/voice";
-import { isInvalidWebhookError } from "@/contracts/voice";
+import type { CallPurpose, VoiceAdapter, VoiceSnapshot } from "@/contracts/voice";
+import { CALL_PLAN_ACTIONS, isInvalidWebhookError, validateCallPlan } from "@/contracts/voice";
 import { assembleCase, hasActiveCall, toCallV1 } from "@/server/cases/assemble";
 import {
-  PERMITTED_ACTIONS,
   applyChanges,
   buildBrief,
+  buildCallPlan,
   buildDraft,
   formatAmount,
+  isValidAmountMinor,
   missingFields,
   type Facts,
 } from "@/server/cases/facts";
+import { evaluateHistory, unavailableHistory, type HistoryCheck, type TransactionHistory } from "@/server/cases/history";
+import { merchantRecordSummary, type FrozenMerchantRecord, type MerchantInsights, type MerchantInsightsResult } from "@/server/cases/insights";
+import { proposeUpdates } from "@/server/cases/answers";
 import { analyzeTranscript, unknownOutcome } from "@/server/cases/outcome";
 import { type AppConfig, assertLiveLlmConfig, assertModeValid } from "@/server/config";
 import type { ExtractedFields, Extractor } from "@/server/documents/extractor";
@@ -48,10 +52,30 @@ export interface ServiceDeps {
   extractor: Extractor;
   /** Lazily resolves the voice adapter; throws a 503 ApiHttpError when live mode is not configured. */
   voice: () => VoiceAdapter;
+  /** Optional transaction-history source (Keewano or fixture); absent = no history check. */
+  history?: TransactionHistory | null;
+  /** Optional merchant track-record source (Keewano or fixture); absent = GET /api/insights/merchant answers available:false. */
+  insights?: MerchantInsights | null;
   now?: () => Date;
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms} ms`)), ms);
+    p.then(
+      (v) => {
+        clearTimeout(timer);
+        resolve(v);
+      },
+      (e: unknown) => {
+        clearTimeout(timer);
+        reject(e);
+      },
+    );
+  });
+}
 
 /** Adapter rejection codes that mean "this server is misconfigured", not "the provider refused". */
 const CONFIG_REJECTION_CODES = new Set(["MISSING_CONFIG", "INVALID_CONFIG", "SERVER_ONLY", "INVALID_MODE"]);
@@ -189,6 +213,8 @@ export class CaseService {
 
     const missing = missingFields(facts);
     const evidenceList = evidence.map((e) => ({ id: e.id, name: e.name, mimeType: e.mimeType }));
+    // Pre-authorization transaction-history check (Keewano or the labeled fixture). Bounded; never blocks.
+    const [history, merchantRecord] = await Promise.all([this.checkHistory(facts, 1), this.checkMerchant(facts, 1)]);
     const doc: CaseDoc = {
       ...facts,
       missingFields: missing,
@@ -196,7 +222,11 @@ export class CaseService {
       authorization: null,
       outcome: { decision: "unknown", referenceNumber: null, nextAction: null, paymentStatus: "unverified", supportingQuote: null },
       timeline,
+      history,
+      merchantRecord,
     };
+    if (history) doc.timeline.push(this.historyEntry(history));
+    if (merchantRecord) doc.timeline.push(this.merchantEntry(merchantRecord));
     if (missing.length > 0) doc.timeline.push(this.entry("needs_information", `Missing: ${missing.join(", ")}.`));
     else doc.timeline.push(this.entry("ready_for_approval", "All required facts present; draft generated."));
 
@@ -214,12 +244,56 @@ export class CaseService {
   async getCase(ownerSession: string, id: string): Promise<CaseV1> {
     this.ownedRow(ownerSession, id);
     await this.reconcileDueCalls(id);
+    await this.ensurePreAuthorizationChecks(id);
     return this.assemble(id);
   }
 
   // -------------------------------------------------------------------------
   // PATCH /api/cases/:id
   // -------------------------------------------------------------------------
+  /**
+   * V1.1: the user reviews one transcript proposal. Rejecting only records the decision.
+   * Accepting a fact proposal is an ordinary user edit through patchCase (new revision,
+   * authorization cleared); accepting a question answer records it without changing facts.
+   */
+  reviewProposedUpdate(ownerSession: string, id: string, updateId: string, decision: "accept" | "reject", expectedRevision: number): CaseV1 {
+    const { repo } = this.deps;
+    repo.transaction(() => {
+      const row = this.ownedRow(ownerSession, id);
+      this.assertSameMode(row);
+      if (expectedRevision !== row.revision) {
+        throw new ApiHttpError(409, "REVISION_CONFLICT", `Case is at revision ${row.revision}, not ${expectedRevision}`);
+      }
+      const update = row.doc.proposedUpdates?.find((u) => u.id === updateId);
+      if (!update) throw notFound("Proposed update not found");
+      if (update.status !== "pending") throw new ApiHttpError(400, "BAD_REQUEST", `Proposed update was already ${update.status}`);
+      if (decision === "accept" && update.target.kind === "fact") {
+        // Facts may only change from the revision the answer was heard against.
+        if (update.revision !== row.revision) {
+          throw new ApiHttpError(409, "REVISION_CONFLICT", `This answer was proposed for revision ${update.revision}; the case is at revision ${row.revision}`);
+        }
+        if (update.target.field !== "amountMinor") throw new ApiHttpError(400, "BAD_REQUEST", `Unsupported proposed field ${update.target.field}`);
+        const amountMinor = Number(update.value);
+        if (!isValidAmountMinor(amountMinor)) throw new ApiHttpError(400, "BAD_REQUEST", "Proposed amount is invalid");
+        this.patchCase(ownerSession, id, expectedRevision, { amountMinor });
+      }
+      const current = repo.getCase(id);
+      if (!current) throw notFound();
+      const now = this.nowIso();
+      const status = decision === "accept" ? "accepted" : "rejected";
+      const doc: CaseDoc = {
+        ...current.doc,
+        proposedUpdates: (current.doc.proposedUpdates ?? []).map((u) => (u.id === updateId ? { ...u, status } : u)),
+        timeline: [
+          ...current.doc.timeline,
+          this.entry(`proposed_update_${status}`, `User ${status} a proposed ${update.target.kind === "fact" ? update.target.field : `answer (${update.target.questionId})`}: "${update.quote}"`),
+        ],
+      };
+      repo.updateCase(id, { doc, updatedAt: now });
+    });
+    return this.assemble(id);
+  }
+
   patchCase(ownerSession: string, id: string, expectedRevision: number, changes: CaseChanges): CaseV1 {
     const { repo } = this.deps;
     repo.transaction(() => {
@@ -273,7 +347,7 @@ export class CaseService {
   // -------------------------------------------------------------------------
   // POST /api/cases/:id/authorize  (idempotent per revision)
   // -------------------------------------------------------------------------
-  authorize(ownerSession: string, id: string, expectedRevision: number): CaseV1 {
+  authorize(ownerSession: string, id: string, expectedRevision: number, purpose: CallPurpose = "request_refund"): CaseV1 {
     const { repo } = this.deps;
     repo.transaction(() => {
       const row = this.ownedRow(ownerSession, id);
@@ -285,16 +359,25 @@ export class CaseService {
       if (expectedRevision !== row.revision) {
         throw new ApiHttpError(409, "REVISION_CONFLICT", `Case is at revision ${row.revision}, not ${expectedRevision}`);
       }
-      const missing = missingFields(row.doc);
+      const missing = missingFields(row.doc, purpose);
       if (missing.length > 0) {
         throw new ApiHttpError(422, "MISSING_REQUIRED_FACTS", "Authorization requires every required fact", missing);
       }
       const existing = repo.findAuthorization(id, row.revision);
       if (existing) {
+        // One authorization per revision: a different purpose would silently reuse the other plan.
+        const existingPurpose = existing.snapshot.purpose ?? "request_refund";
+        if (existingPurpose !== purpose) {
+          throw new ApiHttpError(
+            409,
+            "AUTHORIZATION_CONFLICT",
+            `Revision ${row.revision} is already authorized for ${existingPurpose}; edit the case to authorize a different purpose`,
+          );
+        }
         if (row.doc.authorization?.id !== existing.id) {
           const doc: CaseDoc = {
             ...row.doc,
-            authorization: { id: existing.id, revision: existing.revision, approvedAt: existing.approvedAt },
+            authorization: { id: existing.id, revision: existing.revision, approvedAt: existing.approvedAt, purpose: existingPurpose },
           };
           repo.updateCase(id, { doc, updatedAt: this.nowIso() });
         }
@@ -303,7 +386,11 @@ export class CaseService {
       const now = this.nowIso();
       const evidence = repo.listEvidence(id).map((e) => ({ id: e.id, name: e.name, mimeType: e.mimeType }));
       const merchant = { name: row.doc.merchant.name as string, supportPhone: row.doc.merchant.supportPhone as string };
-      const amountMinor = row.doc.amountMinor as number;
+      // gather_information may authorize without an amount; request_refund passed missingFields.
+      const amountMinor = isValidAmountMinor(row.doc.amountMinor) ? row.doc.amountMinor : null;
+      // Only a check of this exact revision is frozen; a stale one is evidence about other facts.
+      const history = row.doc.history && row.doc.history.revision === row.revision ? row.doc.history : null;
+      const merchantRecord = row.doc.merchantRecord && row.doc.merchantRecord.revision === row.revision ? row.doc.merchantRecord : null;
       const snapshot: AuthorizationSnapshot = {
         caseId: id,
         revision: row.revision,
@@ -322,19 +409,45 @@ export class CaseService {
           currency: row.doc.currency,
           reason: row.doc.reason,
           evidence,
+          history,
+          merchantRecord,
+          purpose,
         }),
-        permittedActions: [...PERMITTED_ACTIONS],
+        permittedActions: [...CALL_PLAN_ACTIONS[purpose].permitted],
+        history,
+        merchantRecord,
+        purpose,
+        plan: buildCallPlan({
+          purpose,
+          caseId: id,
+          revision: row.revision,
+          customer: row.doc.customer,
+          merchantName: merchant.name,
+          amountMinor,
+          currency: row.doc.currency,
+          reason: row.doc.reason,
+          evidence,
+          history,
+          merchantRecord,
+        }),
       };
+      // Validate before freezing: an adapter-side rejection would consume the authorization.
+      const planErrors = validateCallPlan(snapshot.plan);
+      if (planErrors.length > 0) {
+        throw new ApiHttpError(422, "MISSING_REQUIRED_FACTS", `The call plan is invalid: ${planErrors.join("; ")}`);
+      }
       const authorization = { id: randomUUID(), caseId: id, revision: row.revision, approvedAt: now, snapshot };
       repo.insertAuthorization(authorization);
       const doc: CaseDoc = {
         ...row.doc,
-        authorization: { id: authorization.id, revision: row.revision, approvedAt: now },
+        authorization: { id: authorization.id, revision: row.revision, approvedAt: now, purpose },
         timeline: [
           ...row.doc.timeline,
           this.entry(
             "authorized",
-            `Authorized revision ${row.revision}: call ${merchant.supportPhone} (${merchant.name}) about ${formatAmount(amountMinor, row.doc.currency)}.`,
+            purpose === "request_refund"
+              ? `Authorized revision ${row.revision}: call ${merchant.supportPhone} (${merchant.name}) about ${formatAmount(amountMinor, row.doc.currency)}.`
+              : `Authorized revision ${row.revision}: call ${merchant.supportPhone} (${merchant.name}) to gather information only (no refund request).`,
           ),
         ],
       };
@@ -412,6 +525,7 @@ export class CaseService {
         authorizationId: input.authorizationId,
         to: frozen.merchant.supportPhone,
         brief: frozen.brief,
+        ...(frozen.plan ? { plan: frozen.plan } : {}),
       });
     } catch (err) {
       // The request may have reached the provider: never retry blindly.
@@ -473,8 +587,35 @@ export class CaseService {
   // GET /api/cases/:id/packet
   // -------------------------------------------------------------------------
   packet(ownerSession: string, id: string): string {
-    this.ownedRow(ownerSession, id);
-    return buildPacket(this.assemble(id), this.deps.repo.listEvidence(id));
+    const row = this.ownedRow(ownerSession, id);
+    const history = row.doc.history && row.doc.history.revision === row.revision ? row.doc.history : null;
+    const merchantRecord = row.doc.merchantRecord && row.doc.merchantRecord.revision === row.revision ? row.doc.merchantRecord : null;
+    return buildPacket(this.assemble(id), this.deps.repo.listEvidence(id), history, merchantRecord);
+  }
+
+  // -------------------------------------------------------------------------
+  // GET /api/cases/:id/history (additive, not in V1)
+  // -------------------------------------------------------------------------
+  /** The stored check as is; `current` is false once the facts moved past it (GET /api/cases/:id re-checks). */
+  history(ownerSession: string, id: string): { history: HistoryCheck | null; current: boolean } {
+    const row = this.ownedRow(ownerSession, id);
+    const history = row.doc.history ?? null;
+    return { history, current: history !== null && history.revision === row.revision };
+  }
+
+  // -------------------------------------------------------------------------
+  // GET /api/insights/merchant (additive, not in V1)
+  // -------------------------------------------------------------------------
+  /** Bounded by the Keewano timeout and never throws: no source or a failed query answers available:false. */
+  async merchantInsights(merchant: string): Promise<MerchantInsightsResult> {
+    const source = this.deps.insights;
+    if (!source) return { available: false, merchant };
+    try {
+      const record = await withTimeout(source.merchantRecord(merchant), this.deps.config.keewano.timeoutMs, `${source.kind} merchant insights`);
+      return { available: true, ...record };
+    } catch (err) {
+      return { available: false, merchant, error: String((err as Error).message ?? err) };
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -527,6 +668,96 @@ export class CaseService {
     }
     // Unmatched events stay queued until the call attempt learns its provider id.
     return { status: 204 };
+  }
+
+  // -------------------------------------------------------------------------
+  // Transaction history (Keewano or fixture): checked before authorization, shown on
+  // the timeline, frozen into the brief. Never a source of facts, never queried mid-call.
+  // -------------------------------------------------------------------------
+  private historyEntry(check: HistoryCheck): TimelineEntry {
+    return this.entry(check.status === "unavailable" ? "history_unavailable" : "history_checked", check.summary);
+  }
+
+  /** Bounded and never throws: an unreachable source yields an explicit "unavailable" result. */
+  private async checkHistory(facts: Facts, revision: number): Promise<HistoryCheck | null> {
+    const source = this.deps.history;
+    if (!source) return null;
+    const merchantName = facts.merchant.name?.trim();
+    const amountMinor = facts.amountMinor;
+    if (!merchantName || !isValidAmountMinor(amountMinor)) return null;
+    if (!facts.customer.email?.trim() && !facts.customer.name?.trim()) return null;
+    const { keewano } = this.deps.config;
+    const opts = { revision, checkedAt: this.nowIso(), source: source.kind, windowMinutes: keewano.historyWindowMinutes };
+    try {
+      const charges = await withTimeout(source.listCharges(facts.customer), keewano.timeoutMs, `${source.kind} history lookup`);
+      return evaluateHistory(charges, { merchantName, amountMinor, currency: facts.currency }, opts);
+    } catch (err) {
+      return unavailableHistory(opts, String((err as Error).message ?? err));
+    }
+  }
+
+  private merchantEntry(record: FrozenMerchantRecord): TimelineEntry {
+    return this.entry("merchant_record", merchantRecordSummary(record));
+  }
+
+  /** Merchant track record from mirrored cases; null when there is no source or it failed. Never blocks. */
+  private async checkMerchant(facts: Facts, revision: number): Promise<FrozenMerchantRecord | null> {
+    const source = this.deps.insights;
+    const merchantName = facts.merchant.name?.trim();
+    if (!source || !merchantName) return null;
+    try {
+      const record = await withTimeout(source.merchantRecord(merchantName), this.deps.config.keewano.timeoutMs, `${source.kind} merchant record`);
+      return { ...record, revision, checkedAt: this.nowIso() };
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Pre-authorization checks run once per revision (a fact edit re-triggers them): the
+   * transaction-history check (an unavailable result is retried after a pause) and the
+   * merchant track record. Results land on the timeline and are frozen at authorization.
+   */
+  private async ensurePreAuthorizationChecks(id: string): Promise<void> {
+    const { repo, config } = this.deps;
+    const row = repo.getCase(id);
+    if (!row) return;
+    const prev = row.doc.history ?? null;
+    let needHistory = Boolean(this.deps.history);
+    if (needHistory && prev && prev.revision === row.revision) {
+      needHistory = prev.status === "unavailable" && Date.parse(this.nowIso()) - Date.parse(prev.checkedAt) >= config.keewano.retryMs;
+    }
+    const prevRecord = row.doc.merchantRecord ?? null;
+    const needMerchant = Boolean(this.deps.insights) && (!prevRecord || prevRecord.revision !== row.revision);
+    if (!needHistory && !needMerchant) return;
+    const [check, record] = await Promise.all([
+      needHistory ? this.checkHistory(row.doc, row.revision) : Promise.resolve(null),
+      needMerchant ? this.checkMerchant(row.doc, row.revision) : Promise.resolve(null),
+    ]);
+    if (!check && !record) return;
+    repo.transaction(() => {
+      const latest = repo.getCase(id);
+      if (!latest || latest.revision !== row.revision) return; // facts changed meanwhile; the next GET re-checks
+      const timeline = [...latest.doc.timeline];
+      const doc: CaseDoc = { ...latest.doc, timeline };
+      if (check) {
+        const current = latest.doc.history ?? null;
+        const fresh = current && current.revision === check.revision && (current.status !== "unavailable" || current.checkedAt === check.checkedAt);
+        if (!fresh) {
+          doc.history = check;
+          timeline.push(this.historyEntry(check));
+        }
+      }
+      if (record) {
+        const current = latest.doc.merchantRecord ?? null;
+        if (!current || current.revision !== record.revision) {
+          doc.merchantRecord = record;
+          timeline.push(this.merchantEntry(record));
+        }
+      }
+      if (timeline.length === latest.doc.timeline.length) return;
+      repo.updateCase(id, { doc, updatedAt: this.nowIso() });
+    });
   }
 
   // -------------------------------------------------------------------------
@@ -602,7 +833,8 @@ export class CaseService {
       }
       // State stays completed: terminal states never regress; only the missing transcript and outcome are filled in.
       repo.updateCall(callId, { transcript: snapshot.transcript, lastReconciledAt: now, updatedAt: now });
-      repo.updateCase(fresh.caseId, { doc: { ...row.doc, outcome, timeline }, updatedAt: now });
+      const proposedUpdates = this.withProposals(row, callId, auth, snapshot.transcript, timeline, now);
+      repo.updateCase(fresh.caseId, { doc: { ...row.doc, outcome, timeline, proposedUpdates }, updatedAt: now });
     });
   }
 
@@ -708,7 +940,31 @@ export class CaseService {
         updatedAt: now,
       });
       repo.markEventsProcessed(call.providerCallId, call.id, now);
-      repo.updateCase(call.caseId, { doc: { ...row.doc, outcome, timeline }, updatedAt: now });
+      const proposedUpdates = this.withProposals(row, call.id, auth, snapshot.transcript, timeline, now);
+      repo.updateCase(call.caseId, { doc: { ...row.doc, outcome, timeline, proposedUpdates }, updatedAt: now });
     });
+  }
+
+  /**
+   * V1.1: proposals from a transcript, only for the call of the CURRENT authorization and
+   * revision (a late transcript can never populate a newer plan), once per call, never applied.
+   */
+  private withProposals(
+    row: CaseRow,
+    callId: string,
+    auth: ReturnType<CaseRepository["getAuthorization"]>,
+    transcript: string | null,
+    timeline: TimelineEntry[],
+    now: string,
+  ): CaseDoc["proposedUpdates"] {
+    const existing = row.doc.proposedUpdates;
+    const plan = auth?.snapshot.plan;
+    if (!auth || !plan || !transcript?.trim()) return existing;
+    if (row.doc.authorization?.id !== auth.id || auth.revision !== row.revision) return existing;
+    if (existing?.some((u) => u.callId === callId)) return existing;
+    const fresh = proposeUpdates({ transcript, plan, callId, authorizationId: auth.id, revision: auth.revision, now });
+    if (fresh.length === 0) return existing;
+    timeline.push(this.entry("updates_proposed", `${fresh.length} answer(s) from call ${callId} proposed for review; nothing was changed.`));
+    return [...(existing ?? []), ...fresh];
   }
 }

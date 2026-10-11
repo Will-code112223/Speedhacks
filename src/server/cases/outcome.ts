@@ -68,7 +68,8 @@ function findReference(sentences: Sentence[]): string | null {
   return null;
 }
 
-type RefundContext = { amountMinor: number; currency: string; merchantName: string };
+/** amountMinor is null for an information-only authorization; any explicit money mention then needs review. */
+type RefundContext = { amountMinor: number | null; currency: string; merchantName: string };
 type Decisive = { kind: "approved" | "denied" | "review"; quote: string };
 
 /** Recognize explicit money conservatively; a charge amount is not proof of the refund amount. */
@@ -93,7 +94,7 @@ function amountNeedsReview(text: string, context: RefundContext): boolean {
     const cents = marker === "CENT" || marker === "CENTS";
     if (cents && fraction) return true;
     const minor = cents ? Number(whole) : Number(whole) * 100 + Number(fraction.padEnd(2, "0"));
-    if (!Number.isSafeInteger(minor) || minor !== context.amountMinor) return true;
+    if (context.amountMinor === null || !Number.isSafeInteger(minor) || minor !== context.amountMinor) return true;
   }
   // Spelled-out amounts and unsupported notation remain unresolved rather than
   // being replaced with the requested amount. A bare approval has no amount proof.
@@ -121,13 +122,15 @@ export function analyzeTranscript(
   transcript: string | null,
   context: RefundContext,
 ): CaseOutcome {
-  const amount = formatAmount(context.amountMinor, context.currency);
+  // An information-only authorization may have no amount: say "the charge", never "[amount missing]".
+  const charge = context.amountMinor === null ? "charge" : `${formatAmount(context.amountMinor, context.currency)} charge`;
+  const refund = context.amountMinor === null ? "refund" : `${formatAmount(context.amountMinor, context.currency)} refund`;
   const base = { referenceNumber: null as string | null, paymentStatus: "unverified" as const, supportingQuote: null as string | null };
   if (!transcript || transcript.trim().length === 0) {
     return {
       ...base,
       decision: "unknown",
-      nextAction: `No transcript was available. Contact ${context.merchantName} support again with the refund packet, or dispute the ${amount} charge with your card issuer.`,
+      nextAction: `No transcript was available. Contact ${context.merchantName} support again with the refund packet, or dispute the ${charge} with your card issuer.`,
     };
   }
 
@@ -177,7 +180,7 @@ export function analyzeTranscript(
       decision: "denied",
       referenceNumber,
       supportingQuote: decisive.quote,
-      nextAction: `${context.merchantName} declined on the call. Dispute the ${amount} charge with your card issuer and attach the refund packet and transcript.`,
+      nextAction: `${context.merchantName} declined on the call. Dispute the ${charge} with your card issuer and attach the refund packet and transcript.`,
     };
   }
   if (needsInfo) {

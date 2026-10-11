@@ -11,6 +11,8 @@
  * Empty collections are [].
  */
 
+import type { CallPurpose } from "./voice";
+
 export type Mode = "simulated" | "live";
 
 export type CaseStatus =
@@ -58,7 +60,8 @@ export interface CaseV1 {
   evidence: { id: string; name: string; mimeType: string }[];
   missingFields: string[];
   draft: { subject: string; body: string } | null;
-  authorization: { id: string; revision: number; approvedAt: string } | null;
+  /** V1.1 adds optional `purpose` (absent = "request_refund", the V1 behavior). */
+  authorization: { id: string; revision: number; approvedAt: string; purpose?: CallPurpose } | null;
   calls: CallV1[];
   outcome: {
     decision: "unknown" | "requested" | "needs_information" | "approved" | "denied";
@@ -68,8 +71,31 @@ export interface CaseV1 {
     supportingQuote: string | null;
   };
   timeline: { id: string; at: string; type: string; message: string }[];
+  /** V1.1 (additive): transcript answers awaiting user review. Absent = none. */
+  proposedUpdates?: ProposedUpdateV1[];
   createdAt: string;
   updatedAt: string;
+}
+
+/**
+ * V1.1: an answer read from a call transcript, proposed for user review.
+ * Never applied automatically: accepting one is a user edit (new revision,
+ * re-authorization). Bound to the call, authorization and revision it came
+ * from, so a late transcript can never populate a newer plan or brief.
+ */
+export interface ProposedUpdateV1 {
+  id: string;
+  callId: string;
+  authorizationId: string;
+  revision: number;
+  target:
+    | { kind: "fact"; field: "customer.name" | "customer.email" | "merchant.name" | "merchant.supportPhone" | "amountMinor" | "currency" | "reason" }
+    | { kind: "question"; questionId: string };
+  value: string;
+  /** Verbatim support-side transcript text that supports the value. */
+  quote: string;
+  status: "pending" | "accepted" | "rejected";
+  createdAt: string;
 }
 
 export interface CaseChanges {
@@ -120,6 +146,8 @@ export interface PatchCaseRequest {
 }
 export interface AuthorizeCaseRequest {
   expectedRevision: number;
+  /** V1.1: absent = "request_refund". "gather_information" does not require an amount. */
+  purpose?: CallPurpose;
 }
 export interface StartCallRequest {
   authorizationId: string;

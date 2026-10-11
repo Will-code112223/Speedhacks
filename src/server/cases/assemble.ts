@@ -61,6 +61,7 @@ export function assembleCase(row: CaseRow, evidence: EvidenceRow[], calls: CallR
     calls: calls.map(toCallV1),
     outcome: { ...doc.outcome },
     timeline: doc.timeline.map((t) => ({ ...t })),
+    ...(doc.proposedUpdates?.length ? { proposedUpdates: doc.proposedUpdates.map((u) => ({ ...u, target: { ...u.target } })) } : {}),
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
