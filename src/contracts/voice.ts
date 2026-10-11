@@ -134,6 +134,11 @@ export interface CallPlanV1 {
   permittedActions: string[];
   forbiddenActions: string[];
   caseRef: { caseId: string; revision: number };
+  /**
+   * Optional server-generated strategy notes (e.g. the merchant's track record).
+   * Context for the agent, not facts to read out; never caller-supplied text.
+   */
+  guidance?: string[];
 }
 
 /** Server-owned action constants per purpose. A plan carrying any other text is invalid. */
@@ -181,6 +186,8 @@ export const CALL_PLAN_LIMITS = {
   questions: 10,
   questionIdChars: 64,
   questionChars: 300,
+  guidance: 6,
+  guidanceChars: 400,
 } as const;
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -212,7 +219,7 @@ export function validateCallPlan(plan: unknown): string[] {
   const errors: string[] = [];
   const L = CALL_PLAN_LIMITS;
   if (!isRecord(plan)) return ["plan must be an object"];
-  if (!onlyKeys(plan, ["version", "purpose", "facts", "permittedDisclosures", "questions", "permittedActions", "forbiddenActions", "caseRef"])) {
+  if (!onlyKeys(plan, ["version", "purpose", "facts", "permittedDisclosures", "questions", "permittedActions", "forbiddenActions", "caseRef", "guidance"])) {
     errors.push("plan has unknown keys");
   }
   if (plan.version !== 1) errors.push("version must be 1");
@@ -274,6 +281,11 @@ export function validateCallPlan(plan: unknown): string[] {
   if (!sameList(plan.permittedActions, actions.permitted)) errors.push("permittedActions must be the server constants for the purpose");
   if (!sameList(plan.forbiddenActions, actions.forbidden)) errors.push("forbiddenActions must be the server constants for the purpose");
 
+  const g = plan.guidance;
+  if (g !== undefined && (!Array.isArray(g) || g.length > L.guidance || !g.every((line) => boundedText(line, L.guidanceChars, false)))) {
+    errors.push("guidance is invalid");
+  }
+
   const ref = plan.caseRef;
   if (!isRecord(ref) || !onlyKeys(ref, ["caseId", "revision"]) || typeof ref.caseId !== "string" || !UUID_RE.test(ref.caseId)
     || !(typeof ref.revision === "number" && Number.isSafeInteger(ref.revision) && ref.revision > 0)) {
@@ -305,5 +317,6 @@ export function planForProvider(plan: CallPlanV1): ProviderCallPlan {
     permittedActions: [...plan.permittedActions],
     forbiddenActions: [...plan.forbiddenActions],
     caseRef: { ...plan.caseRef },
+    ...(plan.guidance ? { guidance: [...plan.guidance] } : {}),
   };
 }
