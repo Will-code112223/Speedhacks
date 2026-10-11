@@ -12,7 +12,7 @@
 import { useCallback, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import type { CallV1, CaseV1 } from "../../../contracts/case";
 import { Banner, Button, SkeletonRows } from "../ui/primitives";
-import { AlertIcon, ChevronRightIcon, FileIcon, PhoneIcon } from "../ui/icons";
+import { FileIcon } from "../ui/icons";
 import { formatClock } from "../ui/format";
 import DecisionCard from "../ui/DecisionCard";
 import { caseTitle, currentCall, isCallActive, isOutcomeStatus } from "../state/call";
@@ -38,33 +38,9 @@ export interface ChatColumnProps {
   metrics: ReactNode;
 }
 
-const EXAMPLES = [
-  {
-    text: "Get a refund for a duplicate $49.99 charge from Ridgeline Outfitters",
-    title: "Recover a duplicate charge",
-    detail: "Ridgeline Outfitters · $49.99 charged twice",
-    icon: PhoneIcon,
-    fixtureOnly: false,
-  },
-  {
-    text: "File an insurance claim against Northwind for the water damage on Oct 3, about $1,200",
-    title: "Explore an insurance claim",
-    detail: "Northwind · $1,200 water damage · Fictional policy",
-    icon: FileIcon,
-    fixtureOnly: true,
-  },
-  {
-    text: "Ridgeline charged me twice but I lost the receipt",
-    title: "Start with missing evidence",
-    detail: "A duplicate charge with a missing receipt",
-    icon: AlertIcon,
-    fixtureOnly: false,
-  },
-];
-
 const ASSISTANT_KINDS: ReadonlySet<ThreadItem["kind"]> = new Set(["assistant", "understood", "approval", "result"]);
 
-export default function ChatColumn({ controller, fixture, phoneHint, planCount, callBar, metrics }: ChatColumnProps) {
+export default function ChatColumn({ controller, fixture, phoneHint, callBar, metrics }: ChatColumnProps) {
   const session = controller.active;
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const draftKey = session?.key ?? "new";
@@ -117,29 +93,12 @@ export default function ChatColumn({ controller, fixture, phoneHint, planCount, 
     setUnseen(false);
   };
 
-  const chooseExample = (text: string) => {
-    setDraft(text);
-    requestAnimationFrame(() => {
-      const node = textareaRef.current;
-      if (!node) return;
-      node.focus();
-      node.setSelectionRange(text.length, text.length);
-    });
-  };
-
   const caseData = session?.caseData ?? null;
   const placeholder = caseData
     ? "Add a note to this case…"
     : "Who charged you, what happened, and how much are you owed?";
 
-  const hint =
-    caseData
-      ? "Notes stay in this browser. Edit the facts above to update the call brief."
-      : fixture && planCount > 0
-      ? planCount === 1
-        ? "Your plan is attached when you describe an insurance claim."
-        : "Your plans are attached when you describe an insurance claim."
-      : "You review the facts and approve before a call starts.";
+  const hint = caseData ? "Notes are local. Edit the facts to update the call brief." : null;
 
   return (
     <section className={styles.column} aria-label="Conversation">
@@ -147,6 +106,17 @@ export default function ChatColumn({ controller, fixture, phoneHint, planCount, 
       {callBar}
       <div className={styles.scroller} ref={scrollerRef} onScroll={onScroll}>
         <div className={styles.thread}>
+          {!session ? (
+            <div className={styles.gettingStarted}>
+              <h2 className={styles.emptyTitle}>New case</h2>
+              <p className={styles.emptyText}>Recourse helps automate insurance claims and refund requests. Prepare your documents, check provider requirements, and approve support calls in one place.</p>
+              <ol className={styles.steps} aria-label="How to start a case">
+                <li><span className={styles.stepNumber} aria-hidden="true">01</span><span>Describe the issue</span></li>
+                <li><span className={styles.stepNumber} aria-hidden="true">02</span><span>Attach supporting documents</span></li>
+                <li><span className={styles.stepNumber} aria-hidden="true">03</span><span>Review details and approve the action</span></li>
+              </ol>
+            </div>
+          ) : null}
           <ActivityGraph
             key={caseData?.id ?? "new-case-graph"}
             caseData={caseData}
@@ -163,9 +133,7 @@ export default function ChatColumn({ controller, fixture, phoneHint, planCount, 
               factsDirty={dirtyFacts[session.key] ?? false}
               onFactsDirty={reportFactsDirty}
             />
-          ) : (
-            <EmptyState onExample={chooseExample} planCount={planCount} fixture={fixture} />
-          )}
+          ) : null}
         </div>
         {unseen ? (
           <div className={styles.jump}>
@@ -187,45 +155,6 @@ export default function ChatColumn({ controller, fixture, phoneHint, planCount, 
         textareaRef={textareaRef}
       />
     </section>
-  );
-}
-
-function EmptyState({ onExample, planCount, fixture }: { onExample: (text: string) => void; planCount: number; fixture: boolean }) {
-  return (
-    <div className={styles.empty}>
-      <p className={styles.eyebrow}>{fixture ? "Your claims & refund assistant" : "Your refund assistant"}</p>
-      <h2 className={styles.emptyTitle}>What are you owed?</h2>
-      <p className={styles.emptyText}>
-        {fixture
-          ? "Describe a refund or explore a fictional claim. Recourse prepares the facts, calls with your approval, and keeps the outcome here."
-          : "Describe a duplicate charge. Recourse prepares the facts, calls with your approval, and keeps the outcome here."}
-      </p>
-      <ol className={styles.steps} aria-label="How Recourse works">
-        <li><span className={styles.stepNumber}>01</span><span><strong>Review the facts</strong><span>Check the details and evidence.</span></span></li>
-        <li><span className={styles.stepNumber}>02</span><span><strong>Approve the call</strong><span>You choose what happens next.</span></span></li>
-        <li><span className={styles.stepNumber}>03</span><span><strong>Review the outcome</strong><span>See the transcript and next steps.</span></span></li>
-      </ol>
-      <div className={styles.examples}>
-        <div className={styles.examplesHeading}>
-          <span className={styles.examplesLabel}>Start with an example</span>
-          <span className={styles.exampleDisclaimer}>Fictional cases</span>
-        </div>
-        <ul className={styles.exampleList}>
-          {EXAMPLES.filter((example) => fixture || !example.fixtureOnly).map(({ text, title, detail, icon: Icon }) => (
-            <li key={text}>
-              <button type="button" className={styles.example} onClick={() => onExample(text)} aria-label={`${title}. ${text}`}>
-                <span className={styles.exampleIcon}><Icon /></span>
-                <span className={styles.exampleContent}><strong>{title}</strong><span>{detail}</span></span>
-                <span className={styles.exampleArrow}><ChevronRightIcon /></span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      </div>
-      {fixture && planCount === 0 ? (
-        <p className={styles.emptyNote}><FileIcon /> Have a policy to review? Add it under Plans.</p>
-      ) : null}
-    </div>
   );
 }
 

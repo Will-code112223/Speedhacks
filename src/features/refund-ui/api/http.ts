@@ -35,7 +35,7 @@ export function createHttpCaseApi(options: HttpCaseApiOptions = {}): CaseApi {
   const base = (options.baseUrl ?? "").replace(/\/+$/, "");
   const fetchImpl: typeof fetch = options.fetch ?? ((input, init) => globalThis.fetch(input, init));
 
-  async function send(method: Method, path: string, body: RequestBody = null, accept = "application/json"): Promise<Response> {
+  async function send(method: Method, path: string, body: RequestBody = null, accept = "application/json", signal?: AbortSignal): Promise<Response> {
     const headers = new Headers({ accept });
     let payload: BodyInit | undefined;
     if (body !== null && "json" in body) {
@@ -51,6 +51,7 @@ export function createHttpCaseApi(options: HttpCaseApiOptions = {}): CaseApi {
         body: payload,
         credentials: "same-origin",
         cache: "no-store",
+        ...(signal ? { signal } : {}),
       });
     } catch (cause) {
       throw unreachable("The server could not be reached.", cause);
@@ -102,8 +103,8 @@ export function createHttpCaseApi(options: HttpCaseApiOptions = {}): CaseApi {
       return envelope(await send("POST", "/api/cases", { form: toFormData(input) }), "case", isCaseV1);
     },
 
-    async getCase(caseId) {
-      return envelope(await send("GET", casePath(caseId)), "case", isCaseV1, CASE_NOT_FOUND_MESSAGE);
+    async getCase(caseId, signal) {
+      return envelope(await send("GET", casePath(caseId), null, "application/json", signal), "case", isCaseV1, CASE_NOT_FOUND_MESSAGE);
     },
 
     async patchCase(caseId, expectedRevision, changes) {

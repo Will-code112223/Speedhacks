@@ -49,18 +49,16 @@ export default function CaseDocuments({ caseData, fixture, packet, onDownloadPac
     <section className={styles.documents} aria-labelledby={headingId} data-testid="case-documents">
       <header className={styles.header}>
         <div>
-          <p className={styles.eyebrow}>Case preparation</p>
           <h3 id={headingId} className={styles.heading}>Your documents</h3>
         </div>
         <SourcePill fixture={fixture} simulated={caseData.mode === "simulated"} />
       </header>
 
       <p className={styles.note}>
-        Review the request draft and evidence before the call. This is a preparation document, not an official
-        insurer form. Generating or downloading it does not submit a claim.
+        Preparation draft, not an official insurer form. No claim has been submitted.
       </p>
 
-      {fixture ? <p className={styles.fixtureNotice}>Fictional demo data. Do not submit it to an insurer.</p> : null}
+      {fixture ? <p className={styles.fixtureNotice}>Do not submit simulated data to an insurer.</p> : null}
 
       {caseData.missingFields.length > 0 ? (
         <div className={styles.missing} data-testid="document-missing-fields">

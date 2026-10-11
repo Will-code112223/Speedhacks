@@ -44,13 +44,12 @@ export function activityNodes(caseData: CaseV1 | null, call: CallV1 | null, fixt
     description: "No call record is available for this case.", facts: [],
   };
   if (call) {
-    const source = fixture ? "Fixture" : call.mode === "simulated" ? "Simulated" : "Live mode";
+    const source = fixture || call.mode === "simulated" ? "Simulated" : "Live";
     voice.status = call.state.replaceAll("_", " ");
     voice.tone = call.state === "dispatch_unknown" ? "attention" : call.state === "failed" ? "failed" : call.state === "cancelled" ? "idle" : call.state === "completed" ? "recorded" : "active";
     voice.description = call.state === "dispatch_unknown"
       ? "Dispatch is uncertain. The provider may have received the request; do not start a replacement call."
-      : fixture ? "Fixture data only. This workflow does not place a phone call."
-      : call.mode === "simulated" ? "Simulated adapter response. No real phone call is represented here."
+      : fixture || call.mode === "simulated" ? "Simulated call. No real phone call was placed."
       : "Status from the live-mode call record. A connected conversation is only established when the provider reports it.";
     voice.facts = [source, `Call status: ${voice.status}`, call.transcript ? "Transcript available" : "No transcript available yet"];
     if (call.error) voice.facts.push(call.error);
@@ -71,7 +70,7 @@ export function activityNodes(caseData: CaseV1 | null, call: CallV1 | null, fixt
 }
 
 export function activityMode(caseData: CaseV1 | null, call: CallV1 | null, fixture: boolean): string {
-  if (fixture) return "Fixture · no real calls";
+  if (fixture) return "Simulated";
   if (call?.mode === "simulated" || (!call && caseData?.mode === "simulated")) return "Simulated";
   if (call?.mode === "live") return "Live call record";
   if (caseData?.mode === "live") return "Live mode · no call yet";

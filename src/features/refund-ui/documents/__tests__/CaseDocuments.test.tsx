@@ -44,7 +44,8 @@ describe("case document preparation", () => {
   it("distinguishes fixture documents from real insurer submissions in both display and copied text", () => {
     const caseData = sampleCase();
     const html = renderToStaticMarkup(<CaseDocuments caseData={caseData} fixture packet={idle} onDownloadPacket={noop} />);
-    expect(html).toContain("Fictional demo data. Do not submit it to an insurer.");
+    expect(html).toContain("Do not submit simulated data to an insurer.");
+    expect(html).toContain("Simulated");
     expect(draftText(caseData, true)).toContain("FICTIONAL DEMO — fixture data");
     expect(draftText(caseData, false)).not.toContain("FICTIONAL DEMO");
     expect(draftText(caseData, false)).toContain("PREPARATION DRAFT — NOT SUBMITTED");

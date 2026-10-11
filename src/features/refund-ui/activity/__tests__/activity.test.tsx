@@ -1,8 +1,8 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import type { CallV1, CaseV1 } from "../../../contracts/case";
-import ActivityGraph from "./ActivityGraph";
-import { activityMode, activityNodes } from "./model";
+import type { CallV1, CaseV1 } from "../../../../contracts/case";
+import ActivityGraph from "../ActivityGraph";
+import { activityMode, activityNodes } from "../model";
 
 const at = "2026-10-11T19:00:00.000Z";
 function makeCase(overrides: Partial<CaseV1> = {}): CaseV1 {
@@ -43,10 +43,10 @@ describe("activity graph snapshot projection", () => {
 
   it("gives fixture provenance precedence even if a supplied call says live", () => {
     const call = makeCall({ state: "in_progress" });
-    expect(activityMode(makeCase({ mode: "live" }), call, true)).toBe("Fixture · no real calls");
+    expect(activityMode(makeCase({ mode: "live" }), call, true)).toBe("Simulated");
     const dial = activityNodes(makeCase(), call, true).find((node) => node.id === "dial")!;
-    expect(dial.facts[0]).toBe("Fixture");
-    expect(dial.description).toContain("does not place a phone call");
+    expect(dial.facts[0]).toBe("Simulated");
+    expect(dial.description).toContain("No real phone call was placed");
   });
 
   it("does not label a simulated call live just because its case says live", () => {
@@ -102,18 +102,19 @@ describe("activity graph snapshot projection", () => {
     expect(html).toContain("No provider browser activity is recorded");
   });
 
-  it("renders only supplied chronological events, leaving the source array unchanged", () => {
-    const timeline = [{ id: "2", at: "2026-10-11T20:00:00.000Z", type: "call", message: "Second event" }, { id: "1", at, type: "case", message: "First event" }];
-    const html = renderToStaticMarkup(<ActivityGraph caseData={makeCase({ timeline })} call={null} fixture defaultExpanded />);
-    expect(html.indexOf("First event")).toBeLessThan(html.indexOf("Second event"));
-    expect(timeline[0]?.id).toBe("2");
+  it("keeps the compact graph free of the removed inspector and event list", () => {
+    const html = renderToStaticMarkup(<ActivityGraph caseData={makeCase()} call={null} fixture defaultExpanded />);
+    expect(html).toContain("Graph help");
+    expect(html).not.toContain("Inspect node");
+    expect(html).not.toContain("Selected node connections");
+    expect(html).not.toContain("Recorded case events");
   });
 
-  it("keeps the mode header consistent when a supplied live call belongs to another case", () => {
+  it("keeps the source details consistent when a supplied live call belongs to another case", () => {
     const html = renderToStaticMarkup(<ActivityGraph caseData={makeCase()} call={makeCall()} fixture={false} />);
     expect(html).not.toContain("Live call record");
     expect(html).toContain("Simulated");
     expect(html).toContain("Dial call: Not started");
-    expect(html).toContain("Inspect node");
+    expect(html).not.toContain("Inspect node");
   });
 });

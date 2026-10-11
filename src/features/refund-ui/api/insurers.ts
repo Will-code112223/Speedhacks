@@ -170,9 +170,17 @@ function createHttpInsurerApi(baseUrl: string): InsurerApi {
   };
 }
 
-// Minimal shape checks; the server owns the full shape.
+// Validate the fields consumed by the reference browser before rendering them.
+// A partial 200 response is unavailable data, not a provider with empty facts.
+const nullableText = (value: unknown): boolean => value === null || typeof value === "string";
+const textList = (value: unknown): value is string[] => Array.isArray(value) && value.every((item) => typeof item === "string");
+const oneOf = (value: unknown, allowed: readonly string[]): boolean => typeof value === "string" && allowed.includes(value);
+const confidence = (value: unknown): boolean => oneOf(value, ["verified_official", "reported", "regulatory_default", "unknown"]);
+
 function isInsurerSummary(v: unknown): v is InsurerSummary {
-  return isRecord(v) && typeof v.id === "string" && typeof v.name === "string";
+  return isRecord(v) && typeof v.id === "string" && typeof v.name === "string"
+    && textList(v.categories) && textList(v.lines) && textList(v.aliases)
+    && [v.legalName, v.parentId, v.eligibility, v.website, v.tosUrl, v.privacyUrl, v.notes].every(nullableText);
 }
 
 function isInsurerList(v: unknown): v is InsurerSummary[] {
@@ -180,7 +188,26 @@ function isInsurerList(v: unknown): v is InsurerSummary[] {
 }
 
 function isInsurerLookup(v: unknown): v is InsurerLookup {
-  return isInsurerSummary(v);
+  if (!isRecord(v) || !isInsurerSummary(v)) return false;
+  const row = v as unknown as Record<string, unknown>;
+  return [row.supportPhone, row.claimsPhone].every(nullableText)
+    && [row.supportPhoneConfidence, row.claimsPhoneConfidence].every((value) => value === null || confidence(value))
+    && typeof row.needsPlanOrRegion === "boolean"
+    && isRecord(row.match) && oneOf(row.match.via, ["id", "name", "alias", "tokens"]) && typeof row.match.matched === "string"
+    && Array.isArray(row.contacts) && row.contacts.every((contact) => isRecord(contact)
+      && oneOf(contact.purpose, ["customer_service", "claims", "billing", "cancellation", "appeals"])
+      && oneOf(contact.channel, ["phone", "web", "app", "mail"])
+      && oneOf(contact.scope, ["national", "regional", "plan_specific", "corporate_only"])
+      && (contact.purposeVerified === null || typeof contact.purposeVerified === "boolean")
+      && [contact.region, contact.phoneE164, contact.hours, contact.url, contact.notes, contact.sourceUrl, contact.retrievedAt].every(nullableText)
+      && confidence(contact.confidence))
+    && Array.isArray(row.terms) && row.terms.every((term) => isRecord(term)
+      && typeof term.line === "string" && typeof term.key === "string"
+      && [term.value, term.unit, term.jurisdictionScope, term.notes, term.sourceUrl, term.sourceQuote, term.retrievedAt].every(nullableText)
+      && (term.valueNumber === null || (typeof term.valueNumber === "number" && Number.isFinite(term.valueNumber)))
+      && confidence(term.confidence))
+    && Array.isArray(row.openQuestions) && row.openQuestions.every((question) => isRecord(question)
+      && typeof question.question === "string" && typeof question.whyItMatters === "string");
 }
 
 /** JSON body; anything unreadable means nothing usable came back. */

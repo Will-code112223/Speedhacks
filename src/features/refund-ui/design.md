@@ -5,6 +5,41 @@ It follows the Refero skill in `.agents/skills/refero-design` with its bundled c
 
 ## October 11 visual refinement
 
+### Compact workspace revision
+
+The latest user revision removes the global mode badge and extra graph panels.
+Keep source provenance with actual call results and inside Graph help. The graph
+is capped at 290px on desktop, 240px on mobile, with pan, zoom, movable nodes and
+keyboard selection. Remove the inspector, connection list and timeline below
+Graph help; this supersedes the earlier inspector decision below.
+
+New case keeps a two-sentence description of Recourse's insurance and refund
+purpose, then three short steps: describe the issue, attach documents, review and
+approve. Provider logos and real document excerpt tiles supply visual interest.
+The source is the user's explicit request for less text and useful previews.
+
+### Provider library extension
+
+The Plans view reads the existing insurer knowledge-base API. It uses a provider
+picker with locally served official-site marks, sourced in
+`public/insurers/sources.json`, and paper-like resource tiles. Tiles show actual
+knowledge-base excerpts, not invented document screenshots. The existing Palantir
+reference owns crisp borders, monochrome typography and compact information;
+the user's request for browsable documents supplies the preview interaction.
+Provider marks retain their source colors. GEICO's white official mark uses a blue
+backplate for contrast. The name remains visible when any asset fails to load.
+
+| Decision | Source | Role | Reason |
+| --- | --- | --- | --- |
+| One provider picker backed by GET /api/insurers | Existing canonical API; user request | Navigation | All real providers remain selectable without duplicating the knowledge base |
+| Paper tiles contain real excerpts with source dates | User request; Refero craft guidance | Document navigation | Visual interest comes from useful, attributable content |
+| Selected resource preview and optional source opening | Existing contacts/terms source URLs | Reference inspection | No remote page is framed or claimed to be a complete document preview |
+| Separate uploaded-file preview and blank preparation worksheet | User request; canonical data boundaries | User documents | A policy file and a generated worksheet cannot be mistaken for official coverage or a filed claim |
+
+The generated blank TXT is labeled as a Recourse preparation worksheet, never an
+official insurer form. Unknown filing guidance remains unknown. Provider selection
+does not change an authorized destination, policy coverage or case facts.
+
 The user requested a parallel improvement pass against the published frontend at
 602069a, referencing https://optimizedhq.com and https://www.palantir.com.
 The build target is the existing working Recourse UI, not a new marketing site.

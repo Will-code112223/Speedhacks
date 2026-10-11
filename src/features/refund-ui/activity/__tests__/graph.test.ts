@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { CallV1, CaseV1 } from "../../../contracts/case";
-import { activityGraph } from "./graph";
+import type { CallV1, CaseV1 } from "../../../../contracts/case";
+import { activityGraph } from "../graph";
 
 const at = "2026-10-11T19:00:00.000Z";
 function makeCase(overrides: Partial<CaseV1> = {}): CaseV1 {
@@ -104,7 +104,7 @@ describe("activity graph topology and provenance", () => {
     const caseData = makeCase({ authorization, outcome: { decision: "needs_information", referenceNumber: null, nextAction: "Supply a fictional receipt", paymentStatus: "unverified", supportingQuote: null } });
     const graph = activityGraph(caseData, makeCall({ state: "completed", mode: "live" }), true);
     expect(graph.edges.find((edge) => edge.id === "dial-outcome")?.state).toBe("recorded");
-    expect(graph.nodes.find((node) => node.id === "dial")?.facts[0]).toBe("Fixture");
+    expect(graph.nodes.find((node) => node.id === "dial")?.facts[0]).toBe("Simulated");
     expect(graph.nodes.find((node) => node.id === "outcome")?.tone).toBe("attention");
   });
 

@@ -200,6 +200,11 @@ describe("insurer api: http", () => {
     ["no insurer member", {}],
     ["a null insurer", { insurer: null }],
     ["an insurer without a name", { insurer: { id: "northwind-mutual" } }],
+    ["a summary without lookup details", { insurer: sampleSummary() }],
+    ["a missing contacts array", { insurer: { ...sampleLookup(), contacts: null } }],
+    ["a malformed contact", { insurer: { ...sampleLookup(), contacts: [{ purpose: "claims" }] } }],
+    ["an invalid term", { insurer: { ...sampleLookup(), terms: [{ key: "claim_filing_method", value: {} }] } }],
+    ["a non-string question", { insurer: { ...sampleLookup(), openQuestions: [{ question: {}, whyItMatters: "needed" }] } }],
     ["a list instead", { insurers: [sampleSummary()] }],
   ])("rejects a lookup body with %s as an unexpected shape", async (_label, body) => {
     const { api } = httpApi([jsonResponse(200, body)]);

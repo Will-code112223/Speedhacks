@@ -21,6 +21,7 @@ import {
 } from "./call";
 import type { UiError } from "./errors";
 import { createLocalId } from "./ids";
+import type { RecoveredCase } from "./recovery";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -89,6 +90,8 @@ export interface CaseSession {
   liveError: UiError | null;
   /** Set when reading the case failed; cleared by the next good read. */
   pollError: UiError | null;
+  /** A saved pointer is visible while its initial server read is pending. */
+  recoveryPending: boolean;
   decisions: Record<string, DecisionRecord>;
   join: RequestState;
   /** Calls the person stepped into and then handed back, until the server phase moves on. */
@@ -122,6 +125,7 @@ export type SessionAction =
       at: string;
     }
   | { type: "session/selected"; key: string | null }
+  | { type: "sessions/recovered"; api: CaseApi; entries: RecoveredCase[]; activeCaseId: string | null; discardedCaseIds?: string[]; preserveSelection: boolean; liveCapable: boolean; at: string }
   | { type: "create/retrying"; key: string }
   /** A message before the case exists: it joins the summary and creation is tried again. */
   | { type: "create/message"; key: string; text: string; summary: string; at: string }
@@ -253,7 +257,7 @@ function applyCase(session: CaseSession, next: CaseV1, liveCapable: boolean, at:
     if (!approval.busy) approval = { ...idle, stage: null };
   }
 
-  return { ...session, caseId: next.id, caseData: next, thread, startedCall, seenCallStates, approval };
+  return { ...session, caseId: next.id, caseData: next, thread, startedCall, seenCallStates, approval, recoveryPending: false };
 }
 
 /**
@@ -395,6 +399,7 @@ export function newSession(input: {
     live: null,
     liveError: null,
     pollError: null,
+    recoveryPending: false,
     decisions: {},
     join: idle,
     handedBack: {},
@@ -406,6 +411,41 @@ export function newSession(input: {
 
 export function sessionsReducer(state: SessionsState, action: SessionAction): SessionsState {
   switch (action.type) {
+    case "sessions/recovered": {
+      if (action.api.mode !== "http") return state;
+      const sessions = state.sessions.filter(session => !(session.api === action.api
+        && session.caseData === null && session.key === `http:${session.caseId}`
+        && action.discardedCaseIds?.includes(session.caseId ?? "")));
+      for (const entry of action.entries) {
+        const existing = sessions.findIndex(session => session.api.mode === "http" && session.caseId === entry.caseId);
+        // Hydrate only our placeholder. A newer poll, edit or creation wins over
+        // a delayed recovery result, including a delayed failure.
+        const previous = existing >= 0 ? sessions[existing]! : null;
+        if (previous && (previous.api !== action.api || previous.key !== `http:${entry.caseId}` || previous.caseData !== null)) continue;
+        if (previous && !previous.recoveryPending && entry.caseData === null) continue;
+        const recoveryPending = entry.caseData === null && entry.error === null;
+        const text = entry.caseData
+          ? "Reopened the saved case from the server. Earlier local conversation notes were not retained."
+          : entry.error
+            ? "This saved case could not be loaded. Try updating it again when the server is available. No new call was requested."
+            : "Reopening this saved case from the server. No new call is being requested.";
+        const fresh = newSession({ key: `http:${entry.caseId}`, api: action.api, scenario: null,
+          text: entry.caseData?.reason || "Saved case", attachments: [], notice: null,
+          at: entry.caseData?.createdAt ?? action.at, activeMs: 0 });
+        const restored: CaseSession = { ...(previous ?? fresh), caseId: entry.caseId, create: idle,
+          pollError: entry.error, recoveryPending,
+          summary: entry.caseData?.reason || previous?.summary || "Saved case",
+          thread: previous
+            ? previous.thread.map((item, index) => index === 0 && item.kind === "assistant" ? { ...item, text } : item)
+            : [{ kind: "assistant", id: createLocalId(), at: action.at, text }] };
+        const hydrated = entry.caseData ? applyCase(restored, entry.caseData, action.liveCapable, action.at) : restored;
+        if (existing >= 0) sessions[existing] = hydrated;
+        else sessions.push(hydrated);
+      }
+      const recoveredActive = sessions.find(session => session.api.mode === "http" && session.caseId === action.activeCaseId)?.key ?? null;
+      const activeKey = action.preserveSelection ? state.activeKey : recoveredActive;
+      return { ...state, sessions, activeKey: sessions.some(session => session.key === activeKey) ? activeKey : null };
+    }
     case "session/started": {
       const session = newSession({ ...action, activeMs: state.unassignedActiveMs });
       return { sessions: [session, ...state.sessions], activeKey: action.key, unassignedActiveMs: 0 };

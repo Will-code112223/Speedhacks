@@ -11,6 +11,8 @@ import { FileIcon, UploadIcon } from "../ui/icons";
 import { fileKindLabel, formatBytes, normalizePhone, PHONE_HINT } from "../ui/format";
 import { PLAN_ACCEPT, type PlanRecord } from "./store";
 import type { PlansController } from "./usePlans";
+import ProviderKnowledge from "./ProviderKnowledge";
+import PolicyPreview from "./PolicyPreview";
 import styles from "./PlansManager.module.css";
 
 const UNDO_MS = 8000;
@@ -54,30 +56,16 @@ export default function PlansManager({ plans, mode, onDone }: PlansManagerProps)
 
   return (
     <section className={onboarding ? styles.onboarding : styles.manage} aria-labelledby={headingId}>
-      {onboarding ? (
-        <aside className={styles.guide} aria-label="How Recourse works">
-          <span className={styles.eyebrow}>Recourse / Getting started</span>
-          <h2>Your next step,<br />with less paperwork.</h2>
-          <p>Bring the documents. We’ll help you organize the request and prepare for the call.</p>
-          <ol className={styles.steps}>
-            <li><span>01</span><div><strong>Build the case</strong><p>Add your documents and describe what happened.</p></div></li>
-            <li><span>02</span><div><strong>Review the facts</strong><p>Check the details and approve what the agent can ask.</p></div></li>
-            <li><span>03</span><div><strong>Keep the record</strong><p>Review the call transcript and the next action.</p></div></li>
-          </ol>
-        </aside>
-      ) : null}
       <div className={styles.inner}>
         <header className={styles.intro}>
-          {onboarding ? <span className={styles.eyebrow}>01 / Your documents</span> : null}
           <h1 id={headingId} className={styles.title}>
             {onboarding ? "Add your insurance plans" : "Your plans"}
           </h1>
-          <p className={styles.lead}>
-            Add a policy PDF or photo to keep with your case. You can review every detail before authorizing a call.
-            No documents yet? Start with a description instead.
-          </p>
         </header>
 
+        <ProviderKnowledge />
+
+        <h2 className={styles.listHeading}>Your policy documents</h2>
         <DropZone onFiles={handleFiles} />
 
         {rejections.length > 0 ? (
@@ -134,7 +122,6 @@ export default function PlansManager({ plans, mode, onDone }: PlansManagerProps)
         ) : null}
 
         <footer className={styles.footer}>
-          <p className={styles.storageNote}>Plans stay in this browser. They are sent only with a case you create.</p>
           <div className={styles.actions}>
             {onboarding && count === 0 ? (
               <Button variant="ghost" onClick={onDone} data-testid="plans-skip">
@@ -234,6 +221,7 @@ interface PlanRowProps {
 
 function PlanRow({ plan, onChange, onRemove }: PlanRowProps) {
   const baseId = useId();
+  const [previewOpen, setPreviewOpen] = useState(false);
   const [phoneTouched, setPhoneTouched] = useState(false);
   const phoneError =
     phoneTouched && plan.supportPhone.trim() !== "" && normalizePhone(plan.supportPhone) === null ? PHONE_HINT : null;
@@ -252,10 +240,14 @@ function PlanRow({ plan, onChange, onRemove }: PlanRowProps) {
           <span aria-hidden="true"> · </span>
           {fileKindLabel(plan.fileName, plan.fileType)}
         </span>
+        <Button id={`${baseId}-preview`} variant="ghost" size="small" onClick={() => setPreviewOpen((value) => !value)} aria-label={`Preview ${plan.fileName}`} aria-expanded={previewOpen}>
+          Preview
+        </Button>
         <Button variant="ghost" size="small" onClick={onRemove} aria-label={`Remove ${plan.fileName}`}>
           Remove
         </Button>
       </div>
+      {previewOpen ? <PolicyPreview plan={plan} onClose={() => { document.getElementById(`${baseId}-preview`)?.focus(); setPreviewOpen(false); }} /> : null}
       <div className={styles.planFields}>
         <Field
           id={`${baseId}-name`}
@@ -271,7 +263,7 @@ function PlanRow({ plan, onChange, onRemove }: PlanRowProps) {
           label="Insurer"
           name="insurer"
           autoComplete="organization"
-          placeholder="Northwind Mutual…"
+          placeholder="Insurance provider"
           value={plan.insurer}
           onChange={(event) => onChange({ insurer: event.target.value })}
         />

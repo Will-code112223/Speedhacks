@@ -229,7 +229,7 @@
 
 .emptyTitle {
   margin: 0;
-  font-size: clamp(32px, 3.2vw, 44px);
+  font-size: 24px;
   font-weight: 500;
   letter-spacing: -0.045em;
   line-height: 1.12;
@@ -238,10 +238,10 @@
 
 .emptyText {
   max-width: 580px;
-  margin: 20px 0 0;
+  margin: 12px 0 0;
   color: var(--rc-ink-2);
-  font-size: 16px;
-  line-height: 1.65;
+  font-size: 15px;
+  line-height: 1.55;
   text-wrap: pretty;
 }
 
@@ -258,12 +258,16 @@
   flex: none;
 }
 
+.gettingStarted {
+  padding-bottom: 8px;
+}
+
 .steps {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 20px;
-  margin: 32px 0 0;
-  padding: 24px 0;
+  margin: 20px 0 0;
+  padding: 16px 0;
   list-style: none;
   border-top: 1px solid var(--rc-border);
   border-bottom: 1px solid var(--rc-border);
@@ -272,8 +276,11 @@
 .steps li {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
   min-width: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--rc-ink-2);
 }
 
 .stepNumber {
@@ -422,13 +429,19 @@
     padding-top: 28px;
   }
   .steps {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .steps li {
+    flex-direction: row;
+    align-items: baseline;
     gap: 12px;
   }
   .steps strong + span {
     display: none;
   }
   .emptyTitle {
-    font-size: 36px;
+    font-size: 22px;
   }
   .emptyText {
     font-size: 15px;

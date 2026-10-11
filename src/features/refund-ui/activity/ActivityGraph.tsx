@@ -35,8 +35,6 @@ export default function ActivityGraph({ caseData, call, fixture, defaultExpanded
   const suppressClick = useRef(false);
   const graph = activityGraph(caseData, call, fixture);
   const nodes = graph.nodes.map((node) => ({ ...node, ...positions[node.id] }));
-  const detail = nodes.find((node) => node.id === selected) ?? nodes[0]!;
-  const connected = graph.edges.filter((edge) => edge.source === selected || edge.target === selected);
 
   function reset() { setView(initialView); setPositions({}); }
   function zoomBy(amount: number) {
@@ -113,7 +111,7 @@ export default function ActivityGraph({ caseData, call, fixture, defaultExpanded
   return (
     <section className={styles.root} aria-label="Agent activity map">
       <button type="button" className={styles.toggle} aria-expanded={expanded} aria-controls={`${id}-map`} onClick={() => setExpanded((value) => !value)}>
-        <span className={styles.toggleTitle}><NetworkIcon /> Activity graph <span className={styles.mode}>{activityMode(caseData, graph.call, fixture)}</span></span>
+        <span className={styles.toggleTitle}><NetworkIcon /> Activity graph</span>
         <span className={styles.chevron} data-open={expanded}><ChevronRightIcon /></span>
       </button>
       {expanded && (
@@ -147,7 +145,7 @@ export default function ActivityGraph({ caseData, call, fixture, defaultExpanded
                   })}
                 </g>
                 {nodes.map((node) => (
-                  <g key={node.id} transform={`translate(${node.x} ${node.y})`} className={styles.node} data-node={node.id} data-tone={node.tone} role="button" tabIndex={0} aria-label={`${node.title}: ${node.status}`} aria-pressed={selected === node.id} aria-controls={`${id}-detail`} onFocus={() => reveal(node)} onKeyDown={(event) => nodeKey(event, node)} onPointerDown={(event) => startDrag(event, node)} onClick={(event) => { if (event.detail === 0 || !suppressClick.current) setSelected(node.id); suppressClick.current = false; }}>
+                  <g key={node.id} transform={`translate(${node.x} ${node.y})`} className={styles.node} data-node={node.id} data-tone={node.tone} role="button" tabIndex={0} aria-label={`${node.title}: ${node.status}`} aria-pressed={selected === node.id} onFocus={() => reveal(node)} onKeyDown={(event) => nodeKey(event, node)} onPointerDown={(event) => startDrag(event, node)} onClick={(event) => { if (event.detail === 0 || !suppressClick.current) setSelected(node.id); suppressClick.current = false; }}>
                     <title>{`${node.title}: ${node.status}`}</title>
                     <circle className={styles.focusRing} r={node.id === "agent" ? 49 : 39} />
                     <circle className={styles.nodeBody} r={node.id === "agent" ? 40 : 30} />
@@ -161,30 +159,13 @@ export default function ActivityGraph({ caseData, call, fixture, defaultExpanded
             </svg>
           </div>
           <div className={styles.content}>
-            <p id={`${id}-help`} className={styles.hint}>Drag the canvas to pan; drag nodes to arrange. Tab to a node, Enter to inspect, arrows to move. On the canvas, use + / − to zoom and Home to reset.</p>
-            <label className={styles.inspectorSelect}>Inspect node
-              <select value={selected} onChange={(event) => {
-                const node = nodes.find((item) => item.id === event.target.value);
-                if (node) { setSelected(node.id); reveal(node); }
-              }}>{nodes.map((node) => <option key={node.id} value={node.id}>{node.title} · {node.status}</option>)}</select>
-            </label>
-            <div id={`${id}-detail`} className={styles.detail} aria-live="polite" aria-atomic="true">
-              <div className={styles.detailTitle}><strong>{detail.title}</strong><span>{detail.status}</span></div>
-              <p>{detail.description}</p>
-              {detail.facts.length > 0 && <ul>{detail.facts.map((fact, index) => <li key={`${index}-${fact}`}>{fact}</li>)}</ul>}
-              <div className={styles.relationships} aria-label="Selected node connections">
-                {connected.map((edge) => <span key={edge.id}>{nodes.find((node) => node.id === edge.source)?.title} → {nodes.find((node) => node.id === edge.target)?.title}: {edge.label} ({edge.state})</span>)}
-              </div>
-            </div>
-            <p className={styles.footnote}>Connections describe case records, not a live event trace. No provider browser activity is recorded here.</p>
-            {caseData && caseData.timeline.length > 0 && (
-              <details className={styles.timeline}>
-                <summary>Recorded case events <span>{caseData.timeline.length}</span></summary>
-                <ol>{[...caseData.timeline].sort((a, b) => a.at.localeCompare(b.at)).map((entry) => (
-                  <li key={entry.id}><time dateTime={entry.at}>{entry.at.replace("T", " ").replace(/\.\d{3}Z$/, " UTC")}</time><p>{entry.message}</p></li>
-                ))}</ol>
-              </details>
-            )}
+            <details className={styles.help}>
+              <summary>Graph help</summary>
+              <p className={styles.footnote}>Data source: {activityMode(caseData, graph.call, fixture)}.</p>
+              <p id={`${id}-help`} className={styles.hint}>Drag to pan or move nodes. Use Tab and Enter to select nodes, arrows to move, + / − to zoom, and Home to reset.</p>
+              <p className={styles.footnote}>Connections describe case records, not a live event trace. No provider browser activity is recorded here.</p>
+            </details>
+
           </div>
         </div>
       )}

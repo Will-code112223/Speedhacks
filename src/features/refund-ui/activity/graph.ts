@@ -72,7 +72,7 @@ export function activityGraph(caseData: CaseV1 | null, call: CallV1 | null, fixt
     id: "agent", title: "Recourse", x: 390, y: 285,
     status: caseData ? "Case workspace" : "Ready for a request",
     tone: caseData ? "recorded" : "idle",
-    description: "Connects the request, evidence, approval and result recorded on this case. This map does not indicate that a model is currently running.",
+    description: "Saved case details and actions.",
     facts: caseData ? [`Case revision ${caseData.revision}`, `Case status: ${caseData.status.replaceAll("_", " ")}`] : [],
   });
 
