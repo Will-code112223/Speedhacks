@@ -9,7 +9,17 @@
  */
 
 import type { CallState, CallV1, CaseV1 } from "../../../contracts/case";
-import type { CaseApi, Counterpart, FixtureScenario, LiveCallPhase, LiveCallV2, PendingDecision } from "../api/types";
+import { completedCallFor } from "../api/summary";
+import type {
+  CaseApi,
+  Counterpart,
+  FixtureScenario,
+  LiveCallPhase,
+  LiveCallV2,
+  PendingDecision,
+  SummaryDelivery,
+  SummaryDestination,
+} from "../api/types";
 import { formatDuration, secondsBetween } from "../ui/format";
 import {
   callStateEventText,
@@ -63,6 +73,22 @@ export interface RequestState {
 
 const idle: RequestState = { busy: false, error: null };
 
+export type SummaryStatus = "idle" | "sending" | "sent" | "composed" | "error";
+
+/** The transcript and summary sent after a call, by email or text message. */
+export interface SummaryState {
+  status: SummaryStatus;
+  /** Sent (sentAt set) or composed for the person's own app (sentAt null). */
+  delivery: SummaryDelivery | null;
+  error: UiError | null;
+  /** What the person typed into the destination field. */
+  destinationText: string;
+  /** The call already sent automatically to the email on file, so it happens once. */
+  autoSentCallId: string | null;
+}
+
+export const idleSummary: SummaryState = { status: "idle", delivery: null, error: null, destinationText: "", autoSentCallId: null };
+
 export interface CaseSession {
   /** Local key; stays the same before and after the case exists. */
   key: string;
@@ -98,6 +124,8 @@ export interface CaseSession {
   activeMs: number;
   /** Last V1 call state seen per call, for chat lines when there is no live data. */
   seenCallStates: Record<string, CallState>;
+  /** The post-call transcript and summary. */
+  summaryShare: SummaryState;
 }
 
 export interface SessionsState {
@@ -155,6 +183,13 @@ export type SessionAction =
   | { type: "note/added"; key: string; text: string; reply: string; at: string }
   | { type: "packet/started"; key: string }
   | { type: "packet/finished"; key: string; error: UiError | null }
+  | { type: "summary/edited"; key: string; text: string }
+  /** autoCallId marks an automatic send to the email on file for that call. */
+  | { type: "summary/sending"; key: string; text: string; autoCallId: string | null }
+  | { type: "summary/sent"; key: string; delivery: SummaryDelivery }
+  | { type: "summary/failed"; key: string; error: UiError }
+  /** Back to the form, for example to send to another address. */
+  | { type: "summary/reset"; key: string }
   | { type: "active/elapsed"; ms: number };
 
 // ---------------------------------------------------------------------------
@@ -401,6 +436,7 @@ export function newSession(input: {
     packet: idle,
     activeMs: input.activeMs,
     seenCallStates: {},
+    summaryShare: idleSummary,
   };
 }
 
@@ -597,6 +633,43 @@ export function sessionsReducer(state: SessionsState, action: SessionAction): Se
       return update(state, action.key, (session) => ({ ...session, packet: { busy: true, error: null } }));
     case "packet/finished":
       return update(state, action.key, (session) => ({ ...session, packet: { busy: false, error: action.error } }));
+    case "summary/edited":
+      return update(state, action.key, (session) =>
+        session.summaryShare.destinationText === action.text
+          ? session
+          : { ...session, summaryShare: { ...session.summaryShare, destinationText: action.text, error: null } },
+      );
+    case "summary/sending":
+      return update(state, action.key, (session) => ({
+        ...session,
+        summaryShare: {
+          ...session.summaryShare,
+          status: "sending",
+          error: null,
+          destinationText: action.text,
+          autoSentCallId: action.autoCallId ?? session.summaryShare.autoSentCallId,
+        },
+      }));
+    case "summary/sent":
+      return update(state, action.key, (session) => ({
+        ...session,
+        summaryShare: {
+          ...session.summaryShare,
+          status: action.delivery.sentAt === null ? "composed" : "sent",
+          delivery: action.delivery,
+          error: null,
+        },
+      }));
+    case "summary/failed":
+      return update(state, action.key, (session) => ({
+        ...session,
+        summaryShare: { ...session.summaryShare, status: "error", error: action.error },
+      }));
+    case "summary/reset":
+      return update(state, action.key, (session) => ({
+        ...session,
+        summaryShare: { ...idleSummary, autoSentCallId: session.summaryShare.autoSentCallId },
+      }));
     case "active/elapsed": {
       if (action.ms <= 0) return state;
       if (state.activeKey === null) return { ...state, unassignedActiveMs: state.unassignedActiveMs + action.ms };
@@ -626,4 +699,18 @@ export function decisionForCallScreen(session: CaseSession, callId: string | nul
 export function pendingDecision(session: CaseSession | null): DecisionRecord | null {
   if (!session) return null;
   return Object.values(session.decisions).find((record) => record.status === "pending" || record.status === "answering") ?? null;
+}
+
+/**
+ * Where to send the summary automatically: the email on file, once the newest
+ * call completed with a transcript, once per call, and only while nothing else
+ * was sent or is being sent.
+ */
+export function summaryAutoSend(session: CaseSession | null): { callId: string; destination: SummaryDestination } | null {
+  const caseData = session?.caseData ?? null;
+  const email = caseData?.customer.email?.trim() ?? "";
+  if (!session || !caseData || email === "") return null;
+  const call = completedCallFor(caseData);
+  if (!call || session.summaryShare.autoSentCallId === call.id || session.summaryShare.status !== "idle") return null;
+  return { callId: call.id, destination: { channel: "email", to: email } };
 }

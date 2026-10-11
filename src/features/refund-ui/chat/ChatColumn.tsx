@@ -15,17 +15,22 @@ import { Banner, Button, SkeletonRows } from "../ui/primitives";
 import { AlertIcon, ChevronRightIcon, FileIcon, PhoneIcon } from "../ui/icons";
 import { formatClock } from "../ui/format";
 import DecisionCard from "../ui/DecisionCard";
-import { caseTitle, currentCall, isCallActive, isOutcomeStatus } from "../state/call";
+import { caseTitle, currentCall, hasCallOutcome, isCallActive, isOutcomeStatus } from "../state/call";
 import type { CaseSessionController } from "../state/controller";
+import type { SummaryController } from "../state/useCaseSession";
 import type { CaseSession, EventTone, ThreadItem } from "../state/session";
 import ApprovalCard from "./ApprovalCard";
 import Composer from "./Composer";
 import FactsCard from "./FactsCard";
 import ResultBlock from "./ResultBlock";
+import SummaryCard from "./SummaryCard";
 import styles from "./ChatColumn.module.css";
 
+/** The summary actions are optional so views built against the controller alone still render. */
+type ChatController = CaseSessionController & Partial<SummaryController>;
+
 export interface ChatColumnProps {
-  controller: CaseSessionController;
+  controller: ChatController;
   fixture: boolean;
   /** Shown under the support phone field, for example the simulated backend's number rules. */
   phoneHint: string | null;
@@ -229,7 +234,7 @@ function Thread({
   onFactsDirty,
 }: {
   session: CaseSession;
-  controller: CaseSessionController;
+  controller: ChatController;
   fixture: boolean;
   phoneHint: string | null;
   factsDirty: boolean;
@@ -347,7 +352,7 @@ interface ThreadEntryProps {
   caseData: CaseV1 | null;
   call: CallV1 | null;
   currentApprovalId: string | null;
-  controller: CaseSessionController;
+  controller: ChatController;
   fixture: boolean;
   phoneHint: string | null;
   factsDirty: boolean;
@@ -473,17 +478,30 @@ function ThreadEntry(props: ThreadEntryProps) {
     case "result": {
       if (!caseData) return null;
       const resultCall = item.callId ? (caseData.calls.find((candidate) => candidate.id === item.callId) ?? null) : null;
+      const shownCall = resultCall ?? (call && call.id === item.callId ? call : null);
+      const latest = item.callId === null || item.callId === call?.id;
+      const { sendSummary, editSummaryDestination, resetSummary } = controller;
       return (
         <li className={[styles.assistant, groupedClass].join(" ")}>
           {grouped ? null : <MessageMeta who="Recourse" at={item.at} />}
           <ResultBlock
             caseData={caseData}
-            call={resultCall ?? (call && call.id === item.callId ? call : null)}
-            latest={item.callId === null || item.callId === call?.id}
+            call={shownCall}
+            latest={latest}
             fixture={fixture}
             packet={session.packet}
             onDownloadPacket={controller.downloadPacket}
           />
+          {latest && shownCall && hasCallOutcome(caseData, shownCall) && sendSummary && editSummaryDestination && resetSummary ? (
+            <SummaryCard
+              state={session.summaryShare}
+              fixture={fixture}
+              simulated={caseData.mode === "simulated"}
+              onSend={sendSummary}
+              onEdit={editSummaryDestination}
+              onReset={resetSummary}
+            />
+          ) : null}
         </li>
       );
     }

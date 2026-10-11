@@ -279,6 +279,12 @@ describe("server render of each stage", () => {
     expect(html).toContain("Talking to: an automated agent");
     expect(html).toContain('data-testid="call-notes"');
     expect(html).toContain("On hold");
+    // The spoken lines stream above the agent's activity, each with who said it.
+    expect(html).toContain('data-testid="call-transcript"');
+    expect(html).toContain(">Support</span>");
+    expect(html).toContain("This is the automated claims assistant. How can I help?");
+    expect(html.indexOf('data-testid="call-plan"')).toBeLessThan(html.indexOf('data-testid="call-transcript"'));
+    expect(html.indexOf('data-testid="call-transcript"')).toBeLessThan(html.indexOf('data-testid="call-notes"'));
 
     s.seconds(24);
     await s.live();

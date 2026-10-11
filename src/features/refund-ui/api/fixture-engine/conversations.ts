@@ -7,7 +7,7 @@
 
 import type { CaseOutcome } from "../../../../contracts/case";
 import type { DecisionOption } from "../types";
-import type { CallScript, ScriptStep } from "./call-run";
+import type { CallScript, ScriptSpeaker, ScriptStep } from "./call-run";
 
 export interface CallContext {
   customerName: string;
@@ -29,8 +29,22 @@ export interface PlanStepDefinition {
   detail?: string;
 }
 
+/** One spoken line at a point in script time. */
+export interface ScriptTurn {
+  at: number;
+  speaker: ScriptSpeaker;
+  text: string;
+}
+
 export interface Conversation {
   script(ctx: CallContext): CallScript;
+  /**
+   * Every spoken line, in order, at the script time it is said. The single
+   * source of the words: the script plays these live and the transcript the
+   * call ends with is built from the same list, so the two never disagree.
+   * Without a resolution a gated call uses its default branch.
+   */
+  turns(ctx: CallContext, resolution: Resolution | null): ScriptTurn[];
   /** What the agent intends to do on the call. Intent only: progress comes from the script's tagged steps. */
   plan(ctx: CallContext): PlanStepDefinition[];
   /** Speaker-labelled lines after a first line that marks the transcript as simulated. */
@@ -39,6 +53,23 @@ export interface Conversation {
 }
 
 export const SIMULATED_MARKER = "[SIMULATED] Fixture conversation. No phone call was placed.";
+
+const SPEAKER_LABEL: Record<ScriptSpeaker, string> = { support: "Support", agent: "Agent" };
+
+/** The transcript a call ends with: the simulated marker, then one speaker-labelled line per turn. */
+export function transcriptFromTurns(turns: readonly ScriptTurn[]): string {
+  return [SIMULATED_MARKER, ...turns.map((t) => `${SPEAKER_LABEL[t.speaker]}: ${t.text}`)].join("\n");
+}
+
+/** Script steps that say each turn, merged into `steps` by time; at equal times the existing step goes first. */
+export function withTurns(steps: readonly ScriptStep[], turns: readonly ScriptTurn[]): ScriptStep[] {
+  const said: ScriptStep[] = turns.map((t) => ({ at: t.at, say: { speaker: t.speaker, text: t.text } }));
+  return [...steps, ...said].sort((a, b) => a.at - b.at);
+}
+
+function lerp(from: number, to: number, fraction: number): number {
+  return Math.round(from + (to - from) * fraction);
+}
 
 // ---------------------------------------------------------------------------
 // Refund call: a person at the merchant's billing line issues the refund.
@@ -77,6 +108,7 @@ const QUICK_PACE: RefundPace = {
 };
 
 function refundCall(pace: RefundPace): Conversation {
+  const turns = (ctx: CallContext): ScriptTurn[] => refundTurns(pace, ctx);
   return {
     plan: (ctx) => [
       { id: "reach", title: "Reach the billing team", detail: "Dialing, phone menu and hold." },
@@ -85,37 +117,34 @@ function refundCall(pace: RefundPace): Conversation {
       { id: "confirm", title: "Confirm the reference number", detail: "Read back the amount and reference." },
       { id: "record", title: "Record the outcome", detail: "Save the reference and next step to the case." },
     ],
+    turns,
     script: (ctx) => ({
       gate: null,
-      steps: [
-        { at: 0, phase: "dialing", step: "reach", note: `Dialing ${ctx.merchantName}.` },
-        { at: pace.ringAt, phase: "ringing" },
-        { at: pace.holdAt, phase: "on_hold", note: "On hold for the billing team." },
-        {
-          at: pace.answerAt,
-          phase: "talking",
-          step: "explain",
-          counterpart: { who: "human", confidence: 0.8 },
-          note: "A person answered.",
-        },
-        { at: pace.explainAt, step: "ask", note: `Explained the duplicate ${ctx.amount} charge and asked for a refund of the second one.` },
-        { at: pace.issuedAt, step: "confirm", note: `The rep issued the refund. Reference ${REFUND_REFERENCE}.` },
-        { at: pace.readBackAt, note: "Read back the amount and reference. The rep confirmed." },
-        { at: pace.endAt, phase: "ended", step: "record", note: "Call ended." },
-      ],
+      steps: withTurns(
+        [
+          { at: 0, phase: "dialing", step: "reach", note: `Dialing ${ctx.merchantName}.` },
+          { at: pace.ringAt, phase: "ringing" },
+          { at: pace.holdAt, phase: "on_hold", note: "On hold for the billing team." },
+          {
+            at: pace.answerAt,
+            phase: "talking",
+            step: "explain",
+            counterpart: { who: "human", confidence: 0.8 },
+            note: "A person answered.",
+          },
+          {
+            at: pace.explainAt,
+            step: "ask",
+            note: `Explained the duplicate ${ctx.amount} charge and asked for a refund of the second one.`,
+          },
+          { at: pace.issuedAt, step: "confirm", note: `The rep issued the refund. Reference ${REFUND_REFERENCE}.` },
+          { at: pace.readBackAt, note: "Read back the amount and reference. The rep confirmed." },
+          { at: pace.endAt, phase: "ended", step: "record", note: "Call ended." },
+        ],
+        turns(ctx),
+      ),
     }),
-    transcript: (ctx) =>
-      [
-        SIMULATED_MARKER,
-        `Support: ${ctx.merchantName}, this is Sam. How can I help?`,
-        `Agent: Hi Sam. I'm an AI assistant calling for ${ctx.customerName} about a duplicate charge of ${ctx.amount}.`,
-        `Support: I can see two charges of ${ctx.amount} on the same day.`,
-        `Agent: The second one is the duplicate. ${ctx.customerName} is asking for a refund of that charge.`,
-        `Support: ${refundQuote(ctx)}.`,
-        `Agent: To confirm: a ${ctx.amount} refund to the original card, reference ${REFUND_REFERENCE}.`,
-        "Support: That's right. It should post in 5 to 7 business days.",
-        "Agent: Thank you. Goodbye.",
-      ].join("\n"),
+    transcript: (ctx) => transcriptFromTurns(turns(ctx)),
     // An explicit support statement supports "approved"; without payment evidence it stays unverified.
     outcome: (ctx) => ({
       decision: "approved",
@@ -125,6 +154,34 @@ function refundCall(pace: RefundPace): Conversation {
       supportingQuote: refundQuote(ctx),
     }),
   };
+}
+
+/** The refund call's lines, placed between the person answering and the call ending. */
+function refundTurns(pace: RefundPace, ctx: CallContext): ScriptTurn[] {
+  const talk = (fraction: number): number => lerp(pace.answerAt, pace.explainAt, fraction);
+  const confirm = (fraction: number): number => lerp(pace.issuedAt, pace.readBackAt, fraction);
+  return [
+    { at: talk(0.125), speaker: "support", text: `${ctx.merchantName}, this is Sam. How can I help?` },
+    {
+      at: talk(0.375),
+      speaker: "agent",
+      text: `Hi Sam. I'm an AI assistant calling for ${ctx.customerName} about a duplicate charge of ${ctx.amount}.`,
+    },
+    { at: talk(0.75), speaker: "support", text: `I can see two charges of ${ctx.amount} on the same day.` },
+    {
+      at: pace.explainAt,
+      speaker: "agent",
+      text: `The second one is the duplicate. ${ctx.customerName} is asking for a refund of that charge.`,
+    },
+    { at: pace.issuedAt, speaker: "support", text: `${refundQuote(ctx)}.` },
+    {
+      at: confirm(0.5),
+      speaker: "agent",
+      text: `To confirm: a ${ctx.amount} refund to the original card, reference ${REFUND_REFERENCE}.`,
+    },
+    { at: confirm(0.8), speaker: "support", text: "That's right. It should post in 5 to 7 business days." },
+    { at: lerp(pace.readBackAt, pace.endAt, 0.5), speaker: "agent", text: "Thank you. Goodbye." },
+  ];
 }
 
 function refundQuote(ctx: CallContext): string {
@@ -199,11 +256,52 @@ function claimBranch(resolution: Resolution | null): ClaimBranch {
   return branch;
 }
 
-function afterDecision(branch: ClaimBranch): ScriptStep[] {
+function afterDecision(branch: ClaimBranch, ctx: CallContext, resolution: Resolution): ScriptStep[] {
+  return withTurns(
+    [
+      { at: 31_000, step: "confirm", note: branch.note },
+      { at: 38_000, note: `Read back claim ${CLAIM_REFERENCE}. The claims line confirmed.` },
+      { at: 45_000, phase: "ended", step: "record", note: "Call ended." },
+    ],
+    claimTurns(ctx, resolution).filter((t) => t.at > DECISION_AT),
+  );
+}
+
+/** Per option, the steps after the decision when it was chosen by `by`. */
+function afterDecisions(ctx: CallContext, by: Resolution["by"]): Record<string, ScriptStep[]> {
+  return Object.fromEntries(
+    Object.entries(CLAIM_BRANCHES).map(([optionId, branch]) => [optionId, afterDecision(branch, ctx, { optionId, by })]),
+  );
+}
+
+/**
+ * The claim call's lines. Lines up to DECISION_AT play before the prompt; the
+ * rest play after it, from script time DECISION_AT, and depend on the answer.
+ */
+function claimTurns(ctx: CallContext, resolution: Resolution | null): ScriptTurn[] {
+  const branch = claimBranch(resolution);
+  const agentLine =
+    resolution?.by === "default" && branch.agentLineByDefault ? branch.agentLineByDefault(ctx) : branch.agentLine(ctx);
   return [
-    { at: 31_000, step: "confirm", note: branch.note },
-    { at: 38_000, note: `Read back claim ${CLAIM_REFERENCE}. The claims line confirmed.` },
-    { at: 45_000, phase: "ended", step: "record", note: "Call ended." },
+    { at: 3_500, speaker: "support", text: `Thank you for calling ${ctx.merchantName}. For existing claims, press 2.` },
+    { at: 9_500, speaker: "support", text: "Please hold for the next available claims agent." },
+    { at: 17_000, speaker: "support", text: "This is the automated claims assistant. How can I help?" },
+    {
+      at: 20_000,
+      speaker: "agent",
+      text: `I'm an AI assistant calling for ${ctx.customerName} about a claim for ${ctx.amount}. The details and photos are on file.`,
+    },
+    {
+      at: DECISION_AT - 1_500,
+      speaker: "support",
+      text: "I can open the claim now. An adjuster needs to visit, and the first opening is Tuesday from 10 to 12. Does that work?",
+    },
+    { at: DECISION_AT, speaker: "agent", text: `One moment while I check with ${ctx.customerName}.` },
+    { at: DECISION_AT + 500, speaker: "agent", text: agentLine },
+    { at: 30_000, speaker: "support", text: branch.supportLine },
+    { at: 36_000, speaker: "agent", text: branch.readBack },
+    { at: 37_500, speaker: "support", text: branch.closing },
+    { at: 42_000, speaker: "agent", text: "Thank you. Goodbye." },
   ];
 }
 
@@ -215,52 +313,37 @@ export const insuranceClaimCall: Conversation = {
     { id: "confirm", title: "Confirm the claim reference", detail: "Read back the claim reference." },
     { id: "record", title: "Record the outcome", detail: "Save the reference and next step to the case." },
   ],
+  turns: claimTurns,
   script: (ctx) => ({
-    steps: [
-      { at: 0, phase: "dialing", step: "reach", note: `Dialing ${ctx.merchantName}.` },
-      { at: 3_000, phase: "navigating_menu", note: "The phone menu answered." },
-      { at: 5_000, note: "Pressed 2 for existing claims" },
-      { at: 9_000, phase: "on_hold", note: "On hold for the claims team." },
-      {
-        at: 17_000,
-        phase: "talking",
-        step: "state",
-        counterpart: { who: "agent", confidence: 0.9 },
-        note: "Automated claims assistant answered. Switching to concise mode.",
-      },
-      { at: 20_000, note: `Stated the claim for ${ctx.customerName}: ${ctx.amount}, with the evidence on file.` },
-      { at: DECISION_AT, step: "decide", note: "The claims line asked to book an adjuster visit. Asking you." },
-    ],
+    steps: withTurns(
+      [
+        { at: 0, phase: "dialing", step: "reach", note: `Dialing ${ctx.merchantName}.` },
+        { at: 3_000, phase: "navigating_menu", note: "The phone menu answered." },
+        { at: 5_000, note: "Pressed 2 for existing claims" },
+        { at: 9_000, phase: "on_hold", note: "On hold for the claims team." },
+        {
+          at: 17_000,
+          phase: "talking",
+          step: "state",
+          counterpart: { who: "agent", confidence: 0.9 },
+          note: "Automated claims assistant answered. Switching to concise mode.",
+        },
+        { at: 20_000, note: `Stated the claim for ${ctx.customerName}: ${ctx.amount}, with the evidence on file.` },
+        { at: DECISION_AT, step: "decide", note: "The claims line asked to book an adjuster visit. Asking you." },
+      ],
+      claimTurns(ctx, null).filter((t) => t.at <= DECISION_AT),
+    ),
     gate: {
       at: DECISION_AT,
       question: ADJUSTER_QUESTION,
       options: ADJUSTER_OPTIONS.map((o) => ({ ...o })),
       defaultOptionId: ADJUSTER_DEFAULT,
       timeoutMs: DECISION_TIMEOUT_MS,
-      after: Object.fromEntries(
-        Object.entries(CLAIM_BRANCHES).map(([optionId, branch]) => [optionId, afterDecision(branch)]),
-      ),
+      after: afterDecisions(ctx, "user"),
+      afterByDefault: afterDecisions(ctx, "default"),
     },
   }),
-  transcript: (ctx, resolution) => {
-    const branch = claimBranch(resolution);
-    const agentLine =
-      resolution?.by === "default" && branch.agentLineByDefault ? branch.agentLineByDefault(ctx) : branch.agentLine(ctx);
-    return [
-      SIMULATED_MARKER,
-      `Support: Thank you for calling ${ctx.merchantName}. For existing claims, press 2.`,
-      "Support: Please hold for the next available claims agent.",
-      "Support: This is the automated claims assistant. How can I help?",
-      `Agent: I'm an AI assistant calling for ${ctx.customerName} about a claim for ${ctx.amount}. The details and photos are on file.`,
-      "Support: I can open the claim now. An adjuster needs to visit, and the first opening is Tuesday from 10 to 12. Does that work?",
-      `Agent: One moment while I check with ${ctx.customerName}.`,
-      `Agent: ${agentLine}`,
-      `Support: ${branch.supportLine}`,
-      `Agent: ${branch.readBack}`,
-      `Support: ${branch.closing}`,
-      "Agent: Thank you. Goodbye.",
-    ].join("\n");
-  },
+  transcript: (ctx, resolution) => transcriptFromTurns(claimTurns(ctx, resolution)),
   // Opening a claim is a request, not a decision on it; nothing is paid yet.
   outcome: (_ctx, resolution) => {
     const branch = claimBranch(resolution);

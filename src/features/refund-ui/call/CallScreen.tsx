@@ -11,7 +11,7 @@
 
 import { useEffect, useId, useRef } from "react";
 import type { CallV1, CaseV1 } from "../../../contracts/case";
-import type { CallPlan, CaseApiCapabilities, Counterpart, LiveCallV2 } from "../api/types";
+import type { CallPlan, CaseApiCapabilities, Counterpart, LiveCallTurn, LiveCallV2, TranscriptSpeaker } from "../api/types";
 import DecisionCard from "../ui/DecisionCard";
 import { CheckIcon } from "../ui/icons";
 import { Button, Mono, MonoBlock, SourcePill } from "../ui/primitives";
@@ -145,6 +145,8 @@ export default function CallScreen(props: CallScreenProps) {
       ) : null}
 
       {plan ? <CallPlanSection plan={plan} /> : null}
+
+      {live?.turns ? <LiveTranscript live={live} turns={live.turns} /> : null}
 
       {liveError ? (
         <div className={styles.liveError} role="status">
@@ -402,6 +404,67 @@ function CallNotes({ live }: { live: LiveCallV2 }) {
           ))}
         </ol>
       )}
+    </div>
+  );
+}
+
+const SPEAKER_LABEL: Record<TranscriptSpeaker, string> = { support: "Support", agent: "Agent", user: "You" };
+
+/** How long after the last line the agent counts as listening. */
+const LISTENING_AFTER_MS = 2_000;
+
+/**
+ * The spoken lines as the agent says and hears them, newest at the bottom.
+ * Only shown when the backend reports turns; an ended call that never spoke
+ * shows nothing rather than a promise of lines to come.
+ */
+function LiveTranscript({ live, turns }: { live: LiveCallV2; turns: readonly LiveCallTurn[] }) {
+  const listRef = useRef<HTMLOListElement | null>(null);
+  const reducedMotion = usePrefersReducedMotion();
+  const count = turns.length;
+  const speaking = phaseIsLive(live.phase) && live.phase !== "user_joined" && live.phase !== "waiting_for_user";
+  const now = useNow(speaking && count > 0, 500);
+  const last = turns[count - 1];
+  const listening = speaking && last !== undefined && now - Date.parse(last.at) > LISTENING_AFTER_MS;
+
+  // Newest at the bottom, kept in view as lines arrive.
+  useEffect(() => {
+    const node = listRef.current;
+    if (!node || count === 0) return;
+    node.scrollTo({ top: node.scrollHeight, behavior: reducedMotion ? "auto" : "smooth" });
+  }, [count, reducedMotion]);
+
+  if (count === 0 && !phaseIsLive(live.phase)) return null;
+
+  return (
+    <div className={styles.liveTranscript}>
+      <h3 className={styles.sectionLabel}>Live transcript</h3>
+      <ol
+        className={styles.turnList}
+        ref={listRef}
+        data-testid="call-transcript"
+        aria-live="polite"
+        aria-relevant="additions"
+        aria-label="Live transcript"
+      >
+        {turns.map((turn, index) => (
+          <li
+            key={`${turn.at}-${index}`}
+            className={[styles.turn, turn.speaker === "agent" ? styles.turnAgent : ""].join(" ")}
+          >
+            <span className={styles.turnSpeaker}>{SPEAKER_LABEL[turn.speaker]}</span>
+            <span className={styles.turnText}>{turn.text}</span>
+          </li>
+        ))}
+      </ol>
+      {count === 0 ? <p className={styles.turnEmpty}>Lines appear here as the call goes.</p> : null}
+      {listening ? (
+        <span className={styles.listening} aria-hidden="true" data-testid="call-transcript-listening">
+          <span className={styles.listeningDot} />
+          <span className={styles.listeningDot} />
+          <span className={styles.listeningDot} />
+        </span>
+      ) : null}
     </div>
   );
 }

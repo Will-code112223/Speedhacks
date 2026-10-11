@@ -385,6 +385,96 @@
   border: 0;
 }
 
+/* ------------------------------------------------------------------------- */
+/* Live transcript: the spoken lines as they happen, newest kept in view.    */
+/* ------------------------------------------------------------------------- */
+
+.liveTranscript {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+  border-bottom: 1px solid var(--rc-border);
+}
+
+.liveTranscript > .sectionLabel {
+  margin-bottom: 12px;
+}
+
+/* About five lines tall; it scrolls on its own so the plan and activity stay put. */
+.turnList {
+  max-height: 232px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.turn {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 8px;
+  padding: 4px 0 4px 10px;
+  border-left: 2px solid transparent;
+  animation: noteIn var(--rc-default) var(--rc-ease);
+}
+
+/* The edge marks who is speaking; the words stay in the ink colour. */
+.turnAgent {
+  border-left-color: var(--rc-accent-tint);
+}
+
+.turnSpeaker {
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 19px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--rc-ink-3);
+}
+
+.turnText {
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--rc-ink);
+  overflow-wrap: anywhere;
+}
+
+.turnEmpty {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--rc-ink-2);
+}
+
+.listening {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 12px;
+  margin: 8px 0 0 12px;
+}
+
+.listeningDot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--rc-ink-3);
+  animation: beat 1.2s ease-in-out 4;
+}
+
+.listeningDot:nth-child(2) {
+  animation-delay: 150ms;
+}
+
+.listeningDot:nth-child(3) {
+  animation-delay: 300ms;
+}
+
 .liveError {
   flex: none;
   display: flex;
@@ -637,8 +727,13 @@
 @media (prefers-reduced-motion: reduce) {
   .dot_live,
   .badgePulse .badgeDot,
-  .note {
+  .note,
+  .turn {
     animation: none;
+  }
+
+  .listening {
+    display: none;
   }
 
   .planSegment {

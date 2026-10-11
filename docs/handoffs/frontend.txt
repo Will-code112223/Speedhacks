@@ -119,3 +119,14 @@ KNOWN LIMITS AND REQUESTS
   an end-to-end run against codex/case-engine is the first integration step for T2.
 - Repo-level additions on this branch: .agents/skills/refero-design (design craft
   references used for the UI), .claude/skills symlink, skills-lock.json, docs/SPEC.md.
+- Proposal for T2 (Oct 11): post-call summary by email or text message.
+  POST /api/cases/:id/summary { channel: "email" | "sms", to: string } -> { delivery: SummaryDelivery }
+  SummaryDelivery = { channel, to, subject (email only, else null), summary: string[], transcript,
+  sentAt (ISO when sent, null when only composed) }. Errors match the fixture: 404 NOT_FOUND for an
+  unknown case; 409 CALL_NOT_COMPLETE "The call has not finished yet." until the newest call is
+  completed with a transcript; 400 BAD_REQUEST fields ["to"] when `to` is not an email address
+  (channel email) or 10 to 15 digits after removing spaces, dashes, dots and parentheses (channel sms).
+  A repeat for the same call and destination returns the stored delivery without sending again, and
+  each send adds a timeline entry type "summary_sent". Until the route exists the http client
+  composes the message in the browser (src/features/refund-ui/api/summary.ts) with sentAt null and
+  the UI opens it in the person's own Mail or Messages app; nothing claims it was sent.
