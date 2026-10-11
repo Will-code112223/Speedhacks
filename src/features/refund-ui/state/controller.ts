@@ -5,6 +5,7 @@
 
 import type { CallV1, CaseChanges, CaseV1 } from "../../../contracts/case";
 import type { ApiMode, CaseApiCapabilities, FixtureScenario, LiveCallV2 } from "../api/types";
+import type { WorkflowController } from "../workflow/session";
 import type { UiError } from "./errors";
 import type { CaseSession, DecisionRecord } from "./session";
 
@@ -43,7 +44,9 @@ export interface CaseSessionController {
   /** null starts a new case. */
   selectCase(key: string | null): void;
   /** Resolves false when the message was not accepted (for example while a case is being created). */
-  send(text: string): Promise<boolean>;
+  send(text: string, files?: File[]): Promise<boolean>;
+  /** Persisted conversational intake, present for real HTTP cases. */
+  workflow?: WorkflowController;
   retryCreate(): void;
   /** Resolves with the saved case, or null when the save failed (the error is on the session). */
   saveFacts(changes: CaseChanges, expectedRevision: number): Promise<CaseV1 | null>;

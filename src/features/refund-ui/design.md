@@ -185,6 +185,29 @@ and Refero's craft guidance for visible focus and non-drag interaction alternati
 | Phone-style call screen | user brief, screens research on in-call views | live call | people already know what a call screen means |
 | 120 and 200ms transitions | Refero motion guide 2 | feedback and state | product UI stays fast and quiet |
 
+
+### Real browser execution panel
+
+The existing Palantir/Optimized reference lock supplies the quiet, divided workspace,
+compact controls and document-like hierarchy. Refero's bundled craft guidance supplies
+visible keyboard focus and disclosure for advanced settings. The browser is a real
+side panel alongside chat, with a wider image area on desktop and a dismissible sheet
+on smaller screens. Browser and Call support are explicit separate actions; selecting
+a browser task never authorizes a call.
+
+| Decision | Source | Role | Why |
+| --- | --- | --- | --- |
+| Browser-first case tools, explicit Call support tab | User request for non-call refund and form tasks | Task selection | Browser work is available without a support phone or amount; calls retain their existing approval step |
+| Actual server JPEG plus exact page URL and action history | BrowserRun contract | Execution evidence | Shows the real controlled browser rather than a generated preview or replay |
+| Stop polling when hidden; clear failed frames | Frame availability and document visibility | State honesty | An old screenshot cannot masquerade as a current successful browser view |
+| Review exact action target/value before approval | BrowserPendingAction contract | Authorization | Every approval names the pending action and observation; ambiguous responses require a status refresh |
+| Session-scoped request ID, read-only reload recovery | HTTP browser contract | Recovery | Reloads never launch or repeat a browser task; explicit retries reuse the original instructions |
+| Compact setup and sign-in handoffs | Runtime readiness and backend status | Required intervention | Missing configuration is shown plainly; password screens are not captured |
+
+Verification for this addition is unit, HTTP-transport stubs and server-rendered markup.
+No live browser/provider action or visual browser inspection is implied by those checks.
+The app runtime now always uses HTTP; fixtures remain isolated to development tests.
+
 ### Call plan and step-in
 
 The call screen shows the agent's plan as a map of ordered steps and a one-line dashboard of the step it is on.

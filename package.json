@@ -8,10 +8,10 @@
   },
   "scripts": {
     "dev": "next dev",
-    "dev:live": "node --env-file=\"$HOME/.config/speedhacks/dial.env\" node_modules/next/dist/bin/next dev",
+    "dev:live": "node scripts/live-server.cjs dev",
     "build": "next build",
     "start": "next start",
-    "start:live": "node --env-file=\"$HOME/.config/speedhacks/dial.env\" node_modules/next/dist/bin/next start",
+    "start:live": "node scripts/live-server.cjs start",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"
@@ -19,6 +19,7 @@
   "dependencies": {
     "better-sqlite3": "^12.11.1",
     "next": "^16.4.0",
+    "playwright": "^1.64.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },

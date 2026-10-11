@@ -1,0 +1,133 @@
+/**
+ * Keewano custom event registry for the refund assistant.
+ *
+ * Keewano stores one typed value per event, per entity, in time order. Two entity
+ * kinds are used here:
+ *   - a refund case (entity id = case id): timeline entry types, derived status,
+ *     merchant, amount, call states, outcome and the history-check result;
+ * The unused history/charge definitions remain registered for compatibility with
+ * Jonathan's original registry. The live product never emits customer identities,
+ * charge history, free-form merchant strings, or seeded data.
+ *
+ * Append only: a registered id never changes its name or type (Keewano rejects
+ * that); add a new id instead. Ids start at 2000 as in the SpeedHacks quickstart and
+ * stay contiguous: Keewano's own listing (list_event_types, 2026-10-11) numbers the
+ * registered list by position (2000 + index). Events sent with the registry hash were
+ * mapped correctly even when this list had a gap, but keeping both numberings identical
+ * removes any doubt when reading ids off the Keewano UI or MCP tools.
+ *
+ * No "@/" or relative imports here: plain `node` loads this module from the seed CLI.
+ */
+
+export type KeewanoDataType = "none" | "string" | "uint" | "bool" | "price_usd_cent" | "timestamp";
+
+export interface KeewanoEventType {
+  eventTypeId: number;
+  name: string;
+  dataType: KeewanoDataType;
+}
+
+export const EVENT_TYPES = [
+  // Refund case entity (id = case id)
+  { eventTypeId: 2000, name: "RefundCaseEvent", dataType: "string" },
+  { eventTypeId: 2001, name: "RefundCaseStatus", dataType: "string" },
+  { eventTypeId: 2002, name: "RefundCaseMode", dataType: "string" },
+  { eventTypeId: 2003, name: "RefundMerchant", dataType: "string" },
+  { eventTypeId: 2004, name: "RefundAmount", dataType: "price_usd_cent" },
+  { eventTypeId: 2005, name: "RefundCallState", dataType: "string" },
+  { eventTypeId: 2006, name: "RefundOutcome", dataType: "string" },
+  { eventTypeId: 2007, name: "RefundHistoryCheck", dataType: "string" },
+  // Customer entity (id = customerEntityId): synthetic transaction history
+  { eventTypeId: 2008, name: "ChargeMerchant", dataType: "string" },
+  { eventTypeId: 2009, name: "ChargeAmount", dataType: "price_usd_cent" },
+  { eventTypeId: 2010, name: "ChargeCurrency", dataType: "string" },
+  { eventTypeId: 2011, name: "ChargeId", dataType: "string" },
+] as const satisfies readonly KeewanoEventType[];
+
+// Guard the positional contract above at module load.
+EVENT_TYPES.forEach((t, i) => {
+  if (t.eventTypeId !== 2000 + i) throw new Error(`Keewano event ids must be contiguous from 2000: ${t.name} is ${t.eventTypeId}, expected ${2000 + i}`);
+});
+
+export type KeewanoEventName = (typeof EVENT_TYPES)[number]["name"];
+
+const BY_NAME = new Map<string, KeewanoEventType>(EVENT_TYPES.map((t) => [t.name, t]));
+
+export function eventType(name: KeewanoEventName): KeewanoEventType {
+  const t = BY_NAME.get(name);
+  if (!t) throw new Error(`Unknown Keewano event ${name}`);
+  return t;
+}
+
+export interface KeewanoEvent {
+  eventTypeId: number;
+  dataType: KeewanoDataType;
+  /** Unix seconds, UTC. */
+  timestamp: number;
+  data: string | number | boolean | null;
+}
+
+export const MAX_STRING_LENGTH = 256;
+export const MAX_UINT32 = 0xffff_ffff;
+
+export function toUnixSeconds(at: string | number | Date): number {
+  const ms = at instanceof Date ? at.getTime() : typeof at === "number" ? at : Date.parse(at);
+  if (!Number.isFinite(ms)) throw new Error(`Invalid timestamp ${String(at)}`);
+  return Math.floor(ms / 1000);
+}
+
+/** Build one event. Strings are truncated to Keewano's limit; integer types must fit uint32. */
+export function event(name: KeewanoEventName, data: string | number | boolean | null, at: string | number | Date): KeewanoEvent {
+  const t = eventType(name);
+  let value: KeewanoEvent["data"] = data;
+  switch (t.dataType) {
+    case "string":
+      value = String(data ?? "").slice(0, MAX_STRING_LENGTH);
+      break;
+    case "price_usd_cent":
+    case "uint":
+    case "timestamp":
+      if (typeof data !== "number" || !Number.isInteger(data) || data < 0 || data > MAX_UINT32) {
+        throw new Error(`${name} needs an integer in 0..${MAX_UINT32}, got ${String(data)}`);
+      }
+      break;
+    case "bool":
+      value = Boolean(data);
+      break;
+    case "none":
+      value = null;
+      break;
+  }
+  return { eventTypeId: t.eventTypeId, dataType: t.dataType, timestamp: toUnixSeconds(at), data: value };
+}
+
+// ---------------------------------------------------------------------------
+// customEventsHash: names this exact registry in /custom and in every /in batch.
+// ---------------------------------------------------------------------------
+
+const CRC_TABLE = new Uint32Array(256).map((_, n) => {
+  let c = n;
+  for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+  return c >>> 0;
+});
+
+export function crc32(input: string | Uint8Array): number {
+  const bytes = typeof input === "string" ? new TextEncoder().encode(input) : input;
+  let crc = 0xffffffff;
+  for (const b of bytes) crc = (CRC_TABLE[(crc ^ b) & 0xff] ?? 0) ^ (crc >>> 8);
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+/** JSON with object keys sorted at every level, so the hash does not depend on key order. */
+export function canonicalJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  if (value !== null && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    const keys = Object.keys(record).sort();
+    return `{${keys.map((k) => `${JSON.stringify(k)}:${canonicalJson(record[k])}`).join(",")}}`;
+  }
+  return JSON.stringify(value) ?? "null";
+}
+
+/** CRC32 of the canonical registry, never 0 (0 means "no custom events" to Keewano). */
+export const EVENTS_HASH = crc32(canonicalJson(EVENT_TYPES)) || 1;

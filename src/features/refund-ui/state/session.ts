@@ -461,7 +461,7 @@ export function sessionsReducer(state: SessionsState, action: SessionAction): Se
         if (previous && !previous.recoveryPending && entry.caseData === null) continue;
         const recoveryPending = entry.caseData === null && entry.error === null;
         const text = entry.caseData
-          ? "Reopened the saved case from the server. Earlier local conversation notes were not retained."
+          ? "Reopened the saved case from the server. Loading its saved conversation and plan."
           : entry.error
             ? "This saved case could not be loaded. Try updating it again when the server is available. No new call was requested."
             : "Reopening this saved case from the server. No new call is being requested.";

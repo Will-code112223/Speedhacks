@@ -1,10 +1,13 @@
 import path from "node:path";
+import fs from "node:fs";
+import { chromium } from "playwright";
 import type { Mode } from "@/contracts/case";
+import type { RuntimeReadiness } from "@/contracts/browser";
 import { ApiHttpError } from "@/server/http/errors";
 
 export interface AppConfig {
   mode: Mode;
-  /** Raw REFUND_MODE value when it is neither "simulated" nor "live" (fails visibly). */
+  /** Invalid or disallowed REFUND_MODE; never expose its raw value to clients. */
   invalidMode: string | null;
   dataDir: string;
   llm: { provider: string; model: string | null; apiKey: string | null; baseUrl: string };
@@ -50,18 +53,22 @@ function parseDuration(raw: string | undefined): { maxCallDurationSeconds: numbe
 }
 
 export function loadConfig(env: EnvSource = process.env): AppConfig {
-  const rawMode = (env.REFUND_MODE ?? "simulated").trim();
-  const mode: Mode = rawMode === "live" ? "live" : "simulated";
-  const invalidMode = rawMode === "live" || rawMode === "simulated" || rawMode === "" ? null : rawMode;
+  const rawMode = str(env.REFUND_MODE) ?? "live";
+  // Explicit test adapters remain available to Vitest, including its injected
+  // environment objects. Ordinary dev/production servers never simulate.
+  const testEnvironment = (env.NODE_ENV ?? process.env.NODE_ENV) === "test";
+  const mode: Mode = rawMode === "simulated" ? "simulated" : "live";
+  const invalidMode = rawMode === "live" || (rawMode === "simulated" && testEnvironment) ? null : rawMode;
   return {
     mode,
     invalidMode,
-    dataDir: path.resolve(process.cwd(), env.DATA_DIR?.trim() || "./data"),
+    // Runtime-owned private storage must never be traced into a deploy bundle.
+    dataDir: path.resolve(/* turbopackIgnore: true */ process.cwd(), env.DATA_DIR?.trim() || "./data"),
     llm: {
       provider: (env.LLM_PROVIDER ?? "openai").trim() || "openai",
       model: str(env.LLM_MODEL),
       apiKey: str(env.OPENAI_API_KEY),
-      baseUrl: (env.OPENAI_BASE_URL ?? "https://api.openai.com/v1").trim(),
+      baseUrl: (str(env.OPENAI_BASE_URL) ?? "https://api.openai.com/v1").replace(/\/+$/, ""),
     },
     dial: {
       apiKey: str(env.DIAL_API_KEY),
@@ -91,22 +98,74 @@ export function assertModeValid(cfg: AppConfig): void {
     throw new ApiHttpError(
       503,
       "LIVE_CONFIGURATION_MISSING",
-      `REFUND_MODE must be "simulated" or "live" (got "${cfg.invalidMode}")`,
+      'REFUND_MODE must be "live"; "simulated" is supported only with NODE_ENV=test',
+      ["REFUND_MODE"],
     );
   }
 }
 
 export function assertLiveLlmConfig(cfg: AppConfig): void {
   if (cfg.mode !== "live") return;
-  const missing: string[] = [];
-  if (!cfg.llm.model) missing.push("LLM_MODEL");
-  if (!cfg.llm.apiKey) missing.push("OPENAI_API_KEY");
+  const missing = liveLlmMissingConfig(cfg);
   if (missing.length > 0) {
     throw new ApiHttpError(
       503,
       "LIVE_CONFIGURATION_MISSING",
-      `Live mode requires ${missing.join(", ")}; no fallback to simulation`,
+      `Live extraction requires valid ${missing.join(", ")}; no fallback to simulation`,
       missing,
     );
   }
+}
+
+function bearerToken(value: string | null): boolean {
+  return value !== null && value.length <= 4096 && /^[\x21-\x7e]+$/.test(value);
+}
+
+/** Fixed environment names only; configured is not proof of account access. */
+export function liveLlmMissingConfig(cfg: AppConfig): string[] {
+  const missing: string[] = [];
+  if (cfg.llm.provider !== "openai") missing.push("LLM_PROVIDER");
+  if (!cfg.llm.model) missing.push("LLM_MODEL");
+  if (!bearerToken(cfg.llm.apiKey)) missing.push("OPENAI_API_KEY");
+  try {
+    const url = new URL(cfg.llm.baseUrl);
+    if (!["https:", "http:"].includes(url.protocol) || url.username || url.password || url.search || url.hash) {
+      missing.push("OPENAI_BASE_URL");
+    }
+  } catch { missing.push("OPENAI_BASE_URL"); }
+  return missing;
+}
+
+export function liveDialMissingConfig(cfg: AppConfig): string[] {
+  const missing: string[] = [];
+  if (!bearerToken(cfg.dial.apiKey)) missing.push("DIAL_API_KEY");
+  // Dial accepts an account-owned number ID, E.164 number, or nickname.
+  if (!cfg.dial.fromNumber || cfg.dial.fromNumber.length > 256 || /[\x00-\x1f\x7f]/.test(cfg.dial.fromNumber)) {
+    missing.push("DIAL_FROM_NUMBER");
+  }
+  if (cfg.dial.maxCallDurationInvalid !== null) missing.push("DIAL_MAX_CALL_DURATION_SECONDS");
+  return missing;
+}
+
+/** Read-only configuration check: no provider request, account probe or launch. */
+export function getRuntimeReadiness(env: EnvSource = process.env): RuntimeReadiness {
+  const cfg = loadConfig(env);
+  // The runtime endpoint describes the live product even when invoked by tests.
+  const modeMissing = cfg.mode !== "live" || cfg.invalidMode !== null ? ["REFUND_MODE"] : [];
+  const extractionMissing = [...modeMissing, ...liveLlmMissingConfig(cfg)];
+  const callMissing = [...modeMissing, ...liveDialMissingConfig(cfg)];
+  const browserMissing = [...extractionMissing];
+  if (env.BROWSER_ENABLED?.trim() !== "true") browserMissing.push("BROWSER_ENABLED");
+  const configuredPath = str(env.BROWSER_EXECUTABLE_PATH);
+  try {
+    if (!fs.statSync(configuredPath ?? chromium.executablePath()).isFile()) {
+      browserMissing.push(configuredPath ? "BROWSER_EXECUTABLE_PATH" : "PLAYWRIGHT_CHROMIUM");
+    }
+  } catch { browserMissing.push(configuredPath ? "BROWSER_EXECUTABLE_PATH" : "PLAYWRIGHT_CHROMIUM"); }
+  return {
+    mode: "live",
+    extraction: { ready: extractionMissing.length === 0, missing: extractionMissing },
+    calls: { ready: callMissing.length === 0, missing: callMissing },
+    browser: { ready: browserMissing.length === 0, missing: browserMissing },
+  };
 }

@@ -16,8 +16,10 @@ import { analyzeTranscript, unknownOutcome } from "@/server/cases/outcome";
 import { type AppConfig, assertLiveLlmConfig, assertModeValid } from "@/server/config";
 import type { ExtractedFields, Extractor } from "@/server/documents/extractor";
 import { buildPacket } from "@/server/documents/packet";
-import { type UploadInput, UploadStore, validateUploads } from "@/server/documents/storage";
+import { type StoredUpload, type UploadInput, UploadStore, validateUploads } from "@/server/documents/storage";
 import { ApiHttpError, badRequest, notFound } from "@/server/http/errors";
+import { openDatabase } from "@/server/persistence/db";
+import { hasActiveWorkflowCall } from "@/server/workflows/call-store";
 import {
   type SummaryChannel,
   type SummaryDelivery,
@@ -106,6 +108,10 @@ export class CaseService {
     const row = this.deps.repo.getOwnedCase(id, ownerSession);
     if (!row) throw notFound();
     return row;
+  }
+
+  private hasActiveInformationCall(id: string): boolean {
+    return hasActiveWorkflowCall(openDatabase(this.deps.config.dataDir), id);
   }
 
   /** A case created in one mode never dispatches through the other mode's provider (e.g. after a restart with REFUND_MODE=live). */
@@ -260,7 +266,7 @@ export class CaseService {
     repo.transaction(() => {
       const row = this.ownedRow(ownerSession, id);
       const calls = repo.listCalls(id);
-      if (hasActiveCall(calls)) {
+      if (hasActiveCall(calls) || this.hasActiveInformationCall(id)) {
         throw new ApiHttpError(409, "CALL_IN_PROGRESS", "Edits are rejected while a call is active or its dispatch is unknown");
       }
       if (expectedRevision !== row.revision) {
@@ -305,6 +311,40 @@ export class CaseService {
     return this.assemble(id);
   }
 
+  /**
+   * Additive interview bridge. Its caller journals the workflow in an enclosing
+   * transaction on the same SQLite connection. New evidence/messages invalidate
+   * authorization even before extraction completes; model completion is another
+   * revision, so concurrent edits or calls can never consume stale interview facts.
+   */
+  applyWorkflowUpdate(ownerSession: string, id: string, expectedRevision: number, update: {
+    changes: CaseChanges;
+    evidence?: StoredUpload[];
+    draft: CaseV1["draft"];
+    message: string;
+    provenance?: Array<{ field: string; value: string | null; sourceKind: "user_input" | "document" | "llm"; sourceRef: string | null; excerpt: string | null }>;
+  }): CaseV1 {
+    const { repo, config } = this.deps;
+    repo.transaction(() => {
+      const row = this.ownedRow(ownerSession, id);
+      this.assertSameMode(row);
+      if (hasActiveCall(repo.listCalls(id)) || this.hasActiveInformationCall(id)) throw new ApiHttpError(409, "CALL_IN_PROGRESS", "Interview edits are blocked while a call is active or its dispatch is unknown");
+      if (row.revision !== expectedRevision) throw new ApiHttpError(409, "REVISION_CONFLICT", "Case changed while the interview was being updated");
+      const incoming = update.evidence ?? [];
+      if (repo.listEvidence(id).length + incoming.length > config.upload.maxFiles) throw new ApiHttpError(400, "BAD_REQUEST", `At most ${config.upload.maxFiles} evidence files per case`, ["files"]);
+      const now = this.nowIso(); const revision = row.revision + 1;
+      const { next } = applyChanges(row.doc, update.changes);
+      for (const evidence of incoming) repo.insertEvidence({ ...evidence, caseId: id, createdAt: now });
+      for (const p of update.provenance ?? []) repo.insertProvenance({ id: randomUUID(), caseId: id, revision, createdAt: now, ...p });
+      const timeline = [...row.doc.timeline, this.entry("workflow_updated", update.message)];
+      for (const evidence of incoming) timeline.push(this.entry("evidence_added", `Attached ${evidence.name} (${evidence.mimeType}, ${evidence.sizeBytes} bytes).`));
+      if (row.doc.authorization) timeline.push(this.entry("authorization_cleared", "New interview information cleared the previous call authorization."));
+      repo.updateCase(id, { revision, updatedAt: now, doc: { ...row.doc, ...next, missingFields: missingFields(next),
+        draft: update.draft, authorization: null, outcome: unknownOutcome("Review the updated interview before authorizing any external action."), timeline } });
+    });
+    return this.assemble(id);
+  }
+
   // -------------------------------------------------------------------------
   // POST /api/cases/:id/authorize  (idempotent per revision)
   // -------------------------------------------------------------------------
@@ -314,7 +354,7 @@ export class CaseService {
       const row = this.ownedRow(ownerSession, id);
       this.assertSameMode(row);
       const calls = repo.listCalls(id);
-      if (hasActiveCall(calls)) {
+      if (hasActiveCall(calls) || this.hasActiveInformationCall(id)) {
         throw new ApiHttpError(409, "CALL_IN_PROGRESS", "A new authorization is rejected while a call is active or its dispatch is unknown");
       }
       if (expectedRevision !== row.revision) {
@@ -409,6 +449,7 @@ export class CaseService {
       }
       const byAuth = repo.findCallByAuthorizationId(input.authorizationId);
       if (byAuth) return byAuth; // MVP: one dispatch attempt per authorization id
+      if (this.hasActiveInformationCall(id)) throw new ApiHttpError(409, "CALL_IN_PROGRESS", "An information call is active or its dispatch is unknown.");
       if (row.doc.authorization?.id !== auth.id || auth.revision !== row.revision) {
         throw new ApiHttpError(409, "AUTHORIZATION_CONFLICT", "Authorization is stale; re-authorize the current revision");
       }

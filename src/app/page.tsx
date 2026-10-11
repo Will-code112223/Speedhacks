@@ -4,6 +4,5 @@ export const dynamic = "force-dynamic";
 import RefundApp from "@/features/refund-ui/RefundApp";
 
 export default function Page() {
-  const mode = process.env.REFUND_MODE === "live" ? "live" : "simulated";
-  return <RefundApp serverMode={mode} />;
+  return <RefundApp serverMode="live" />;
 }

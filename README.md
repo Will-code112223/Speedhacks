@@ -1,6 +1,8 @@
-# Speedhacks — Refund Assistant
+# Recourse — refunds and insurance preparation
 
-Hackathon refund assistant. First scenario: a duplicate charge. Upload evidence, review the extracted facts, authorize one support call, then see the transcript and an evidence-backed outcome. Insurance is a later extension.
+Upload evidence, review extracted facts, prepare request documents, and authorize a support call or browser task. Browser tasks use a real, isolated Chromium session, with its current view shown beside the conversation. The agent proposes actions against the actual page; the user reviews each navigation, form edit, upload, or click before it executes. Login stays in the local browser.
+
+The current call workflow requests a refund for a reviewed amount and reason. Browser tasks are bounded assistance, not a guarantee that every merchant or insurer accepts automation. Coverage decisions, claim approval, and payment require provider evidence; completing a browser task does not establish those outcomes.
 
 Team prompts and the shared contract live in `team-prompts/`. `team-prompts/00-shared-contract.txt` is the source of truth for ownership, types and the HTTP API.
 
@@ -8,6 +10,7 @@ Team prompts and the shared contract live in `team-prompts/`. `team-prompts/00-s
 
 - Next.js (App Router) + TypeScript, npm, Node runtime for server routes
 - Local SQLite (`better-sqlite3`) for persistence — a hackathon setup on local disk, **not** suitable for ephemeral/serverless deployment without changes
+- Playwright Chromium for browser execution; OpenAI Responses API for extraction and browser decisions
 - Vitest for tests
 
 ## Setup
@@ -15,9 +18,12 @@ Team prompts and the shared contract live in `team-prompts/`. `team-prompts/00-s
 ```bash
 nvm use            # Node 24 (see .nvmrc; >=20.9 required)
 npm install
-cp .env.example .env.local   # simulated mode works with no credentials
+cp .env.example .env.local   # configure real provider credentials locally
+npx playwright install chromium
 npm run dev                  # http://localhost:3000
 ```
+
+Set `OPENAI_API_KEY` and `LLM_MODEL`, then `BROWSER_ENABLED=true` to enable browser tasks. Set `DIAL_API_KEY` and `DIAL_FROM_NUMBER` to enable calls. `npm run dev:live` loads the private Dial environment file from `~/.config/speedhacks/dial.env`; Next.js also reads `.env.local`. No credential is committed or exposed to the browser. See [live setup and limits](docs/handoffs/live-product.txt).
 
 Scripts: `npm run dev`, `npm run build`, `npm start`, `npm run typecheck`, `npm test`.
 
@@ -42,21 +48,13 @@ Import with `@/contracts/case` and `@/contracts/voice`. Never change V1 silently
 
 See `team-prompts/00-shared-contract.txt` → "SHARED HTTP API". Routes are under `src/app/api/**` and run on the Node runtime.
 
-## Modes
+## Real execution
 
-`REFUND_MODE=simulated` (default) runs end to end with no credentials and labels everything as simulated. `REFUND_MODE=live` requires the provider configuration in `.env.example`; a missing value fails visibly (503) and never falls back to simulation.
+`REFUND_MODE=live` is the default. Missing provider configuration fails visibly and never substitutes fabricated records. The application uses the HTTP backend even if an old bookmark contains `?api=fixture`. Offline adapters remain available only for automated tests.
 
-Simulated call scenarios are chosen by the last four digits of the merchant support number:
+`GET /api/runtime` reports configuration readiness without making calls, launching a browser, or probing provider accounts. `src/contracts/browser.ts` defines the additive browser API; it leaves the shared case and voice contracts unchanged. Browser runs and generated files belong to the same private session cookie as the case. The viewer displays recent real JPEG frames; it is not a recording or an interactive remote desktop.
 
-| Suffix | Result |
-| --- | --- |
-| 0001 | rejected before dispatch (503, attempt kept as failed) |
-| 0002 | dispatch_unknown (no provider id, no redial) |
-| 0003 | completed, refund denied |
-| 0004 | completed, support needs more information |
-| 0005 | failed |
-| 0006 | cancelled |
-| other | completed, refund approved with a reference number (payment still unverified) |
+This is a single-host worker with local storage and local login handoff. Deploying it for multiple users requires durable worker orchestration, stronger account authentication, controlled egress and a remote login handoff. Do not run it on an ephemeral/serverless host unchanged.
 
 ## Testing
 

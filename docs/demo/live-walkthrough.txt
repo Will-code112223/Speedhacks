@@ -1,0 +1,69 @@
+Recourse: two real-service walkthroughs
+
+Setup
+Pull main; npm ci; configure .env.local from .env.example using your own funded
+OpenAI and Dial credentials. For dev:live put Dial settings in the private file
+~/.config/speedhacks/dial.env. Install Chromium with npx playwright install chromium.
+Set REFUND_MODE=live, BROWSER_ENABLED=true and BROWSER_HEADLESS=false.
+Run npm run dev:live. Use http://127.0.0.1:3000/ without ?api=fixture.
+Cases are owner-cookie scoped in local SQLite; git pull does not share cases,
+credentials, authenticated browser sessions or private evidence between teammates.
+
+Amazon return
+1. Paste the private order intake prepared for the presenter. Attach the actual
+   screenshot. Public teammates should use their own order and truthful reason.
+2. Send once; allow the real model to prepare questions, facts, brief and actions.
+   The presenter's chosen reason is wrong size. Check the screenshot's order
+   total separately from the item price/refund amount; don't assume they match.
+3. Open Amazon order history from the browser action. Review the task, sign in
+   when prompted and approve the proposed browser steps. The side viewer shows
+   actual browser frames. Stop for unknown details and review final submission.
+4. Do not claim a completed return/refund without the provider's confirmation.
+   Amazon login, CAPTCHA, cross-host navigation and return eligibility may block
+   the run. This exact Amazon return has not been verified end to end.
+
+Car insurance information call and follow-up
+1. Paste samples/auto-insurance-intake.txt. Send once and review the prepared brief.
+2. Choose Review insurer information call. Enter the consenting participant's
+   phone, not an official AAA number. Select 60–120 seconds for a short run.
+3. Authorize call, review the frozen brief, then Place live call. Only the last
+   action dispatches. Use the recipient's speakerphone for live audience audio.
+4. Participant asks: What vehicle and damage? When/where? Are photos and a repair
+   estimate available? Then: Please provide damage photos and a repair estimate
+   so we can review the next steps. Do not pretend a real claim was opened.
+5. Wait for real Call results/transcript; late transcripts can take another poll.
+   Recording is post-call. Refresh reconciles; it does not place another call.
+6. Attach samples/auto-damage-sample.png and samples/auto-repair-estimate.txt using
+   Evidence, then Upload evidence. These files are visibly synthetic examples.
+   A successful real analysis automatically updates the saved brief, evidence
+   index and action list. Review facts/conflicts and download the updated brief.
+7. This ends with a packet prepared in Recourse for review, per the user's choice.
+   There is no automatic external submission, new call, email or SMS here.
+
+What is and isn't established
+Live calls to a consenting human and actual transcript/recording retrieval were
+verified previously. Website call ownership, approvals, dispatch deduplication,
+late results and UI recovery are tested with mocked provider responses.
+The merged code passed 777 tests, typecheck and production build on 2026-10-11.
+Real model intake was previously exercised with three synthetic scenarios.
+On 2026-10-11 the expanded real-model check completed the sample insurance intake
+in 4.769s and image/estimate upload in 4.963s. It verified two persisted evidence
+files, regenerated brief, unchanged unknown/unverified outcome, and a same-ID
+upload retry with no duplicate files or revision change. No call was dispatched.
+Earlier attempts hit a clarification conflict and a model error; a later pass
+does not establish deterministic success. Review any conflict; if analysis fails,
+the saved input can be analyzed again using the explicit retry control.
+Reproduce (paid model use, no external browser/call/submission):
+LIVE_WORKFLOW_SMOKE=1 WORKFLOW_SMOKE_SCENARIO=insurance-preparation node --env-file=.env.local node_modules/vite-node/vite-node.mjs --config vitest.config.ts scripts/workflow-model-smoke.ts
+The saved local-browser permission has prevented full visual/end-to-end website
+verification. Do not describe these two complete journeys as rehearsed yet.
+For a short presentation, prepare and review both briefs before starting; show
+the real call and follow-up upload during the presentation. External timing is
+variable; the previous human call lasted 67 seconds. Model requests can take up
+to 90 seconds each. Do not promise a fixed total runtime.
+
+Sample provenance
+auto-insurance-intake.txt and auto-repair-estimate.txt are authored sample text.
+auto-damage-sample.png is generated illustrative imagery with permanent labels.
+None of these are real customer evidence. Keep the presenter's real Amazon
+order screenshot and personal prefill outside the shared repository.

@@ -129,7 +129,7 @@ export function applyChanges(facts: Facts, changes: CaseChanges): { next: Facts;
 export function buildDraft(facts: Facts, evidence: CaseV1["evidence"]): CaseV1["draft"] {
   if (missingFields(facts).length > 0) return null;
   const amount = formatAmount(facts.amountMinor, facts.currency);
-  const subject = `Refund request: duplicate charge of ${amount} at ${facts.merchant.name}`;
+  const subject = `Refund request: ${amount} at ${facts.merchant.name}`;
   const evidenceLines =
     evidence.length > 0
       ? evidence.map((e, i) => `  ${i + 1}. ${e.name} (${e.mimeType})`).join("\n")
@@ -138,7 +138,7 @@ export function buildDraft(facts: Facts, evidence: CaseV1["evidence"]): CaseV1["
     `Hello ${facts.merchant.name} support,`,
     "",
     `My name is ${facts.customer.name}${facts.customer.email ? ` (${facts.customer.email})` : ""}.`,
-    `I am requesting a refund of ${amount} for a duplicate charge.`,
+    `I am requesting a refund of ${amount} for the reason described below.`,
     "",
     `Reason: ${facts.reason}`,
     "",
@@ -154,8 +154,9 @@ export function buildDraft(facts: Facts, evidence: CaseV1["evidence"]): CaseV1["
 }
 
 export const PERMITTED_ACTIONS = [
-  "Identify yourself as calling on behalf of the customer about a duplicate charge.",
-  "Request a refund of the duplicate charge for the exact amount stated.",
+  "Identify yourself as an AI assistant calling on behalf of the customer about their stated issue.",
+  "Request a refund for the exact amount and reason approved by the customer.",
+  "Do not assume a duplicate charge, eligibility, policy coverage, or an incident that the customer did not state.",
   "Ask for a reference or confirmation number and the expected refund timeline.",
   "Answer verification questions only with the facts listed; say you do not know otherwise.",
 ];
@@ -181,7 +182,7 @@ export function buildBrief(input: {
   const amount = formatAmount(input.amountMinor, input.currency);
   return [
     `You are calling ${input.merchant.name} customer support on behalf of ${input.customer.name ?? "the customer"}.`,
-    `Purpose: request a refund of ${amount} for a duplicate charge.`,
+    `Purpose: request a refund of ${amount} for the customer's stated reason below.`,
     "",
     "Approved facts (do not alter):",
     `- Customer name: ${input.customer.name ?? "unknown"}`,

@@ -181,6 +181,28 @@
   grid-template-columns: 256px minmax(0, 1fr) 344px;
 }
 
+.bodyWithBrowser {
+  grid-template-columns: 256px minmax(0, 1fr) minmax(390px, 42%);
+}
+
+.toolTabs {
+  display: flex;
+  flex: none;
+  gap: 4px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--rc-border);
+  background: var(--rc-canvas);
+}
+
+.callGuide { padding: 20px; color: var(--rc-ink-2); font-size: 13px; line-height: 1.65; }
+.callGuide h2 { margin: 0 0 12px; font-size: 15px; color: var(--rc-ink); }
+
+.toolTabs button[aria-pressed="true"] {
+  color: var(--rc-ink);
+  background: var(--rc-surface);
+  box-shadow: inset 0 -2px var(--rc-ink);
+}
+
 .rail {
   min-height: 0;
   overflow-y: auto;
@@ -197,6 +219,7 @@
 }
 
 .callColumn {
+  min-width: 0;
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -248,6 +271,8 @@
   overscroll-behavior: contain;
   animation: slideFromRight var(--rc-default) var(--rc-ease);
 }
+
+.browserSheet { width: min(620px, 100%); }
 
 /* The sheet takes focus as a whole when it opens; its controls carry their own rings. */
 .sheet:focus {
@@ -340,7 +365,8 @@
 }
 
 @media (max-width: 1023px) {
-  .bodyWithCall {
+  .bodyWithCall,
+  .bodyWithBrowser {
     grid-template-columns: 256px minmax(0, 1fr);
   }
 }
@@ -356,7 +382,8 @@
     display: none;
   }
   .body,
-  .bodyWithCall {
+  .bodyWithCall,
+  .bodyWithBrowser {
     padding: 0;
     grid-template-columns: minmax(0, 1fr);
   }

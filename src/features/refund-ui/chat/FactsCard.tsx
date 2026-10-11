@@ -43,6 +43,8 @@ export interface FactsCardProps {
   flaggedFields: readonly FactKey[];
   /** Extra guidance under the support phone, for example the simulated backend's number rules. */
   phoneHint: string | null;
+  /** Missing call fields never block a separate browser task. */
+  forCall?: boolean;
   /** Resolves with the saved case, or null when the save failed. */
   onSave: (changes: CaseChanges, expectedRevision: number) => Promise<CaseV1 | null>;
   onReload: () => void;
@@ -68,6 +70,7 @@ export default function FactsCard(props: FactsCardProps) {
     reloadError,
     flaggedFields,
     phoneHint,
+    forCall = true,
     onSave,
     onReload,
     onDirtyChange,
@@ -88,6 +91,7 @@ export default function FactsCard(props: FactsCardProps) {
 
   // Report unsaved edits by value; the listener is read from a ref so its identity never matters.
   const editing = dirty && lockedReason === null;
+  const extractionFailure = [...caseData.timeline].reverse().find((entry) => entry.type === "extraction_failed");
   const dirtyListener = useRef(onDirtyChange);
   useEffect(() => {
     dirtyListener.current = onDirtyChange;
@@ -110,14 +114,14 @@ export default function FactsCard(props: FactsCardProps) {
   const visibleError = (key: FactKey): string | null => {
     const local = errors[key];
     if (local && (touched[key] || submitted)) return local;
-    if (!dirty && flaggedFields.includes(key)) return "Needed before the call can be approved.";
+    if (forCall && !dirty && flaggedFields.includes(key)) return "Needed before the call can be approved.";
     return null;
   };
 
   const missingKeys = new Set(
     caseData.missingFields.map(factKeyForServerField).filter((key): key is FactKey => key !== null),
   );
-  const missingHint = (key: FactKey) => (missingKeys.has(key) && draft[key].trim() === "" ? "Needed for the call" : undefined);
+  const missingHint = (key: FactKey) => (forCall && missingKeys.has(key) && draft[key].trim() === "" ? "Needed for the call" : undefined);
 
   const set = (key: FactKey) => (value: string) => setDraft((current) => ({ ...current, [key]: value }));
   const touch = (key: FactKey) => () => setTouched((current) => ({ ...current, [key]: true }));
@@ -169,6 +173,8 @@ export default function FactsCard(props: FactsCardProps) {
         </span>
       </div>
 
+      {extractionFailure ? <Banner tone="warning" title="Automatic extraction unavailable">{extractionFailure.message}</Banner> : null}
+
       {conflict ? (
         <Banner
           tone="warning"
@@ -191,7 +197,7 @@ export default function FactsCard(props: FactsCardProps) {
         </Banner>
       ) : null}
 
-      {missingLabels.length > 0 ? (
+      {forCall && missingLabels.length > 0 ? (
         <div className={styles.missing} data-testid="missing-list">
           <span className={styles.missingTitle}>Missing information</span>
           <ul className={styles.missingItems}>
