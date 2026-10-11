@@ -180,16 +180,16 @@
   cursor: default;
 }
 
-/* Counterpart labels carry meaning without competing with warning states. */
+/* A person stays neutral; an automated agent is marked in the accent, never a warning tone. */
 .badgeHuman {
   color: var(--rc-ink);
   background: var(--rc-canvas);
 }
 
 .badgeAgent {
-  color: var(--rc-ink);
-  background: var(--rc-surface);
-  border-color: var(--rc-border-strong);
+  color: var(--rc-accent);
+  background: var(--rc-accent-tint);
+  border-color: var(--rc-accent);
 }
 
 .badgeNeutral {

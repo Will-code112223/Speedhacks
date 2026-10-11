@@ -24,6 +24,8 @@ export interface PlansManagerProps {
 
 export default function PlansManager({ plans, mode, onDone }: PlansManagerProps) {
   const headingId = useId();
+  const removedMessageId = useId();
+  const titleRef = useRef<HTMLHeadingElement>(null);
   const [rejections, setRejections] = useState<string[]>([]);
   const [lastRemoved, setLastRemoved] = useState<PlanRecord | null>(null);
 
@@ -32,6 +34,11 @@ export default function PlansManager({ plans, mode, onDone }: PlansManagerProps)
     const timer = window.setTimeout(() => setLastRemoved(null), UNDO_MS);
     return () => window.clearTimeout(timer);
   }, [lastRemoved]);
+
+  // Opened from the rail: move focus into the view so keyboard and screen reader users land on it.
+  useEffect(() => {
+    if (mode === "manage") titleRef.current?.focus();
+  }, [mode]);
 
   const handleFiles = (files: File[]) => {
     if (files.length === 0) return;
@@ -57,19 +64,21 @@ export default function PlansManager({ plans, mode, onDone }: PlansManagerProps)
       {onboarding ? (
         <aside className={styles.guide} aria-label="How Recourse works">
           <span className={styles.eyebrow}>Recourse / Getting started</span>
-          <h2>Your next step,<br />with less paperwork.</h2>
-          <p>Bring the documents. We’ll help you organize the request and prepare for the call.</p>
+          <p className={styles.guideTitle}>Recourse calls the company for you.</p>
+          <p className={styles.guideLead}>
+            Add your plans once. Recourse reads them when it files a claim or calls your insurer for you.
+          </p>
           <ol className={styles.steps}>
-            <li><span>01</span><div><strong>Build the case</strong><p>Add your documents and describe what happened.</p></div></li>
-            <li><span>02</span><div><strong>Review the facts</strong><p>Check the details and approve what the agent can ask.</p></div></li>
-            <li><span>03</span><div><strong>Keep the record</strong><p>Review the call transcript and the next action.</p></div></li>
+            <li><span>01</span><div><strong>Review the facts</strong><p>Check the details and evidence.</p></div></li>
+            <li><span>02</span><div><strong>Approve the call</strong><p>Nothing is dialed until you approve.</p></div></li>
+            <li><span>03</span><div><strong>Recourse makes the call</strong><p>Listen in or step in. The outcome and transcript are kept.</p></div></li>
           </ol>
         </aside>
       ) : null}
       <div className={styles.inner}>
         <header className={styles.intro}>
           {onboarding ? <span className={styles.eyebrow}>01 / Your documents</span> : null}
-          <h1 id={headingId} className={styles.title}>
+          <h1 id={headingId} ref={titleRef} tabIndex={-1} className={styles.title}>
             {onboarding ? "Add your insurance plans" : "Your plans"}
           </h1>
           <p className={styles.lead}>
@@ -122,14 +131,16 @@ export default function PlansManager({ plans, mode, onDone }: PlansManagerProps)
 
         {lastRemoved ? (
           <Banner
+            key={lastRemoved.id}
             role="status"
             actions={
-              <Button size="small" variant="secondary" onClick={undo}>
+              // The removed row took focus with it, so focus lands on the timed Undo.
+              <Button size="small" variant="secondary" onClick={undo} autoFocus aria-describedby={removedMessageId}>
                 Undo
               </Button>
             }
           >
-            Removed {lastRemoved.fileName}.
+            <span id={removedMessageId}>Removed {lastRemoved.fileName}.</span>
           </Banner>
         ) : null}
 
@@ -143,7 +154,7 @@ export default function PlansManager({ plans, mode, onDone }: PlansManagerProps)
             ) : null}
             {onboarding ? (
               <Button variant="primary" onClick={onDone} disabled={count === 0} data-testid="plans-continue">
-                Continue
+                Save plans and continue
               </Button>
             ) : (
               <Button variant="primary" onClick={onDone} data-testid="plans-continue">

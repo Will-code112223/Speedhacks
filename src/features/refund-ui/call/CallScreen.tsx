@@ -16,7 +16,7 @@ import DecisionCard from "../ui/DecisionCard";
 import { Button, Mono, MonoBlock, SourcePill } from "../ui/primitives";
 import { formatClock, formatDuration, formatPhone, secondsBetween, statusWord } from "../ui/format";
 import { useNow, usePrefersReducedMotion } from "../state/browser";
-import { counterpartLabel, phaseHasCounterpart, phaseIsLive, phaseLabel } from "../state/call";
+import { phaseHasCounterpart, phaseIsLive, phaseLabel } from "../state/call";
 import type { UiError } from "../state/errors";
 import type { DecisionRecord, RequestState } from "../state/session";
 import styles from "./Call.module.css";
@@ -90,18 +90,6 @@ export default function CallScreen(props: CallScreenProps) {
 
   return (
     <section className={styles.screen} aria-labelledby={headingId} data-testid="call-screen">
-      {decision ? (
-        <div className={styles.decisionSlot}>
-          <DecisionCard
-            record={decision}
-            variant="prominent"
-            canAnswer={capabilities?.decisions ?? false}
-            onAnswer={(optionId) => props.onAnswer(decision.decision.id, optionId)}
-            onDismiss={() => props.onDismissDecision(decision.decision.id)}
-          />
-        </div>
-      ) : null}
-
       <div className={styles.identity}>
         <div className={styles.identityTop}>
           <span className={styles.eyebrow}>Support call</span>
@@ -135,7 +123,7 @@ export default function CallScreen(props: CallScreenProps) {
               Counterpart not identified
             </span>
           ) : phaseHasCounterpart(live.phase) ? (
-            <CounterpartBadge counterpart={live.counterpart} confidence={live.counterpartConfidence} />
+            <CounterpartBadge counterpart={live.counterpart} confidence={live.counterpartConfidence} ended={live.phase === "ended"} />
           ) : null
         ) : (
           <span className={[styles.badge, styles.badgeNeutral].join(" ")} data-testid="call-counterpart">
@@ -143,6 +131,19 @@ export default function CallScreen(props: CallScreenProps) {
           </span>
         )}
       </div>
+
+      {/* Below who and how long, so the timer stays in the top half while a question waits. */}
+      {decision ? (
+        <div className={styles.decisionSlot}>
+          <DecisionCard
+            record={decision}
+            variant="prominent"
+            canAnswer={capabilities?.decisions ?? false}
+            onAnswer={(optionId) => props.onAnswer(decision.decision.id, optionId)}
+            onDismiss={() => props.onDismissDecision(decision.decision.id)}
+          />
+        </div>
+      ) : null}
 
       {liveError ? (
         <div className={styles.liveError} role="status">
@@ -273,7 +274,24 @@ function CallClock({ live }: { live: LiveCallV2 }) {
   );
 }
 
-function CounterpartBadge({ counterpart, confidence }: { counterpart: Counterpart; confidence: number }) {
+/** One grammar for who is on the line; past tense once the call is over. */
+function counterpartText(counterpart: Counterpart, ended: boolean): string {
+  const verb = ended ? "Spoke with" : "Talking to";
+  switch (counterpart) {
+    case "human":
+      return `${verb}: a person`;
+    case "agent":
+      return `${verb}: an automated agent`;
+    case "unknown":
+      return "Identifying who answered";
+    default: {
+      const unreachable: never = counterpart;
+      return unreachable;
+    }
+  }
+}
+
+function CounterpartBadge({ counterpart, confidence, ended }: { counterpart: Counterpart; confidence: number; ended: boolean }) {
   const tooltipId = useId();
   const tooltip =
     counterpart === "unknown" ? "Not identified yet" : `Confidence ${Math.round(Math.max(0, Math.min(1, confidence)) * 100)}%`;
@@ -288,7 +306,7 @@ function CounterpartBadge({ counterpart, confidence }: { counterpart: Counterpar
         data-testid="call-counterpart"
       >
         {counterpart === "unknown" ? <span className={styles.badgeDot} aria-hidden="true" /> : null}
-        {counterpartLabel(counterpart)}
+        {counterpartText(counterpart, ended)}
       </span>
       <span id={tooltipId} role="tooltip" className={styles.tooltip}>
         {tooltip}

@@ -59,7 +59,6 @@ export default function Rail(props: RailProps) {
   return (
     <div className={styles.rail}>
       <div className={styles.workspace}>
-        <span className={styles.workspaceLabel}>Personal workspace</span>
         <span className={styles.workspaceTitle}>Your cases</span>
       </div>
       <Button
@@ -78,7 +77,7 @@ export default function Rail(props: RailProps) {
           <h2 id={casesHeadingId} className={styles.heading}>
             Cases
           </h2>
-          <span className={styles.count}>{sessions.length.toString().padStart(2, "0")}</span>
+          <span className={styles.count}>{sessions.length}</span>
         </div>
         {sessions.length === 0 ? (
           <p className={styles.empty}>A place for every request.<br />Start a case to keep it in view.</p>
@@ -154,7 +153,6 @@ export default function Rail(props: RailProps) {
 
       <div className={styles.footer}>
         {footer}
-        <p className={styles.controlNote}>You approve. Then we call.</p>
         <p className={styles.localNote}>Cases stay in this tab.<br />Plans stay in this browser.</p>
       </div>
     </div>

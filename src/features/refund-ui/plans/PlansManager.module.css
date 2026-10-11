@@ -1,6 +1,6 @@
 .onboarding {
   display: grid;
-  grid-template-columns: minmax(280px, 400px) minmax(0, 560px);
+  grid-template-columns: minmax(280px, 400px) minmax(360px, 560px);
   justify-content: center;
   align-content: start;
   gap: clamp(32px, 7vw, 112px);
@@ -10,8 +10,8 @@
 }
 .guide { min-width: 0; padding-top: 4px; }
 .eyebrow { display: block; margin-bottom: 18px; color: var(--rc-ink-3); font: 10px var(--rc-mono); text-transform: uppercase; letter-spacing: .11em; }
-.guide h2 { margin: 0 0 20px; font-size: clamp(32px, 3.7vw, 48px); line-height: 1.08; font-weight: 500; letter-spacing: -.055em; }
-.guide > p { color: var(--rc-ink-2); line-height: 1.8; max-width: 38ch; }
+.guideTitle { margin: 0 0 20px; color: var(--rc-ink); font-size: clamp(32px, 3.7vw, 48px); line-height: 1.08; font-weight: 500; letter-spacing: -.055em; text-wrap: balance; }
+.guideLead { margin: 0; color: var(--rc-ink-2); line-height: 1.8; max-width: 38ch; }
 .steps { list-style: none; padding: 0; margin: 38px 0 0; }
 .steps li { display: flex; gap: 18px; padding: 16px 0; border-top: 1px solid var(--rc-border); }
 .steps li > span { padding-top: 2px; font: 11px var(--rc-mono); color: var(--rc-ink-3); }
@@ -42,6 +42,7 @@
 
 .title {
   margin: 0;
+  outline: none;
   font-size: 28px;
   font-weight: 500;
   letter-spacing: -0.04em;
@@ -243,6 +244,15 @@
   }
 }
 
+/* Largest to smallest so the phone rules win. The rail narrows the main column,
+   so the guide stacks above the form below the 1280 desktop breakpoint. */
+@media (max-width: 1279px) {
+  .onboarding { grid-template-columns: minmax(0, 560px); padding: 36px 24px; gap: 32px; }
+  .guideTitle { font-size: 34px; }
+  .guideLead { max-width: none; }
+  .steps { margin-top: 24px; }
+}
+
 @media (max-width: 560px) {
   .onboarding {
     padding: 32px 16px 48px;
@@ -265,13 +275,6 @@
     flex-basis: 100%;
     margin: 0 0 4px 24px;
   }
-}
-
-@media (max-width: 850px) {
-  .onboarding { grid-template-columns: minmax(0, 560px); padding: 36px 24px; gap: 32px; }
-  .guide h2 { font-size: 34px; }
-  .guide > p { max-width: none; }
-  .steps { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {

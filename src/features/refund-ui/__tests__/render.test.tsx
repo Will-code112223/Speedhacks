@@ -248,7 +248,7 @@ describe("server render of each stage", () => {
     expect(html).not.toContain('data-testid="approve-button"');
   });
 
-  it("renders the live call at each phase, with the decision on top while it waits", async () => {
+  it("renders the live call at each phase, with the decision below the timer while it waits", async () => {
     const s = stage("insurance_claim");
     s.begin("insurance claim");
     await s.create("insurance claim");
@@ -266,7 +266,7 @@ describe("server render of each stage", () => {
     s.seconds(18);
     await s.live();
     html = callScreen(s.controller());
-    expect(html).toContain("Automated agent");
+    expect(html).toContain("Talking to: an automated agent");
     expect(html).toContain('data-testid="call-notes"');
     expect(html).toContain("On hold");
 
@@ -275,6 +275,7 @@ describe("server render of each stage", () => {
     const controller = s.controller();
     html = callScreen(controller);
     expect(html).toContain('data-testid="decision-card"');
+    expect(html.indexOf('data-testid="call-timer"')).toBeLessThan(html.indexOf('data-testid="decision-card"'));
     expect(html).toContain('data-testid="decision-option-accept"');
     expect(html).toContain('data-testid="decision-countdown"');
     expect(html).toContain("Waiting for you");

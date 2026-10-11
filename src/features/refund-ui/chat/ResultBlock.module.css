@@ -33,6 +33,12 @@
   text-wrap: balance;
 }
 
+/* Only an approved outcome shows money, so the amount is always the success colour. */
+.amount {
+  color: var(--rc-success);
+  font-variant-numeric: tabular-nums;
+}
+
 .ledger {
   margin: 0;
   display: grid;

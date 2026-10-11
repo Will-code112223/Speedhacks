@@ -313,10 +313,7 @@ function Workspace({ serverMode, apiMode, plans }: WorkspaceProps) {
           ) : null}
           <div className={styles.headerRight}>
             {pickerInHeader ? (
-              <details className={styles.demoSettings}>
-                <summary>Demo controls</summary>
-                <div className={styles.demoPopover}>{fixturePicker("stacked")}</div>
-              </details>
+              <DemoControls>{fixturePicker("stacked")}</DemoControls>
             ) : null}
             <ApiModePill apiMode={apiMode} />
             {fixture ? <span className={styles.demoNote}>No real calls</span> : <ServerModePill serverMode={serverMode} />}
@@ -384,6 +381,41 @@ function Workspace({ serverMode, apiMode, plans }: WorkspaceProps) {
 // ---------------------------------------------------------------------------
 // Call sheet (under 1024px)
 // ---------------------------------------------------------------------------
+
+/** The header's demo panel: a disclosure that also closes on Escape and on a pointer press outside it. */
+function DemoControls({ children }: { children: ReactNode }) {
+  const detailsRef = useRef<HTMLDetailsElement>(null);
+  const summaryRef = useRef<HTMLElement>(null);
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    const details = detailsRef.current;
+    if (!open || !details) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented) return;
+      event.preventDefault();
+      details.open = false;
+      summaryRef.current?.focus();
+    };
+    const onPointerDown = (event: PointerEvent) => {
+      if (event.target instanceof Node && details.contains(event.target)) return;
+      details.open = false;
+    };
+    document.addEventListener("keydown", onKeyDown);
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("pointerdown", onPointerDown);
+    };
+  }, [open]);
+
+  return (
+    <details ref={detailsRef} className={styles.demoSettings} onToggle={(event) => setOpen(event.currentTarget.open)}>
+      <summary ref={summaryRef}>Demo controls</summary>
+      <div className={styles.demoPopover}>{children}</div>
+    </details>
+  );
+}
 
 function CallSheet({ titleId, onClose, children }: { titleId: string; onClose: () => void; children: ReactNode }) {
   const panelRef = useRef<HTMLDivElement | null>(null);

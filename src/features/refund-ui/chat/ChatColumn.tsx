@@ -89,9 +89,10 @@ export default function ChatColumn({ controller, fixture, phoneHint, planCount, 
   };
 
   // New items keep the view pinned to the bottom unless the person scrolled up to read.
+  // The empty state has nothing to follow, so it stays at the top.
   useLayoutEffect(() => {
     const node = scrollerRef.current;
-    if (!node) return;
+    if (!node || itemCount === 0) return;
     if (stickToBottom.current) {
       node.scrollTop = node.scrollHeight;
     } else if (itemCount > 0) {
@@ -99,12 +100,12 @@ export default function ChatColumn({ controller, fixture, phoneHint, planCount, 
     }
   }, [itemCount]);
 
-  // A different case starts at its newest message.
+  // A different case starts at its newest message; a new case starts at the top.
   useLayoutEffect(() => {
     stickToBottom.current = true;
     setUnseen(false);
     const node = scrollerRef.current;
-    if (node) node.scrollTop = node.scrollHeight;
+    if (node) node.scrollTop = draftKey === "new" ? 0 : node.scrollHeight;
   }, [draftKey]);
 
   const jumpToLatest = () => {
@@ -184,7 +185,6 @@ export default function ChatColumn({ controller, fixture, phoneHint, planCount, 
 function EmptyState({ onExample, planCount, fixture }: { onExample: (text: string) => void; planCount: number; fixture: boolean }) {
   return (
     <div className={styles.empty}>
-      <p className={styles.eyebrow}>{fixture ? "Your claims & refund assistant" : "Your refund assistant"}</p>
       <h2 className={styles.emptyTitle}>What are you owed?</h2>
       <p className={styles.emptyText}>
         {fixture
@@ -193,8 +193,8 @@ function EmptyState({ onExample, planCount, fixture }: { onExample: (text: strin
       </p>
       <ol className={styles.steps} aria-label="How Recourse works">
         <li><span className={styles.stepNumber}>01</span><span><strong>Review the facts</strong><span>Check the details and evidence.</span></span></li>
-        <li><span className={styles.stepNumber}>02</span><span><strong>Approve the call</strong><span>You choose what happens next.</span></span></li>
-        <li><span className={styles.stepNumber}>03</span><span><strong>Review the outcome</strong><span>See the transcript and next steps.</span></span></li>
+        <li><span className={styles.stepNumber}>02</span><span><strong>Approve the call</strong><span>Nothing is dialed until you approve.</span></span></li>
+        <li><span className={styles.stepNumber}>03</span><span><strong>Recourse makes the call</strong><span>Listen in or step in. The outcome and transcript are kept.</span></span></li>
       </ol>
       <div className={styles.examples}>
         <div className={styles.examplesHeading}>
