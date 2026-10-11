@@ -177,8 +177,11 @@ KEEWANO (optional sponsor integration; nothing in the shared contract changed)
   keewano:seed backfills it (idempotent per customer); npm run keewano:sql -- --tools | --charges <email> | "<SQL>" [--raw].
 - Verified live 2026-10-11 (credentials in .env.local, git-ignored): /custom + /in accept the registry and the seed
   (all batches accepted); MCP tool is run_sql_query({projectId, sqlQuery, maxRows}) → structuredContent {columns, rows};
-  projectId comes from KEEWANO_PROJECT_ID, else the SDK key's JWT claim, else list_projects. Keewano numbers custom
-  events by position (list_event_types showed 2000..2011), so EVENT_TYPES must stay contiguous (guarded at load).
+  projectId comes from KEEWANO_PROJECT_ID, else the SDK key's JWT claim, else list_projects. Keewano's listing numbers
+  custom events by position (list_event_types showed 2000..2011) while ingestion maps ids via the registry hash; EVENT_TYPES
+  is kept contiguous (guarded at load) so both agree. Because the fixture was seeded before and after that renumbering,
+  the SpeedHacks project holds each of the 16 fixture charges twice (32 ChargeId events, 16 distinct). The check
+  de-duplicates by ChargeId; for clean aggregates use count(DISTINCT "ChargeId") or seed a fresh project once.
   Full simulated case ran against the dev server twice: the check returned duplicate_found from live Keewano and the
   mirrored case (25 events) is queryable. One ingest POST timed out at 6 s, so ingest now has its own timeout
   (KEEWANO_INGEST_TIMEOUT_MS, 20000) and the sink retries a failed batch with backoff (3 attempts) before dropping.

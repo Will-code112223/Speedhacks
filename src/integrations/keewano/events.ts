@@ -12,9 +12,10 @@
  *
  * Append only: a registered id never changes its name or type (Keewano rejects
  * that); add a new id instead. Ids start at 2000 as in the SpeedHacks quickstart and
- * MUST stay contiguous: observed live (list_event_types, 2026-10-11), Keewano numbers
- * the list by position (2000 + index) regardless of the eventTypeId sent, so a gap
- * would make the ids in /in batches point at the wrong columns.
+ * stay contiguous: Keewano's own listing (list_event_types, 2026-10-11) numbers the
+ * registered list by position (2000 + index). Events sent with the registry hash were
+ * mapped correctly even when this list had a gap, but keeping both numberings identical
+ * removes any doubt when reading ids off the Keewano UI or MCP tools.
  *
  * No "@/" or relative imports here: plain `node` loads this module from the seed CLI.
  */
