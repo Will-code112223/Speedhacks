@@ -85,12 +85,14 @@ function buildVoiceResolver(config: AppConfig, overrides: CompositionOverrides =
 
 export function buildCaseService(config: AppConfig = loadConfig(), overrides: CompositionOverrides = {}): CaseService {
   const db = openDatabase(config.dataDir);
-  // Keewano (optional): mirrors cases as they change and answers the pre-authorization history check.
+  // Keewano (optional): mirrors cases as they change, answers the pre-authorization history check
+  // and the merchant track record (GET /api/insights/merchant).
   const keewano = createKeewano(config);
   return new CaseService({
     config,
     repo: keewano.repository(db),
     history: keewano.history,
+    insights: keewano.insights,
     uploads: new UploadStore(config.dataDir),
     extractor: buildExtractor(config),
     voice: buildVoiceResolver(config, overrides),

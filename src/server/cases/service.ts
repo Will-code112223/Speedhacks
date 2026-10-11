@@ -14,6 +14,7 @@ import {
   type Facts,
 } from "@/server/cases/facts";
 import { evaluateHistory, unavailableHistory, type HistoryCheck, type TransactionHistory } from "@/server/cases/history";
+import type { MerchantInsights, MerchantInsightsResult } from "@/server/cases/insights";
 import { analyzeTranscript, unknownOutcome } from "@/server/cases/outcome";
 import { type AppConfig, assertLiveLlmConfig, assertModeValid } from "@/server/config";
 import type { ExtractedFields, Extractor } from "@/server/documents/extractor";
@@ -52,6 +53,8 @@ export interface ServiceDeps {
   voice: () => VoiceAdapter;
   /** Optional transaction-history source (Keewano or fixture); absent = no history check. */
   history?: TransactionHistory | null;
+  /** Optional merchant track-record source (Keewano or fixture); absent = GET /api/insights/merchant answers available:false. */
+  insights?: MerchantInsights | null;
   now?: () => Date;
 }
 
@@ -505,6 +508,31 @@ export class CaseService {
     const row = this.ownedRow(ownerSession, id);
     const history = row.doc.history && row.doc.history.revision === row.revision ? row.doc.history : null;
     return buildPacket(this.assemble(id), this.deps.repo.listEvidence(id), history);
+  }
+
+  // -------------------------------------------------------------------------
+  // GET /api/cases/:id/history (additive, not in V1)
+  // -------------------------------------------------------------------------
+  /** The stored check as is; `current` is false once the facts moved past it (GET /api/cases/:id re-checks). */
+  history(ownerSession: string, id: string): { history: HistoryCheck | null; current: boolean } {
+    const row = this.ownedRow(ownerSession, id);
+    const history = row.doc.history ?? null;
+    return { history, current: history !== null && history.revision === row.revision };
+  }
+
+  // -------------------------------------------------------------------------
+  // GET /api/insights/merchant (additive, not in V1)
+  // -------------------------------------------------------------------------
+  /** Bounded by the Keewano timeout and never throws: no source or a failed query answers available:false. */
+  async merchantInsights(merchant: string): Promise<MerchantInsightsResult> {
+    const source = this.deps.insights;
+    if (!source) return { available: false, merchant };
+    try {
+      const record = await withTimeout(source.merchantRecord(merchant), this.deps.config.keewano.timeoutMs, `${source.kind} merchant insights`);
+      return { available: true, ...record };
+    } catch (err) {
+      return { available: false, merchant, error: String((err as Error).message ?? err) };
+    }
   }
 
   // -------------------------------------------------------------------------

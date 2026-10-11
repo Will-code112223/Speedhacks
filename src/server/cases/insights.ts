@@ -1,0 +1,88 @@
+/**
+ * Merchant-insights port: "how has this merchant handled refund requests so far?"
+ * Keewano implements it over the mirrored cases (src/integrations/keewano/insights.ts);
+ * a labeled fixture stands in when Keewano is not configured. Aggregate reference data
+ * only: no customer data, no case facts, nothing here changes a case.
+ */
+import { merchantMatches } from "@/server/cases/history";
+
+export interface MerchantRecord {
+  /** The merchant name as asked (not the mirrored spelling). */
+  merchant: string;
+  /** Where the numbers came from, e.g. "keewano" or "fixture". */
+  source: string;
+  /** Mirrored cases at this merchant whose outcome was ever recorded. */
+  cases: number;
+  approved: number;
+  denied: number;
+  needsInformation: number;
+  /** Cases with no decision yet: outcome unknown or requested (or any unrecognized value). */
+  unresolved: number;
+  /** approved / (approved + denied), rounded to three decimals; null when nothing was decided. */
+  approvalRate: number | null;
+  /** When the most recent non-unknown outcome was set (ISO-8601 UTC), null when none. */
+  lastOutcomeAt: string | null;
+}
+
+export interface MerchantInsights {
+  /** Label returned as MerchantRecord.source, e.g. "keewano" or "fixture". */
+  readonly kind: string;
+  merchantRecord(merchantName: string): Promise<MerchantRecord>;
+}
+
+/** One mirrored row: the case's merchant and outcome as of `at` (values carry forward). */
+export interface OutcomeRow {
+  caseId: string;
+  merchant: string;
+  outcome: string;
+  /** ISO-8601 UTC */
+  at: string;
+}
+
+/** What GET /api/insights/merchant returns: the record when a source answered, otherwise why not. */
+export type MerchantInsightsResult = ({ available: true } & MerchantRecord) | { available: false; merchant: string; error?: string };
+
+export function emptyMerchantRecord(merchant: string, source: string): MerchantRecord {
+  return { merchant, source, cases: 0, approved: 0, denied: 0, needsInformation: 0, unresolved: 0, approvalRate: null, lastOutcomeAt: null };
+}
+
+/**
+ * Pure reduction of forward-filled outcome rows into one merchant's record. Rows are
+ * sorted by time here; the LAST row per case wins (it carries the case's current merchant
+ * and outcome), then cases are matched to the merchant with merchantMatches, so abbreviated
+ * statement descriptors still count and other merchants are ignored.
+ */
+export function summarizeOutcomes(rows: readonly OutcomeRow[], merchantName: string, source = "keewano"): MerchantRecord {
+  const sorted = [...rows].sort((a, b) => a.at.localeCompare(b.at) || a.caseId.localeCompare(b.caseId));
+  const last = new Map<string, { merchant: string; outcome: string; outcomeAt: string }>();
+  for (const row of sorted) {
+    const prev = last.get(row.caseId);
+    // Rows repeat the outcome until it changes; remember when the current value was set.
+    const outcomeAt = prev && prev.outcome === row.outcome ? prev.outcomeAt : row.at;
+    last.set(row.caseId, { merchant: row.merchant, outcome: row.outcome, outcomeAt });
+  }
+  const record = emptyMerchantRecord(merchantName, source);
+  for (const c of last.values()) {
+    if (!merchantMatches(c.merchant, merchantName)) continue;
+    record.cases += 1;
+    switch (c.outcome) {
+      case "approved":
+        record.approved += 1;
+        break;
+      case "denied":
+        record.denied += 1;
+        break;
+      case "needs_information":
+        record.needsInformation += 1;
+        break;
+      default:
+        record.unresolved += 1;
+    }
+    if (c.outcome !== "unknown" && (record.lastOutcomeAt === null || c.outcomeAt > record.lastOutcomeAt)) {
+      record.lastOutcomeAt = c.outcomeAt;
+    }
+  }
+  const decided = record.approved + record.denied;
+  record.approvalRate = decided > 0 ? Math.round((record.approved / decided) * 1000) / 1000 : null;
+  return record;
+}
