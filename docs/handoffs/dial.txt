@@ -46,19 +46,46 @@ does not establish that free limits are lifted. Missing API key/from number
 rejects before dispatch; webhook verification only requires the webhook secret.
 The API key must be a nonempty visible-ASCII bearer token without whitespace.
 An explicit injected config replaces environment config in full.
+The inspected T2 .env.example at db5f311 is missing DIAL_FROM_NUMBER; T2 must
+add it. If exposing the optional duration in its template, set300 or comment
+the variable out. A blank duration is parsed as0 and correctly rejected.
+
+LOCAL SERVER STARTUP WITH THE EXTERNAL ENV FILE
+The user-configured local credentials live in ~/.config/speedhacks/dial.env,
+outside git with file permissions0600. Next.js does not automatically load this
+external path. Load it BEFORE createDialAdapter captures the environment; on the
+combined, installed T2 application using Node >=22.18 (Node24 supported):
+  node --env-file="$HOME/.config/speedhacks/dial.env" node_modules/next/dist/bin/next dev
+For an already-built application use the same command with start instead of dev.
+No root package script was changed here. These commands start the application;
+they do not authorize dispatch or deployment. Existing exported environment
+variables take precedence over Node's --env-file, so remove stale conflicting
+Dial values before launch. Keep all four Dial values server-only.
 
 LIVE ACCOUNT STATUS
-Read-only Firefox inspection confirmed a signed-in Dial account, an existing
-phone number, event credits, and an existing API key entry. No key was copied,
-created or committed; no number/credit purchase or settings change was made.
-DIAL_API_KEY, DIAL_FROM_NUMBER and DIAL_WEBHOOK_SECRET were absent from the
-terminal environment. Therefore authenticated account-limit lookup and live
-adapter requests have NOT been verified. The account settings cap was empty;
-that does not establish effective free duration/concurrency limits.
-The live API key and webhook signing secret still need secure server configuration.
+The credential-setup side chat recorded the user's authorized local setup in
+Alike decision "Speedhacks local Dial credentials verified; webhook awaits
+deployed backend" (MCP source). The existing API key and sending number are now
+configured as DIAL_API_KEY and DIAL_FROM_NUMBER in the external0600 file above,
+with DIAL_MAX_CALL_DURATION_SECONDS=300. Authenticated read-only GET/api/v1/account
+and GET/api/v1/numbers succeeded there. The configured account cap and account
+limits were both null. These read-only checks replace the earlier audit's
+credentials-absent state; they do not establish a successful outgoing call.
+No credential values are included in this handoff or git.
+The lead refreshed the account preflight successfully at2026-10-11T19:33:05Z:
+account cap and free guardrails remain null; requested300s is permitted by those
+guardrails. A separate injected-transport check verified the external env reaches
+the server factory and a missing webhook secret fails closed as MISSING_CONFIG.
+That dispatch check made zero provider requests; no call was placed.
 
-Read-only preflight after configuring a secure external environment file:
-  node --env-file=/secure/path/dial.env src/integrations/dial/check-account.mts
+DIAL_WEBHOOK_SECRET remains unset. There is no deployed public HTTPS receiver
+or registered subscription yet. T2 must deploy its authenticated durable receiver
+before a real subscription signing secret can be configured. Do not substitute
+a generated placeholder. No live call, number/credit purchase or deployment has
+occurred in this workstream.
+
+Read-only preflight using the configured external environment file:
+  node --env-file="$HOME/.config/speedhacks/dial.env" src/integrations/dial/check-account.mts
 It GETs /api/v1/account and prints only validated duration/concurrency limits.
 Missing limits is an error; explicit limits:null means free guardrails lifted.
 The command also validates DIAL_MAX_CALL_DURATION_SECONDS, compares that request
@@ -255,14 +282,15 @@ are rejected. This fixture is independent of T2's early simulated-voice adapter.
 
 OPT-IN LIVE SMOKE TEST — PREPARED, NOT EXECUTED
 Only after the user explicitly authorizes a specific consenting test recipient:
-1. Configure DIAL_API_KEY, DIAL_FROM_NUMBER and DIAL_TEST_TO in a secure external
-   environment file; never commit real customer data or credentials.
+1. Load the existing DIAL_API_KEY and DIAL_FROM_NUMBER from the secure external
+   environment file; add DIAL_TEST_TO only after recipient authorization.
+   Never commit real customer data or credentials.
 2. Set DIAL_TEST_CONSENT_TO to that exact recipient number and verify account
    limits with the read-only preflight above. It is not authorization to call
    another recipient or reuse a real merchant's number.
 3. Set DIAL_SMOKE_ATTEMPT_FILE to a new absolute file path outside the repository.
 4. Run:
-   node --env-file=/secure/path/dial.env src/integrations/dial/live-smoke.mts --live
+   node --env-file="$HOME/.config/speedhacks/dial.env" src/integrations/dial/live-smoke.mts --live
 The script validates consent/configuration first, caps at60s, uses a synthetic
 test brief, rejects repository-contained paths (including symlinked parents),
 reserves a0600 attempt file and syncs it and its directory before dispatch.
@@ -291,7 +319,45 @@ distinct AI-agent and human-support conversations. Their detailed sources are
 owner-only/unavailable. That counterpart distinction must not overload V1's
 mode:"live"|"simulated", which describes execution. V1's approved brief can state
 known counterpart context without changing authorization or introducing a new
-mode. No teammate was messaged and no colleague record was edited.
+mode. The earlier implementation audit did not message teammates or edit
+colleague records; subsequent coordination is recorded separately.
+
+DIAL/BACKEND BOUNDARY COORDINATION — 2026-10-11
+The user authorized a scoped Alike handoff to teammate2, without full integration.
+Task: "Speedhacks prompt 2 backend collaboration with Claude"
+  urn:alike:task:f29a81e564bcbd98e8b52bb1d7581a86ed8a666641fa0fdf8acb90d88b86ba61
+Current task-linked sessions: Claude implementation fe22b3b41e3baa624cea09c28771c205;
+Codex verification dc49c607d8512c47da66e814df762a82. The newer colleague split
+decision assigns Claude implementation and Codex tests/integration + tests/sparta;
+it supersedes the older proposed split mentioned in the scaffold handoff.
+The colleague task's latest recorded status at19:30:59Z reports outcome-safety
+tests with8 failures/4 passes (negation, conditionals, quotations and customer
+claims). This is their reported WIP status, not a locally reproduced result.
+
+Published backend snapshot remains db5f311: exact canonical V1 types are at
+src/contracts/case.ts and src/contracts/voice.ts; no service/routes/persistence
+implementation is present in that remote commit. Do not mistake its unchecked
+handoff checklist for evidence that newer unpushed work does not exist.
+Our exact V1 equality/bundler compiler checks passed again against that snapshot.
+T2's actual isInvalidWebhookError helper recognizes Dial's INVALID_WEBHOOK and
+does not misclassify MISSING_CONFIG as an authentication failure.
+
+Alike question0ecf15fd-be61-412c-93bd-cf2584880d4f sent to Jonathan's colleague
+inbox: exported interface, codex/voice3ef5066,183-test/typecheck evidence, exact
+env gap and late-transcript requirement. Requested the current composition-root
+and env-loading paths; durable attempt/event/job ownership; pending-secret
+behavior; and any newer WIP commit or V1 deviation. No secrets/customer data sent.
+No new agreement was received as of this handoff; reply remains pending.
+
+Confirmed boundary from shared V1: T2 owns frozen authorization/case access,
+durable dispatch dedup before sending, unknown-dispatch locking, raw webhook
+acceptance and durable event dedup, unmatched-event retention, late-transcript
+jobs and atomic terminal outcome publication. Dial owns transport/normalization,
+authentication and explicit simulation. Do not move those T2 responsibilities
+into the adapter or modify the shared contract without agreement.
+Next handoff point: T2 supplies its reviewable wiring commit/paths and confirms
+the env + reconciliation details. Review that boundary without merging; deploy
+and register the webhook only in a separately authorized later phase.
 
 VERIFICATION
 Run:
@@ -322,8 +388,10 @@ Mode/input/result/snapshot/event/adapter types and factory assignment passed wit
 strict/noUncheckedIndexedAccess/isolatedModules and bundler resolution, without
 allowImportingTsExtensions. Extracted route/worker examples also typechecked.
 Final independent read-only code review found no remaining material findings;
-git diff --check passed. No provider/account request, live webhook delivery,
-real phone call, deployed route, or full application build was verified.
+git diff --check passed. The183-test audit used no provider/account requests.
+Subsequent authenticated read-only account/number verification is described
+under LIVE ACCOUNT STATUS. Live webhook delivery, a real phone call, a deployed
+route and a full application build remain unverified.
 Compiler was installed only in a temporary directory outside the repo.
 The standalone tests use .node-test.mts to avoid T2's Vitest discovery. Production
 scripts use .mts and need this lane's explicit separate typecheck; T2's current
