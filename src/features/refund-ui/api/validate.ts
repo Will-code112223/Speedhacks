@@ -27,6 +27,8 @@ import type {
   CallPlanStep,
   CallPlanStepStatus,
   PendingDecision,
+  SummaryChannel,
+  SummaryDelivery,
 } from "./types";
 
 // Records keyed by every union member, so adding a member to the contract
@@ -232,6 +234,21 @@ export function isLiveCallV2(v: unknown): v is LiveCallV2 {
     (v.progress === undefined || v.progress === null || isPlan(v.progress)) &&
     (v.turns === undefined || isArrayOf(v.turns, isTurn)) &&
     isString(v.updatedAt)
+  );
+}
+
+const SUMMARY_CHANNELS: Record<SummaryChannel, true> = { email: true, sms: true };
+
+/** The `delivery` of POST /api/cases/:id/summary. */
+export function isSummaryDelivery(v: unknown): v is SummaryDelivery {
+  return (
+    isRecord(v) &&
+    oneOf(SUMMARY_CHANNELS, v.channel) &&
+    isString(v.to) &&
+    isNullableString(v.subject) &&
+    isArrayOf(v.summary, isString) &&
+    isString(v.transcript) &&
+    isNullableString(v.sentAt)
   );
 }
 

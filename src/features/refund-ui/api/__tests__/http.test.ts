@@ -401,3 +401,48 @@ describe("http client: V2 live call routes", () => {
     expect(requests).toHaveLength(2);
   });
 });
+
+describe("http client: post-call summary", () => {
+  const sms = { channel: "sms" as const, to: "415 555 0199" };
+  const delivery = {
+    channel: "sms",
+    to: "+14155550199",
+    subject: null,
+    summary: ["The refund of $49.99 was approved.", "Reference RO-77102."],
+    transcript: "Agent: Hello.\nSupport: Approved.",
+    sentAt: "2026-10-11T22:40:00.000Z",
+  };
+  const completedCase = () =>
+    sampleCase({ calls: [sampleCall({ state: "completed", transcript: "Agent: Hello.\nSupport: Approved." })] });
+
+  it("posts the destination to .../summary and returns the server's delivery", async () => {
+    const { api, requests } = httpApi(jsonResponse(200, { delivery }));
+    expect(await api.sendSummary(CASE_ID, sms)).toEqual(delivery);
+    expect(requests.map((r) => `${r.method} ${r.url}`)).toEqual([`POST ${CASE_URL}/summary`]);
+    expect(jsonBodyOf(requests[0])).toEqual(sms);
+  });
+
+  it("composes in the browser with sentAt null when the backend has no summary route", async () => {
+    const { api, requests } = httpApi(missingRoute(), jsonResponse(200, { case: completedCase() }));
+    const composed = await api.sendSummary(CASE_ID, sms);
+    expect(composed).toMatchObject({ channel: "sms", to: sms.to, sentAt: null });
+    expect(composed.transcript).toContain("Support: Approved.");
+    expect(requests.map((r) => `${r.method} ${r.url}`)).toEqual([`POST ${CASE_URL}/summary`, `GET ${CASE_URL}`]);
+  });
+
+  it("keeps the server's answer for a case error, and rejects a bad destination before any request", async () => {
+    const { api, requests } = httpApi(apiError(409, "CALL_NOT_COMPLETE", "The call has not finished yet."));
+    expect(await failureOf(api.sendSummary(CASE_ID, sms))).toMatchObject({ status: 409, code: "CALL_NOT_COMPLETE" });
+    expect(await failureOf(api.sendSummary(CASE_ID, { channel: "sms", to: "soon" }))).toMatchObject({
+      status: 400,
+      code: "BAD_REQUEST",
+      fields: ["to"],
+    });
+    expect(requests).toHaveLength(1);
+  });
+
+  it("rejects a delivery that does not match the contract", async () => {
+    const { api } = httpApi(jsonResponse(200, { delivery: { ...delivery, summary: "not a list" } }));
+    expect(await failureOf(api.sendSummary(CASE_ID, sms))).toMatchObject({ status: 200, code: "CONTRACT_VIOLATION" });
+  });
+});

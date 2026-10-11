@@ -8,6 +8,7 @@ import { type AppConfig, assertLiveLlmConfig, assertModeValid, liveDialMissingCo
 import { type Extractor, HeuristicExtractor, OpenAIExtractor } from "@/server/documents/extractor";
 import { UploadStore } from "@/server/documents/storage";
 import { ApiHttpError } from "@/server/http/errors";
+import type { FetchTransport } from "@/server/summary/llm";
 import { openDatabase } from "@/server/persistence/db";
 import { createProductCaseRepository } from "@/integrations/keewano/product";
 
@@ -21,6 +22,8 @@ const liveVoiceFactory: ((opts: { mode: Mode }, deps?: DialDependencies) => Voic
 /** Test seam: inject the adapter's transport/clock without touching the composition logic. */
 export interface CompositionOverrides {
   dialDependencies?: Omit<DialDependencies, "config">;
+  /** Post-call summary seams: the Dial messages transport and the LLM transport (both default to fetch). */
+  summary?: { smsTransport?: FetchTransport; llmTransport?: FetchTransport };
 }
 
 function buildExtractor(config: AppConfig): Extractor {
@@ -88,20 +91,26 @@ export function buildCaseService(config: AppConfig = loadConfig(), overrides: Co
     uploads: new UploadStore(config.dataDir),
     extractor: buildExtractor(config),
     voice: buildVoiceResolver(config, overrides),
+    summary: overrides.summary,
   });
 }
 
 type Cache = { key: string; service: CaseService };
 const globalCache = globalThis as unknown as { __refundService?: Cache };
 
-/** Process-wide service; survives Next dev reloads via globalThis. */
+/**
+ * Process-wide service; survives Next dev reloads via globalThis. A dev reload of
+ * the service module creates a new CaseService class, so an instance built from the
+ * previous module (missing any method added since) is replaced. The database handle
+ * has its own cache in persistence/db, so rebuilding the service is cheap.
+ */
 export function getCaseService(): CaseService {
   const config = loadConfig();
   // Readiness and the cached service must agree after a configuration change.
   // Hash instead of retaining credentials in the diagnostic/cache key.
   const key = createHash("sha256").update(JSON.stringify([config, process.env.KEEWANO_API_KEY, process.env.KEEWANO_LIVE_PROJECT_CONFIRMED])).digest("hex");
   const cached = globalCache.__refundService;
-  if (cached && cached.key === key) return cached.service;
+  if (cached && cached.key === key && cached.service instanceof CaseService) return cached.service;
   const service = buildCaseService(config);
   globalCache.__refundService = { key, service };
   return service;

@@ -17,9 +17,25 @@ import { type AppConfig, assertLiveLlmConfig, assertModeValid } from "@/server/c
 import type { ExtractedFields, Extractor } from "@/server/documents/extractor";
 import { buildPacket } from "@/server/documents/packet";
 import { type StoredUpload, type UploadInput, UploadStore, validateUploads } from "@/server/documents/storage";
-import { ApiHttpError, notFound } from "@/server/http/errors";
+import { ApiHttpError, badRequest, notFound } from "@/server/http/errors";
 import { openDatabase } from "@/server/persistence/db";
 import { hasActiveWorkflowCall } from "@/server/workflows/call-store";
+import {
+  type SummaryChannel,
+  type SummaryDelivery,
+  callSeconds,
+  caseTitleFor,
+  channelLabel,
+  composeSummaryLines,
+  formatCallLength,
+  isEmail,
+  maskDestination,
+  messageBody,
+  normalizeSmsNumber,
+  subjectFor,
+} from "@/server/summary/compose";
+import { type FetchTransport, summarizeWithLlm } from "@/server/summary/llm";
+import { assertLiveSmsConfig, sendSmsViaDial } from "@/server/summary/sms";
 import type {
   AuthorizationSnapshot,
   CallRow,
@@ -28,6 +44,7 @@ import type {
   CaseRow,
   EvidenceRow,
   ProvenanceRow,
+  StoredSummary,
 } from "@/server/persistence/repository";
 
 export interface CreateCaseInput {
@@ -51,6 +68,8 @@ export interface ServiceDeps {
   /** Lazily resolves the voice adapter; throws a 503 ApiHttpError when live mode is not configured. */
   voice: () => VoiceAdapter;
   now?: () => Date;
+  /** Network seams for the post-call summary; default to fetch. Tests inject both so nothing leaves the process. */
+  summary?: { smsTransport?: FetchTransport; llmTransport?: FetchTransport };
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -58,8 +77,24 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-
 /** Adapter rejection codes that mean "this server is misconfigured", not "the provider refused". */
 const CONFIG_REJECTION_CODES = new Set(["MISSING_CONFIG", "INVALID_CONFIG", "SERVER_ONLY", "INVALID_MODE"]);
 
+export const CALL_NOT_COMPLETE_MESSAGE = "The call has not finished yet.";
+
+function toDelivery(stored: StoredSummary): SummaryDelivery {
+  return {
+    channel: stored.channel,
+    to: stored.to,
+    subject: stored.subject,
+    summary: [...stored.summary],
+    transcript: stored.transcript,
+    sentAt: stored.sentAt,
+  };
+}
+
 export class CaseService {
   constructor(private readonly deps: ServiceDeps) {}
+
+  /** Concurrent identical summary requests share one send. */
+  private readonly summariesInFlight = new Map<string, Promise<SummaryDelivery>>();
 
   private nowIso(): string {
     return (this.deps.now ?? (() => new Date()))().toISOString();
@@ -516,6 +551,175 @@ export class CaseService {
   packet(ownerSession: string, id: string): string {
     this.ownedRow(ownerSession, id);
     return buildPacket(this.assemble(id), this.deps.repo.listEvidence(id));
+  }
+
+  // -------------------------------------------------------------------------
+  // POST /api/cases/:id/summary  (idempotent per call, channel and destination)
+  // -------------------------------------------------------------------------
+  async sendSummary(ownerSession: string, id: string, body: unknown): Promise<SummaryDelivery> {
+    const { repo } = this.deps;
+    this.ownedRow(ownerSession, id);
+    await this.reconcileDueCalls(id);
+
+    let newest: CallRow | null = null;
+    for (const call of repo.listCalls(id)) if (!newest || call.createdAt >= newest.createdAt) newest = call;
+    const transcript = newest?.transcript?.trim() ? newest.transcript : null;
+    if (!newest || newest.state !== "completed" || transcript === null) {
+      throw new ApiHttpError(409, "CALL_NOT_COMPLETE", CALL_NOT_COMPLETE_MESSAGE);
+    }
+
+    const input = typeof body === "object" && body !== null && !Array.isArray(body) ? (body as Record<string, unknown>) : {};
+    const channel = input.channel;
+    if (channel !== "email" && channel !== "sms") throw badRequest("Choose email or text message.", ["channel"]);
+    const typed = typeof input.to === "string" ? input.to.trim() : "";
+    let to: string;
+    if (channel === "email") {
+      if (!isEmail(typed)) throw badRequest("Enter an email address.", ["to"]);
+      to = typed;
+    } else {
+      const e164 = normalizeSmsNumber(typed);
+      if (e164 === null) throw badRequest("Enter a mobile number with 10 to 15 digits.", ["to"]);
+      to = e164;
+    }
+    const destinationKey = channel === "email" ? to.toLowerCase() : to;
+
+    const row = this.ownedRow(ownerSession, id);
+    this.assertSameMode(row);
+    const existing = row.doc.summaries?.find(
+      (s) => s.callId === newest.id && s.channel === channel && s.destinationKey === destinationKey,
+    );
+    if (existing) return toDelivery(existing);
+
+    const key = `${id}|${newest.id}|${channel}|${destinationKey}`;
+    const pending = this.summariesInFlight.get(key);
+    if (pending) return pending;
+    const work = this.deliverSummary(id, newest, transcript, channel, to, destinationKey).finally(() => {
+      this.summariesInFlight.delete(key);
+    });
+    this.summariesInFlight.set(key, work);
+    return work;
+  }
+
+  private async deliverSummary(
+    id: string,
+    call: CallRow,
+    transcript: string,
+    channel: SummaryChannel,
+    to: string,
+    destinationKey: string,
+  ): Promise<SummaryDelivery> {
+    const { repo, config } = this.deps;
+    if (channel === "sms") assertLiveSmsConfig(config); // fail before spending an LLM request
+
+    const row = repo.getCase(id);
+    if (!row) throw notFound();
+    // The summary describes what was discussed on this call: its authorization snapshot,
+    // and the stored outcome when the call belongs to the current authorization.
+    const auth = repo.getAuthorization(call.authorizationId);
+    const current = auth !== null && row.doc.authorization?.id === auth.id;
+    const facts = auth
+      ? { merchant: { ...auth.snapshot.merchant }, amountMinor: auth.snapshot.amountMinor, currency: auth.snapshot.currency }
+      : { merchant: { ...row.doc.merchant }, amountMinor: row.doc.amountMinor, currency: row.doc.currency };
+    let outcome = row.doc.outcome;
+    if (!current && auth) {
+      outcome = analyzeTranscript(transcript, {
+        amountMinor: auth.snapshot.amountMinor,
+        currency: auth.snapshot.currency,
+        merchantName: auth.snapshot.merchant.name,
+      });
+    }
+    const summaryDoc = { ...facts, outcome, timeline: row.doc.timeline };
+    const summaryCall = { id: call.id, transcript, createdAt: call.createdAt, updatedAt: call.updatedAt };
+    const composed = composeSummaryLines(summaryDoc, summaryCall, outcome);
+
+    let lines = composed;
+    let source: StoredSummary["source"] = "composed";
+    let fellBack = false;
+    if (config.mode === "live" && config.llm.apiKey && config.llm.model) {
+      const seconds = callSeconds(summaryDoc, summaryCall);
+      const llmLines = await summarizeWithLlm({
+        config,
+        transcript,
+        facts: {
+          merchantName: facts.merchant.name,
+          amount: facts.amountMinor === null ? null : formatAmount(facts.amountMinor, facts.currency),
+          decision: outcome.decision,
+          referenceNumber: outcome.referenceNumber,
+          nextAction: outcome.nextAction,
+          callLength: seconds === null ? null : formatCallLength(seconds),
+        },
+        transport: this.deps.summary?.llmTransport,
+      });
+      if (llmLines) {
+        lines = llmLines;
+        source = "llm";
+      } else {
+        fellBack = true;
+      }
+    }
+
+    const caseTitle = caseTitleFor(facts);
+    const subject = channel === "email" ? subjectFor(facts) : null;
+    const masked = maskDestination(channel, to);
+    const note = fellBack ? " (summary composed from the outcome analysis; the LLM summary was unavailable)" : "";
+
+    let sentAt: string | null = null;
+    let providerMessageId: string | null = null;
+    if (channel === "sms") {
+      try {
+        const sent = await sendSmsViaDial({
+          config,
+          to,
+          body: messageBody({ lines, transcript, channel, caseTitle }),
+          transport: this.deps.summary?.smsTransport,
+          now: () => new Date(this.nowIso()),
+        });
+        sentAt = sent.sentAt;
+        providerMessageId = sent.providerMessageId;
+      } catch (err) {
+        repo.transaction(() => {
+          const fresh = repo.getCase(id);
+          if (!fresh) return;
+          const reason = err instanceof ApiHttpError ? err.message : "the text message could not be sent";
+          const timeline = [...fresh.doc.timeline, this.entry("summary_failed", `Summary not sent by text message to ${masked}: ${reason}.`)];
+          repo.updateCase(id, { doc: { ...fresh.doc, timeline }, updatedAt: this.nowIso() });
+        });
+        throw err;
+      }
+    }
+
+    const stored: StoredSummary = {
+      callId: call.id,
+      channel,
+      destinationKey,
+      to,
+      subject,
+      summary: lines,
+      transcript,
+      sentAt,
+      source,
+      providerMessageId,
+      createdAt: this.nowIso(),
+    };
+    return repo.transaction((): SummaryDelivery => {
+      const fresh = repo.getCase(id);
+      if (!fresh) throw notFound();
+      const already = fresh.doc.summaries?.find(
+        (s) => s.callId === call.id && s.channel === channel && s.destinationKey === destinationKey,
+      );
+      if (already) return toDelivery(already);
+      const message =
+        channel === "sms"
+          ? `Summary sent by ${channelLabel(channel)} to ${masked}${note}.`
+          : `Summary composed for ${channelLabel(channel)} to ${masked}${note}; it was not sent because no mail provider is connected.`;
+      const doc: CaseDoc = {
+        ...fresh.doc,
+        summaries: [...(fresh.doc.summaries ?? []), stored],
+        timeline: [...fresh.doc.timeline, this.entry(channel === "sms" ? "summary_sent" : "summary_composed", message)],
+      };
+      repo.updateCase(id, { doc, updatedAt: this.nowIso() });
+      return toDelivery(stored);
+    });
   }
 
   // -------------------------------------------------------------------------
