@@ -43,7 +43,7 @@ Safe QA command from the repository root (Node >=22.18):
 The tests inject synthetic transport/configuration. Do not load dial.env or run
 live-smoke.mts for this kit. No credentials, application server or dependency on
 teammates' branches is needed to run the standalone adapter tests.
-Final checks: 189 standalone Dial tests and 45 backend Vitest tests passed
+Current checks: 189 standalone Dial tests and 70 backend Vitest tests passed
 separately. Full typechecking, strict Dial checking and production build passed
 on Node 25.2.1. Node 24 is recommended by .nvmrc but was not tested in this run.
 The build retains one non-blocking dynamic DATA_DIR tracing warning.

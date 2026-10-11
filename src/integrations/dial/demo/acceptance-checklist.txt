@@ -10,7 +10,7 @@ All scenario identities, documents, amounts and phone numbers are fictional.
 Use injected transports only. A fictional number is not an authorized recipient.
 Current integration: T2 backend 43d099d and T3 are verified on codex/voice, with
 the late-transcript fixes recorded in the containing commit. T1 UI, main and
-the teammate branch were not changed. All 45 backend tests and 189 standalone
+the teammate branch were not changed. All 70 backend tests and 189 standalone
 Dial tests passed separately; unchecked items still need their own evidence.
 
 EVIDENCE LABELS

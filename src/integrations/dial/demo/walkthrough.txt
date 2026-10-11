@@ -90,7 +90,7 @@ Open acceptance-checklist.txt. T2 owns immutable authorization, persistent one-
 attempt/event dedup, unknown-dispatch locking and atomic transcript/outcome
 publication; T1 owns the UI. The four original 23bd75a findings were corrected,
 and late-transcript integration defects were fixed with six passing regressions.
-Final results: 45 backend tests, 189 separate Dial tests, typechecking, production
+Current results: 70 backend tests, 189 separate Dial tests, typechecking, production
 build and a synthetic built-server HTTP flow passed. See docs/handoffs/dial.txt.
 Explain the actual transcript path: case GETs drive the initial 45 s wait and later
 read-only refresh at most every 30 s for 24 h from attempt creation. No background

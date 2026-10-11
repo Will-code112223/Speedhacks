@@ -1,0 +1,1410 @@
+[
+ {
+  "id": "fidelity-national-financial",
+  "phoneE164": "+18889343354",
+  "purpose": "customer_service",
+  "sourceUrl": "https://fnf.com/Who-We-Are",
+  "confirmed": true,
+  "note": "Digits confirmed on the cited page (curl + WebFetch, 2026-10-11): '888-934-3354' under 'Contact Us' > 'Give Us A Call', with a 'Choose An Option' department menu including 'Escrow Admin' and 'Title Policies or Title Orders'. It is a general main line with IVR rather than an explicitly labeled customer-service line, but the menu routes to policy/order handling, so dialing it for customer_service is sensible. CORRECTION to the record's notes: the menu mapping is off by one. The page HTML pairs each department with its option in the same grid row: Option 1 Dial by Name directory; 2 Escrow Admin; 3 Employment Verification; 4 Vendor List; 5 Title Policies or Title Orders; 6 Jacksonville Claims Center; 7 Omaha Claims Center; 8 Corporate Human Resources; 9 Corporate Payroll. The final row, 'California Unclaimed Property Refunds', carries its own number 866-570-0334 (this answers the record's open question about that 'unlabeled' number; it is not a consumer line). Hours not listed. TTY relay 711."
+ },
+ {
+  "id": "fidelity-national-financial",
+  "phoneE164": "+18889343354",
+  "purpose": "claims",
+  "sourceUrl": "https://fnf.com/Who-We-Are",
+  "confirmed": true,
+  "note": "Digits confirmed on the cited page: '888-934-3354' ('Give Us A Call'). The option menu lists 'Jacksonville Claims Center' and 'Omaha Claims Center', so dialing it for claims is sensible. CORRECTION: per the page's HTML row structure the claims options are 6 (Jacksonville Claims Center) and 7 (Omaha Claims Center), not 5 and 6 as the record's notes state; option 5 is 'Title Policies or Title Orders'. Update the IVR instructions before the voice agent presses any option."
+ },
+ {
+  "id": "fidelity-national-financial",
+  "phoneE164": "+19048548100",
+  "purpose": "customer_service",
+  "sourceUrl": "https://fnf.com/Who-We-Are",
+  "confirmed": false,
+  "note": "Digits are on the cited page ('904-854-8100'), but the page labels it only as 'Corporate Headquarters' beneath the street address (601 Riverside Ave., Building 5, Jacksonville, FL 32204), with no customer-service wording. The record's own note concedes 'Not a consumer service line.' Purpose mismatch: do not dial for customer_service. Re-label as corporate/HQ switchboard or drop the contact."
+ },
+ {
+  "id": "first-american-title",
+  "phoneE164": "+18886321642",
+  "purpose": "claims",
+  "sourceUrl": "https://www.firstam.com/how-to-file-a-title-insurance-claim/",
+  "confirmed": true,
+  "note": "Fetched 2026-10-11 (HTTP 200). Page text: 'Call our National Claims Intake Center at +1 (888) 632-1642 and select option 4 to leave a message, and we will return your call within one business day.' tel: href is tel:8886321642. Digits and claims label match. Voicemail intake, callback within one business day; no live-agent option is described."
+ },
+ {
+  "id": "first-american-title",
+  "phoneE164": "+18008543643",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.firstam.com/contact-us/",
+  "confirmed": false,
+  "note": "Fetched 2026-10-11 (HTTP 200). Digits DO appear (tel:+8008543643; 'Toll Free: 800-854-3643'), but the page labels it as the First American Financial Corporation 'Home Office' line 'for general inquiries or to learn more about our business' (also reused as Media/PR ext. 3298). It is a corporate switchboard, not a policyholder/customer-service line. The page publishes no consumer customer-service number: it routes title customers to 'Find an Office' (office locator) and claims to the Submitting a Claim page; its other phone numbers are product-support lines (IgniteRE 866-540-5614, ClarityFirst 833-627-2255, DataTree 800-708-8463, FraudGuard 800-795-0391). Label does not match customer_service closely enough; use only as a last-resort switchboard."
+ },
+ {
+  "id": "chicago-title",
+  "phoneE164": "+18889343354",
+  "purpose": "claims",
+  "sourceUrl": "https://fnf.com/Who-We-Are",
+  "confirmed": true,
+  "note": "Page fetched (HTTP 200; resolves to https://fnf.com/who-we-are) by curl with browser UA and again by WebFetch; both agree. The exact digits appear verbatim as 'Give Us A Call 888-934-3354' in the Contact Us section, with menu text 'Option 5 Jacksonville Claims Center' and 'Option 6 Omaha Claims Center'. Label matches the claims purpose; dial option 5 or 6. Caveat: this is the FNF parent-company main line, not a Chicago Title-branded page, and no hours are listed."
+ },
+ {
+  "id": "chicago-title",
+  "phoneE164": "+18889343354",
+  "purpose": "customer_service",
+  "sourceUrl": "https://fnf.com/Who-We-Are",
+  "confirmed": true,
+  "note": "Same page and same verbatim number ('Give Us A Call 888-934-3354'). The page does not use the words 'customer service'; it is the FNF corporate main line with a dial-by-name directory and options that include 'Option 1 Escrow Admin' and 'Option 4 Title Policies or Title Orders' (alongside HR, payroll, vendor options). It contains no statement that the line cannot access accounts, and option 4 is an explicit policy/orders route, so dialing it (option 4) for general policy questions is sensible. For a specific transaction or escrow, the issuing local office is the better first contact, as the record already notes."
+ },
+ {
+  "id": "commonwealth-land-title",
+  "phoneE164": "+18778629111",
+  "purpose": "claims",
+  "sourceUrl": "https://www.cltic.com/contactus.aspx",
+  "confirmed": true,
+  "note": "Page fetched (HTTP 200, curl + WebFetch). Digits appear verbatim as '(877) 862-9111' directly under the label 'Claims:' on the official Commonwealth Contact Us page. Label matches purpose exactly. No hours of operation listed anywhere on the page. The contact form on the same page offers 'Jacksonville Claims Center' and 'Omaha Claims Center' categories, but the page does not say which center the number routes to."
+ },
+ {
+  "id": "commonwealth-land-title",
+  "phoneE164": "+18889343354",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.cltic.com/contactus.aspx",
+  "confirmed": true,
+  "note": "Page fetched (HTTP 200). Digits appear verbatim as '(888) 934-3354' under the label 'Need immediate assistance? Call' - a generic assistance line, NOT labeled 'customer service'. The cited page states no restriction (no 'cannot access accounts' language), so dialing it for customer service is sensible, with a caveat: cross-check of https://fnf.com/Who-We-Are ('Give Us A Call') shows this is the shared Fidelity National Financial corporate main line with a 9-option IVR plus dial-by-name: 1 Escrow Admin, 2 Employment Verification, 3 Vendor List, 4 Title Policies or Title Orders, 5 Jacksonville Claims Center, 6 Omaha Claims Center, 7 Corporate HR, 8 Corporate Payroll, 9 California Unclaimed Property Refunds. For customer_service the voice agent should press 4 (Title Policies or Title Orders); 5/6 reach the claims centers. The record's existing note lists only options 1/4/5/6 - the full menu above should replace it. No hours listed on either page."
+ },
+ {
+  "id": "fidelity-national-title",
+  "phoneE164": "+18778629111",
+  "purpose": "claims",
+  "sourceUrl": "https://fntic.com/ContactUs.aspx",
+  "confirmed": true,
+  "note": "Fetched page (HTTP 200) shows 'Claims: (877) 862-9111' in the phone-support block (span id lblClaimsPhone) on the Fidelity National Title Insurance Company Contact Us page. Label matches purpose exactly. Hours not listed."
+ },
+ {
+  "id": "fidelity-national-title",
+  "phoneE164": "+18889343354",
+  "purpose": "customer_service",
+  "sourceUrl": "https://fntic.com/ContactUs.aspx",
+  "confirmed": true,
+  "note": "Fetched page (HTTP 200) shows 'Need immediate assistance? Call (888) 934-3354' (span id lblSupportPhone, div class phone-support) on the Fidelity National Title Contact Us page. Caveat: this is the shared FNF corporate main line; fnf.com/who-we-are (also fetched) lists it as 'Give Us A Call' with an IVR: 1 Escrow Admin, 2 Employment Verification, 3 Vendor List, 4 Title Policies or Title Orders, 5 Jacksonville Claims Center, 6 Omaha Claims Center, 7 Corporate HR, 8 Corporate Payroll, 9 CA Unclaimed Property Refunds, plus dial-by-name. The page does not say it cannot access accounts, and option 4 (Title Policies or Title Orders) is the sensible route for policy customer service; the voice agent should expect an IVR, not a dedicated consumer service desk. Hours not listed."
+ },
+ {
+  "id": "chubb",
+  "phoneE164": "+18663248222",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.chubb.com/us-en/contact/contact-customer-support.html",
+  "confirmed": true,
+  "note": "Fetched HTTP 200 (curl, browser UA). Page 'U.S. Customer Support | Chubb' says: 'Personal lines question? ... To speak with a representative, call 1-866-324-8222' and 'Lost your agent's contact? Call 1-866-324-8222 for personal lines inquiries'. Raw HTML also has an href=\"tel:1-866-324-8222\" link. Digits match exactly; label (personal lines representative) fits customer_service. No hours shown for this number on the page."
+ },
+ {
+  "id": "chubb",
+  "phoneE164": "+18663248222",
+  "purpose": "billing",
+  "sourceUrl": "https://www.chubb.com/us-en/contact/billing-inquiries.html",
+  "confirmed": true,
+  "note": "Fetched HTTP 200. Page 'How to pay your bill | Chubb' says under 'How do I pay my personal bill?': 'For payments or inquiries by phone, call billing support at 1-866-324-8222.' Digits match exactly; label (personal billing support) fits billing. Same page also confirms the small-business billing line 1-833-550-9660 mentioned in the record's notes (its Mon-Fri 8 AM-8 PM EST hours appear on the customer-support page, not this one)."
+ },
+ {
+  "id": "chubb",
+  "phoneE164": "+18002524670",
+  "purpose": "claims",
+  "sourceUrl": "https://www.chubb.com/us-en/claims/report-claim.html",
+  "confirmed": true,
+  "note": "Fetched HTTP 200. Page 'Report a Claim | Chubb' says: 'Report All Claims. You can report your claim 24 hours a day, 7 days a week via one of the following options: Online ... Phone: Chubb Main 1-800-CLAIMS-0 (1-800-252-4670)'. Vanity CLAIMS-0 decodes on the keypad to 252-4670 and the page prints the digits explicitly in parentheses. Label (Chubb Main claims phone) fits claims. The 24/7 sentence covers the listed options including phone; unlike the adjacent 'ACE Main' line, no restricted hours are stated for Chubb Main."
+ },
+ {
+  "id": "chubb",
+  "phoneE164": "+18006824822",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.chubb.com/us-en/contact-us.html",
+  "confirmed": true,
+  "note": "Fetched HTTP 200. Page 'Chubb Insurance in the U.S.' (Contact Chubb in the U.S.) says: 'For Claims, emergencies, or requests that require immediate attention, please contact your agent. If you don't know how to reach your agent, please call us at 1-800-682-4822.' Digits match exactly. Caveat on label: the page presents this as Chubb's general U.S. line / fallback when the agent cannot be reached, not as a dedicated personal-lines service desk, and it is not labeled 'customer service'. There is no 'cannot access accounts' disclaimer, so dialing it for customer_service is sensible, but treat it as the secondary route; the primary personal-lines service number is 1-866-324-8222. No hours stated for this number."
+ },
+ {
+  "id": "kaiser-permanente",
+  "phoneE164": "+18007777902",
+  "purpose": "customer_service",
+  "sourceUrl": "https://myhealth.kaiserpermanente.org/discover/contact/",
+  "confirmed": true,
+  "note": "Page (Kaiser Permanente Mid-Atlantic States; footer names Kaiser Foundation Health Plan of the Mid-Atlantic States, Inc.) lists '800-777-7902 (toll free) or TTY 711' under the label 'Kaiser Permanente Member Services', hours 'Monday through Friday from 7:30 a.m. to 9 p.m. (except holidays)'. Digits and label match. Mid-Atlantic region only (MD/VA/DC)."
+ },
+ {
+  "id": "kaiser-permanente",
+  "phoneE164": "+18887775536",
+  "purpose": "customer_service",
+  "sourceUrl": "https://myhealth.kaiserpermanente.org/discover/contact/",
+  "confirmed": true,
+  "note": "Same Mid-Atlantic page lists '888-777-5536 (toll free) or TTY 711' under the label 'Kaiser Permanente Medicare Member Services', hours 'Open 7 days a week from 8 a.m. to 8 p.m.' Digits and label match. This is the Medicare-member line for the Mid-Atlantic region; non-Medicare members should use +18007777902."
+ },
+ {
+  "id": "kaiser-permanente",
+  "phoneE164": "+18004644000",
+  "purpose": "customer_service",
+  "sourceUrl": "https://healthy.kaiserpermanente.org/southern-california/facilities/kaiser-permanente-san-diego-medical-center-331581/departments/member-and-administrative-services-dlp-166905",
+  "confirmed": true,
+  "note": "WebFetch failed (too many redirects); fetched via curl with browser UA, HTTP 200, no cross-host redirect. Page titled 'Member Services at Kaiser Permanente San Diego Medical Center' (Southern California) says 'please contact the Member Services Contact Center: (800) 464-4000 (English)' and separately 'If you have questions, please call us at 1-800-464-4000 (toll free)'. Digits and label match. Hours for this line are NOT stated on the page (the 24/7 text nearby refers to interpreter services, not the line's hours). Southern California only; Northern California use not verified."
+ },
+ {
+  "id": "kaiser-permanente",
+  "phoneE164": "+18007880616",
+  "purpose": "customer_service",
+  "sourceUrl": "https://healthy.kaiserpermanente.org/southern-california/facilities/kaiser-permanente-san-diego-medical-center-331581/departments/member-and-administrative-services-dlp-166905",
+  "confirmed": true,
+  "note": "Same Southern California page lists '(800) 788-0616 (Espanol)' directly under 'Member Services Contact Center'. Digits and label match; this is the Spanish-language line. Hours not stated. Also on page but not in record: (800) 757-7585 (Chinese dialects)."
+ },
+ {
+  "id": "kaiser-permanente",
+  "phoneE164": "+18004430815",
+  "purpose": "customer_service",
+  "sourceUrl": "https://healthy.kaiserpermanente.org/southern-california/facilities/kaiser-permanente-san-diego-medical-center-331581/departments/member-and-administrative-services-dlp-166905",
+  "confirmed": true,
+  "note": "Same Southern California page: 'Medicare Members: To request a hard copy of Kaiser Permanente's provider directory, please call our Member Services department at 1-800-443-0815, seven days a week, 8 a.m. to 8 p.m.' Digits, 'Member Services department' label and hours match. Caveat: the page cites this number only in the context of Medicare members requesting a hard-copy provider directory; it is labeled as the Medicare Member Services line, so use it for Medicare members in Southern California only, not for commercial/non-Medicare members."
+ },
+ {
+  "id": "cigna",
+  "phoneE164": "+18009971654",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.cigna.com/contact-us/",
+  "confirmed": true,
+  "note": "Digits verified on page (tel:18009971654 href present). Page label: 'Call Us 24/7/365 \u2014 Cigna Healthcare Customer Service'. Label matches purpose; sensible to dial for general customer service."
+ },
+ {
+  "id": "cigna",
+  "phoneE164": "+18002446224",
+  "purpose": "claims",
+  "sourceUrl": "https://www.cigna.com/contact-us/",
+  "confirmed": true,
+  "note": "Digits verified on page (tel:18002446224 href present). Page label: 'Coverage & Claims \u2014 Medical, Dental, Vision \u2014 Phone Number', 24 hours a day, 365 days a year. Label matches claims purpose."
+ },
+ {
+  "id": "cigna",
+  "phoneE164": "+18004335768",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.cigna.com/contact-us/",
+  "confirmed": false,
+  "note": "Digits verified on page (tel:18004335768 href present), but page label is 'Behavioral Health Benefits \u2014 Phone Number'. This is a specialty line, not general customer service; purpose tag 'customer_service' is too broad for a dialer. Retag to a narrower purpose or restrict; do not delete."
+ },
+ {
+  "id": "cigna",
+  "phoneE164": "+18008353784",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.cigna.com/contact-us/",
+  "confirmed": false,
+  "note": "Digits verified on page (tel:18008353784 href present), but page label is 'Cigna Home Delivery Pharmacy \u2014 Phone Number'. Pharmacy-only line, not general customer service; purpose tag 'customer_service' is mislabeled for a dialer. Retag to a pharmacy-specific purpose or restrict; do not delete."
+ },
+ {
+  "id": "cigna",
+  "phoneE164": "+18008532713",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.cigna.com/contact-us/",
+  "confirmed": false,
+  "note": "Digits verified on page (tel:18008532713 href present), but page label is 'Online Help \u2014 Website Assistance'. Technical/website support only (record's own note says 'not benefits or billing'), analogous to a line that cannot access accounts. Not suitable for customer_service dialing. Retag to a technical-support purpose or restrict; do not delete."
+ },
+ {
+  "id": "unitedhealthcare",
+  "phoneE164": "+18668014409",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.uhc.com/contact-us",
+  "confirmed": true,
+  "note": "Visible as '1-866-801-4409 / TTY 711' under 'UnitedHealthcare health insurance plan through work' (members with plans through work). Label matches purpose."
+ },
+ {
+  "id": "unitedhealthcare",
+  "phoneE164": "+18005235800",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.uhc.com/contact-us",
+  "confirmed": true,
+  "note": "Visible as '1-800-523-5800 / TTY 711' under 'UnitedHealthcare Medicare supplement plan'. Matches purpose; Medicare supplement members only."
+ },
+ {
+  "id": "unitedhealthcare",
+  "phoneE164": "+18774829045",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.uhc.com/contact-us",
+  "confirmed": true,
+  "note": "Visible as 'Arizona: 1-877-482-9045 / TTY 711' under 'Individual & Family ACA Marketplace plans'; hours 8 a.m.-8 p.m. local, Mon-Fri."
+ },
+ {
+  "id": "unitedhealthcare",
+  "phoneE164": "+18882000327",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.uhc.com/contact-us",
+  "confirmed": true,
+  "note": "Visible as 'Alabama: 1-888-200-0327 / TTY 711' under 'Individual & Family ACA Marketplace plans'."
+ },
+ {
+  "id": "unitedhealthcare",
+  "phoneE164": "+18888096539",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.uhc.com/contact-us",
+  "confirmed": true,
+  "note": "Visible as 'Colorado: 1-888-809-6539 / TTY 711' under 'Individual & Family ACA Marketplace plans'."
+ },
+ {
+  "id": "unitedhealthcare",
+  "phoneE164": "+18882000405",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.uhc.com/contact-us",
+  "confirmed": true,
+  "note": "Visible as 'Florida: 1-888-200-0405 / TTY 711' under 'Individual & Family ACA Marketplace plans'."
+ },
+ {
+  "id": "unitedhealthcare",
+  "phoneE164": "+18006099754",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.uhc.com/contact-us",
+  "confirmed": true,
+  "note": "Visible as 'Georgia: 1-800-609-9754 / TTY 711' under 'Individual & Family ACA Marketplace plans'."
+ },
+ {
+  "id": "unitedhealthcare",
+  "phoneE164": "+18882000325",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.uhc.com/contact-us",
+  "confirmed": true,
+  "note": "Visible as 'Illinois: 1-888-200-0325 / TTY 711' under 'Individual & Family ACA Marketplace plans'."
+ },
+ {
+  "id": "unitedhealthcare",
+  "phoneE164": "+18667617748",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.uhc.com/contact-us",
+  "confirmed": true,
+  "note": "Visible as 'Kansas: 1-866-761-7748 / TTY 771' (page prints TTY 771, as the record notes) under 'Individual & Family ACA Marketplace plans'."
+ },
+ {
+  "id": "unitedhealthcare",
+  "phoneE164": "+18662686438",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.uhc.com/contact-us",
+  "confirmed": true,
+  "note": "Visible as 'Louisiana: 1-866-268-6438 / TTY 711' under 'Individual & Family ACA Marketplace plans'."
+ },
+ {
+  "id": "unitedhealthcare",
+  "phoneE164": "+18006910021",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.uhc.com/contact-us",
+  "confirmed": true,
+  "note": "Visible as 'Maryland: 1-800-691-0021 / TTY 711' under 'Individual & Family ACA Marketplace plans'."
+ },
+ {
+  "id": "unitedhealthcare",
+  "phoneE164": "+18882000324",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.uhc.com/contact-us",
+  "confirmed": true,
+  "note": "Visible as 'Michigan: 1-888-200-0324 / TTY 711' under 'Individual & Family ACA Marketplace plans'."
+ },
+ {
+  "id": "unitedhealthcare",
+  "phoneE164": "+18882391451",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.uhc.com/contact-us",
+  "confirmed": true,
+  "note": "Visible as 'Mississippi: 1-888-239-1451 / TTY 711' under 'Individual & Family ACA Marketplace plans'."
+ },
+ {
+  "id": "unitedhealthcare",
+  "phoneE164": "+18779404172",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.uhc.com/contact-us",
+  "confirmed": true,
+  "note": "Visible as 'Missouri: 1-877-940-4172 / TTY 711' under 'Individual & Family ACA Marketplace plans'."
+ },
+ {
+  "id": "unitedhealthcare",
+  "phoneE164": "+18665690328",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.uhc.com/contact-us",
+  "confirmed": true,
+  "note": "Visible as 'New Jersey: 1-866-569-0328 / TTY 711' under 'Individual & Family ACA Marketplace plans'."
+ },
+ {
+  "id": "unitedhealthcare",
+  "phoneE164": "+18665693491",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.uhc.com/contact-us",
+  "confirmed": true,
+  "note": "Visible as 'New Mexico: 1-866-569-3491 / TTY 711' under 'Individual & Family ACA Marketplace plans'; page states New Mexico hours are 24 hours a day, 7 days a week."
+ },
+ {
+  "id": "unitedhealthcare",
+  "phoneE164": "+18009805357",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.uhc.com/contact-us",
+  "confirmed": true,
+  "note": "Visible as 'North Carolina: 1-800-980-5357 / TTY 711' under 'Individual & Family ACA Marketplace plans'."
+ },
+ {
+  "id": "unitedhealthcare",
+  "phoneE164": "+18003314680",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.uhc.com/contact-us",
+  "confirmed": true,
+  "note": "Visible as 'Ohio: 1-800-331-4680 / TTY 711' under 'Individual & Family ACA Marketplace plans'."
+ },
+ {
+  "id": "unitedhealthcare",
+  "phoneE164": "+18009805319",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.uhc.com/contact-us",
+  "confirmed": true,
+  "note": "Visible as 'Oklahoma: 1-800-980-5319 / TTY 711' under 'Individual & Family ACA Marketplace plans'."
+ },
+ {
+  "id": "unitedhealthcare",
+  "phoneE164": "+18665692094",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.uhc.com/contact-us",
+  "confirmed": true,
+  "note": "Visible as 'South Carolina: 1-866-569-2094 / TTY 711' under 'Individual & Family ACA Marketplace plans'."
+ },
+ {
+  "id": "unitedhealthcare",
+  "phoneE164": "+18772508188",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.uhc.com/contact-us",
+  "confirmed": true,
+  "note": "Visible as 'Tennessee: 1-877-250-8188 / TTY 711' under 'Individual & Family ACA Marketplace plans'."
+ },
+ {
+  "id": "unitedhealthcare",
+  "phoneE164": "+18668112704",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.uhc.com/contact-us",
+  "confirmed": true,
+  "note": "Visible as 'Texas: 1-866-811-2704 / TTY 711' under 'Individual & Family ACA Marketplace plans'."
+ },
+ {
+  "id": "unitedhealthcare",
+  "phoneE164": "+18772659199",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.uhc.com/contact-us",
+  "confirmed": true,
+  "note": "Visible as 'Virginia: 1-877-265-9199 / TTY 711' under 'Individual & Family ACA Marketplace plans'."
+ },
+ {
+  "id": "unitedhealthcare",
+  "phoneE164": "+18888320969",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.uhc.com/contact-us",
+  "confirmed": true,
+  "note": "Visible as 'Washington: 1-888-832-0969 / TTY 711' under 'Individual & Family ACA Marketplace plans'."
+ },
+ {
+  "id": "unitedhealthcare",
+  "phoneE164": "+18665693468",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.uhc.com/contact-us",
+  "confirmed": true,
+  "note": "Visible as 'Wisconsin: 1-866-569-3468 / TTY 711' under 'Individual & Family ACA Marketplace plans'."
+ },
+ {
+  "id": "unitedhealthcare",
+  "phoneE164": "+18778562429",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.uhc.com/contact-us",
+  "confirmed": true,
+  "note": "Visible as '1-877-856-2429 / TTY 711' under 'Individual Exchange Marketplace (New York and Massachusetts only)'. No hours printed for this line."
+ },
+ {
+  "id": "unitedhealthcare",
+  "phoneE164": "+18006578205",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.uhc.com/contact-us",
+  "confirmed": true,
+  "note": "Visible as '1-800-657-8205 / TTY 711' under 'Short term insurance | Sign in to myuhone.com'. Matches purpose for short-term plan members."
+ },
+ {
+  "id": "unitedhealthcare",
+  "phoneE164": "+18006578205",
+  "purpose": "billing",
+  "sourceUrl": "https://www.uhc.com/contact-us",
+  "confirmed": true,
+  "note": "Visible under 'Dental and vision insurance plans' as '1-800-657-8205 (Payment questions for dental plans underwritten by Golden Rule Insurance Company)'. Billing purpose matches, but only for Golden Rule dental plans; not a general UHC medical billing line."
+ },
+ {
+  "id": "unitedhealthcare",
+  "phoneE164": "+18668776187",
+  "purpose": "claims",
+  "sourceUrl": "https://www.uhc.com/contact-us",
+  "confirmed": true,
+  "note": "Visible under 'Dental and vision insurance plans' as '1-866-877-6187 (Dental and vision claims and benefits)'. Claims purpose matches, dental/vision only; not for medical claims."
+ },
+ {
+  "id": "unitedhealthcare",
+  "phoneE164": "+18004446222",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.uhc.com/contact-us",
+  "confirmed": true,
+  "note": "Visible as 'UnitedHealthcare Oxford | 1-800-444-6222 / TTY 711 | Available hours: 8 a.m. to 6 p.m. ET, Monday through Friday'. Matches purpose for Oxford members."
+ },
+ {
+  "id": "unitedhealthcare",
+  "phoneE164": "+18006248822",
+  "purpose": "appeals",
+  "sourceUrl": "https://memberforms.uhc.com/Memberappealsandgrievances.html",
+  "confirmed": true,
+  "note": "Visible in the 'California Grievance Notice': 'telephone your health plan at 1-800-624-8822 (UnitedHealthcare of California)'. Also printed there: 1-800-260-2773 (UHC Benefits Plan of California) and 1-866-683-6440 (Benefits Plan of California-Surest), as the record notes. Grievance line for UHC of California members only."
+ },
+ {
+  "id": "aetna",
+  "phoneE164": "+18887923862",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.aetna.com/individuals-families/contact-aetna.html",
+  "confirmed": false,
+  "note": "Digits verified on the cited page (text and tel: href '1-888-792-3862'; hours Mon-Fri 7 AM-11 PM ET, Sat 7:00 AM-9:30 PM ET, Sun 8 AM-6 PM ET also match). Label mismatch: the page lists this under the Members tab as 'Pharmacy services: For general questions, call 1-888-792-3862' and separately says 'Health plan: Call the number on your ID card for personalized service.' It is a member pharmacy-plan line, not a general health-plan customer_service line, and the record's lines are commercial_health/medicare_advantage/individual_health with no pharmacy line. Dial only if purpose is scoped to pharmacy; relabel rather than delete. Also: the cited URL 301-redirects on the same host to https://www.aetna.com/about-us/contact-aetna.html (same content); the TTY placeholder '${tty}' is unrendered on the live page, so the record's 'TTY digits not captured' note is accurate."
+ },
+ {
+  "id": "aetna",
+  "phoneE164": "+18008723862",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.aetna.com/individuals-families/contact-aetna.html",
+  "confirmed": false,
+  "note": "Digits verified on the cited page (text and tel: href '1-800-872-3862'; hours Mon-Fri 8 AM-6 PM ET match). Label mismatch: the page lists it under 'All others / Aetna headquarters and family of companies: General question? Call our corporate contact center. They don't have member account info, but they can share contact options for Aetna Member Services.' This is a corporate contact center that cannot access member accounts, so it is not suitable for customer_service dialing. The record's notes already say this, but the purpose field is still customer_service; relabel (e.g. corporate/general_inquiry) or drop. Cited URL 301-redirects on the same host to https://www.aetna.com/about-us/contact-aetna.html (same content)."
+ },
+ {
+  "id": "travelers",
+  "phoneE164": "+18885645043",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.travelers.com/contact-us",
+  "confirmed": true,
+  "note": "Page fetched (HTTP 200, WebFetch + curl). '1.888.564.5043' appears under 'For individuals' > 'Billing and policy service questions' / MyTravelers: 'Looking for help servicing your personal insurance policy? Our customer service team is here to help, 24 hours a day, 365 days a year.' Digits and label match. Personal Insurance only."
+ },
+ {
+  "id": "travelers",
+  "phoneE164": "+18885645043",
+  "purpose": "billing",
+  "sourceUrl": "https://www.travelers.com/contact-us/faq",
+  "confirmed": true,
+  "note": "Page fetched (HTTP 200). FAQ 'Who do I contact if I have a question on my Personal Insurance bill?' answers: call your independent agent or a Travelers customer service representative at 888.564.5043, 24/7/365. Digits and label match. Personal Insurance only."
+ },
+ {
+  "id": "travelers",
+  "phoneE164": "+18002522268",
+  "purpose": "billing",
+  "sourceUrl": "https://www.travelers.com/contact-us",
+  "confirmed": true,
+  "note": "Page fetched (HTTP 200). '1.800.252.2268' appears under 'For business' > 'Billing questions' / 'Pay Your Bill', Mon-Fri 8 a.m.-8 p.m. ET, phone payments 24 hours. Digits and label match, but this is the BUSINESS Insurance billing line only; do not dial it for a personal-lines bill (use 888-564-5043). FAQ page lists its availability as Mon-Fri 7 a.m.-8 p.m. ET, a minor hours discrepancy."
+ },
+ {
+  "id": "travelers",
+  "phoneE164": "+18885645043",
+  "purpose": "cancellation",
+  "sourceUrl": "https://www.travelers.com/contact-us/faq",
+  "confirmed": true,
+  "note": "Page fetched (HTTP 200). FAQ 'How do I make changes to my policy?' says: contact your independent agent or Travelers customer service representative at 888.564.5043, 24/7/365. Digits match; label is 'policy changes' / personal-lines customer service, which is sensible for cancellation. The word 'cancel' does not appear anywhere on this page or on /contact-us; the other-payment-options page cited in the record's notes was not fetched by me either."
+ },
+ {
+  "id": "travelers",
+  "phoneE164": "+18002524633",
+  "purpose": "claims",
+  "sourceUrl": "https://www.travelers.com/contact-us",
+  "confirmed": true,
+  "note": "Page fetched (HTTP 200). '1.800.252.4633' appears under 'For individuals' > 'File a claim': 'File your auto, home and personal property claims by telephone or online through MyTravelers 24 hours a day, 365 days a year.' Also listed for Roadside assistance (Option 3, 13-digit policy number). Digits and label match. Nit: the cited page shows digits only; the '800.CLAIM33' vanity form is on the /contact-us/faq page (CLAIM33 decodes to 252-4633, consistent)."
+ },
+ {
+  "id": "travelers",
+  "phoneE164": "+18002524633",
+  "purpose": "claims",
+  "sourceUrl": "https://www.travelers.com/contact-us",
+  "confirmed": true,
+  "note": "Page fetched (HTTP 200). '1.800.252.4633' appears under 'Check status of a claim': 'Our Claim professionals are available to help Monday-Friday, 8 a.m.-5 p.m. local time.' Digits, label and hours match. The business claims number cited in the notes (1.800.238.6225) is also on the page under 'For business' > File a claim / Check status."
+ },
+ {
+  "id": "travelers",
+  "phoneE164": "+18663362077",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.travelers.com/contact-us",
+  "confirmed": false,
+  "note": "Digits present: '866.336.2077' appears under 'Company information' > 'Customer advocacy': 'If you're not sure where to go or can't find the answer to your question... call our Customer Advocacy line... One of our Customer Advocacy team members will get you to the appropriate department.' This is a routing desk listed beside Company Directory and Retiree Services, not a customer-service line; the page gives it no servicing function. The same page publishes a dedicated 24/7 customer-service line (888-564-5043), so dialing this one for customer_service is not sensible. Keep only as an escalation/routing fallback."
+ },
+ {
+  "id": "travelers",
+  "phoneE164": "+18663362077",
+  "purpose": "appeals",
+  "sourceUrl": "https://www.travelers.com/contact-us",
+  "confirmed": false,
+  "note": "Digits present (same 'Customer advocacy' routing entry as above), but neither /contact-us nor /contact-us/faq contains the words 'appeal', 'dispute' or 'escalate', and the only 'Complaints' reference on the page is a Consumer Affairs mailing address (Travelers, Attn: Consumer Affairs, One Tower Square, Hartford, CT 06183), not a phone number. The record itself concedes the 'appeals' mapping is the knowledge base's judgment, not Travelers' label. Label does not match the stated purpose; usable only as a generic 'route me to the right department' fallback."
+ },
+ {
+  "id": "unum",
+  "phoneE164": "+18666793054",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.unum.com/support/employees/contact-us",
+  "confirmed": true,
+  "note": "Page fetched directly (HTTP 200, no redirect; title 'Contact Policyholder Customer Service and Support | Unum'). Visible text reads: 'Customer support Monday\u2013Friday 8 a.m.\u20138 p.m. ET Call us at 866-679-3054'. The page also says 'If you have Unum coverage through a previous employer, reach out to us via phone at 866-679-3054', corroborating the record's note. tel: href is tel:866-679-3054 and matches the displayed digits. Label and hours match the record exactly; sensible to dial for customer service."
+ },
+ {
+  "id": "unum",
+  "phoneE164": "+18667791054",
+  "purpose": "claims",
+  "sourceUrl": "https://www.unum.com/support/employees/contact-us",
+  "confirmed": true,
+  "note": "Same page, same fetch. Under the heading 'Have questions about filing a claim?' the visible text lists 'Leave, Disability: 866-779-1054'. tel: href is tel:866-779-1054 and matches the displayed digits. Label (leave/disability claims) matches the record's purpose; no hours stated on the page, consistent with the record. Sensible to dial for short-term/long-term disability or leave claims."
+ },
+ {
+  "id": "unum",
+  "phoneE164": "+18004450402",
+  "purpose": "claims",
+  "sourceUrl": "https://www.unum.com/support/employees/contact-us",
+  "confirmed": true,
+  "note": "Same page, same fetch. Under the heading 'Have questions about filing a claim?' the visible text lists 'Term Life/ADD, Whole Life: 800-445-0402'. tel: href is tel:800-445-0402 and matches the displayed digits. Label matches the record's purpose (Term Life/AD&D and Whole Life claims); no hours stated on the page. Sensible to dial for life/AD&D claims only, not for disability claims (those use 866-779-1054)."
+ },
+ {
+  "id": "humana",
+  "phoneE164": "+18004574708",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.humana.com/contact-us",
+  "confirmed": true,
+  "note": "Digits confirmed in raw HTML (HTTP 200). Page text: '[h2] Contact details for plans, agents and providers ... [h3] Medicare plans Call 800-457-4708 (TTY: 711), Monday - Friday, 8 a.m. - 8 p.m., local time.' Hours match the record. Caveats for the owner: the page heading is only 'Medicare plans' - the words 'customer care'/'member' in the record's notes are NOT on the page; the contact-us page separately routes existing members to a 'member help page' link, so this list may be prospect-oriented; and the member-facing disenrollment page names a different number (800-285-7197) as 'Humana Customer Care'. Still a plan-specific Humana Medicare line (not a corporate switchboard), so dialing it for Medicare customer_service is sensible, but it is Medicare-only (not dental/vision or employer-group)."
+ },
+ {
+  "id": "humana",
+  "phoneE164": "+18002857197",
+  "purpose": "cancellation",
+  "sourceUrl": "https://www.humana.com/member/member-rights/disenrollment-and-cancellation",
+  "confirmed": true,
+  "note": "Digits confirmed in raw HTML (HTTP 200), 3 occurrences. Page text: 'Cancel by calling. The most convenient way to cancel your plan before the effective date is to call Humana Customer Care. The Humana Customer Care department will guide you through the cancellation process: 800-285-7197 (TTY: 711) Monday - Friday, 8 a.m. - 8 p.m. (Oct. 15 - March 31) 7 days a week, 8 a.m. - 8 p.m.' Label matches purpose. Scope: phone cancellation is for BEFORE the plan effective date; page states 'You cannot disenroll by calling' after the effective date (online/mail/fax only), though the line also answers 'additional questions about cancellation or disenrollment'. Page's fax 800-633-8188 ('Or fax to:') is correctly held only in the mail contact with phoneE164 null - do not promote it to a dialable number."
+ },
+ {
+  "id": "humana",
+  "phoneE164": "+18778771051",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.humana.com/contact-us",
+  "confirmed": true,
+  "note": "Digits confirmed in raw HTML (HTTP 200). Page text: '[h3] Individual dental and vision plans Call 877-877-1051, Monday - Friday, 8 a.m. - 9 p.m. Eastern time'. Hours match the record. Scope: individual dental and vision plans only; not for Medicare or employer-group members. No TTY stated on the page for this line."
+ },
+ {
+  "id": "humana",
+  "phoneE164": "+18664277478",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.humana.com/contact-us",
+  "confirmed": true,
+  "note": "Digits confirmed in raw HTML (HTTP 200). Page text: '[h3] Employer group plan members Please call the number on the back of your Humana member ID card. Don't have your card? Call 866-427-7478.' Label matches the record's notes exactly. Scope: fallback for employer-group plan members who do not have their ID card; the page's primary instruction is the number on the back of the ID card. No hours stated on the page. Do not use for Medicare or individual dental/vision members."
+ },
+ {
+  "id": "humana",
+  "phoneE164": "+18008676601",
+  "purpose": "appeals",
+  "sourceUrl": "https://www.humana.com/member/exceptions-and-appeals",
+  "confirmed": true,
+  "note": "Digits confirmed in raw HTML (HTTP 200). Page text: 'Here are the ways to submit an expedited appeal: Phone -800-867-6601 Fax (Part D only) -Download a Appeal, Complaint and Grievance form...'. Load-bearing restriction (already in the record's notes): the page labels this number ONLY for EXPEDITED (fast) appeals - services not yet rendered where waiting could seriously harm life/health/function. For standard appeals, grievances and exceptions the page routes to 'the Customer Care number on the back of your Humana member ID card' (TTY 711), which it does not print. No hours stated. Dial only for expedited appeals; not a general appeals or customer-service line."
+ },
+ {
+  "id": "healthy-paws",
+  "phoneE164": "+18558988991",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.healthypawspetinsurance.com/contact.html",
+  "confirmed": true,
+  "note": "Page fetched (HTTP 200, title 'Contact Us | Healthy Paws'). Shows 'Healthy Paws Customer Care: 1-855-898-8991' with help@healthypawspetinsurance.com and hours Mon-Fri 8:00 AM-8:00 PM (EST), Sat 9:00 AM-4:00 PM (EST); tel: href is 1-855-898-8991. Label matches customer_service."
+ },
+ {
+  "id": "healthy-paws",
+  "phoneE164": "+18558988991",
+  "purpose": "claims",
+  "sourceUrl": "https://www.healthypawspetinsurance.com/frequent-questions.html",
+  "confirmed": true,
+  "note": "Page fetched (HTTP 200, title 'Frequently Asked Questions | Healthy Paws'). FAQ states 'Please call (855) 898-8991 and select the option to speak with a Claims Representative' (in the direct-payment-on-covered-claims answer). The only other numbers on the page are fax lines (888-228-4129 claims fax, 844-333-0739 records fax). Same digits; label fits claims via the IVR option."
+ },
+ {
+  "id": "healthy-paws",
+  "phoneE164": "+18558988991",
+  "purpose": "cancellation",
+  "sourceUrl": "https://www.healthypawspetinsurance.com/pet-insurance-coverage-and-exclusions/how-to-cancel.html",
+  "confirmed": true,
+  "note": "Page fetched (HTTP 200, title 'How to Cancel | Healthy Paws'). Under 'Submit cancellation request' it lists 'Phone: 1-855-898-8991' alongside email, fax 888-228-4129 and the Portland, ME P.O. box; the page also says 'Contact our Customer Care Team: 1-855-898-8991'. Label matches cancellation."
+ },
+ {
+  "id": "principal-financial",
+  "phoneE164": "+18009863343",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.principal.com/contact-us",
+  "confirmed": true,
+  "note": "Digits present. Page labels it 'General questions: +1-800-986-3343, Monday-Friday, 7 a.m. - 7 p.m. CT' under the customer 'Still need help?' block (next to account/login help), so it is a customer line, not a corporate switchboard; hours match the record. Caveat: /contact-us now 301-redirects to https://www.principal.com/service-and-support; consider updating sourceUrl."
+ },
+ {
+  "id": "principal-financial",
+  "phoneE164": "+18005477754",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.principal.com/contact-us",
+  "confirmed": true,
+  "note": "Digits present. Page labels it 'Retirement plan participants: +1-800-547-7754, Monday-Friday, 7 a.m. - 9 p.m. CT'; hours match. SCOPE WARNING: retirement plan participants only - do not dial for disability policy, billing, or claims questions; use 800-986-3343 for those. Page reached via 301 to /service-and-support."
+ },
+ {
+  "id": "principal-financial",
+  "phoneE164": "+18004223788",
+  "purpose": "claims",
+  "sourceUrl": "https://www.principal.com/help/help-individuals/help-insurance",
+  "confirmed": true,
+  "note": "Digits present in the 'Individual disability insurance' section under the FAQ 'How do I contact Principal to discuss an individual disability claim? Please call 800-422-3788 7:30 am CT to 5:00 pm with questions or if you need forms emailed or mailed.' Hours match the record; days not stated on page. Fax 866-317-4526 and IndividualDisabilityClaims@ email also present on page."
+ },
+ {
+  "id": "principal-financial",
+  "phoneE164": "+18002451522",
+  "purpose": "claims",
+  "sourceUrl": "https://www.principal.com/help/help-individuals/help-insurance",
+  "confirmed": true,
+  "note": "Digits present in the 'Group disability insurance (through employer)' section, FAQ 'What information does Principal need when I return to work?': 'Reach out to the claim analyst handling your claim or call 800-245-1522.' Identified as the group disability claims team, but the page offers it only for an existing group claim (return-to-work/ongoing-claim matters); initial group claims are filed online, by email (SBDClaims@principal.com) or fax (800-255-6609), all of which are present on the page. No hours stated."
+ },
+ {
+  "id": "guardian-life",
+  "phoneE164": "+18884827342",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.guardianlife.com/contact-us",
+  "confirmed": true,
+  "note": "Page fetched (HTTP 200, curl w/ browser UA). Under 'General questions' > 'Customer support': '1-888-Guardian (1-888-482-7342)', Mon-Thurs 8am-6pm EST, Fri 8am-5pm EST. Vanity decodes G4 U8 A2 R7 D3 I4 A2 = 482-7342 (trailing N is surplus) and the page also prints the digits. Distinct from the HQ switchboard (212) 598-8000 on the same page. The disability contact page additionally lists this number under 'Exploring or have personal insurance' with the same hours."
+ },
+ {
+  "id": "guardian-life",
+  "phoneE164": "+18882757473",
+  "purpose": "claims",
+  "sourceUrl": "https://www.guardianlife.com/forms-and-claims/individuals-families/disability-insurance",
+  "confirmed": true,
+  "note": "Page fetched (HTTP 200). Page title: 'Forms and claims for policies and accounts purchased individually'. Under 'Claims' > 'Disability insurance': '1-888-275-7473, select option 2, or Log in to the client portal to initiate a claim.' No hours stated on page. Applies to individually purchased policies, not employer group coverage."
+ },
+ {
+  "id": "guardian-life",
+  "phoneE164": "+18002682525",
+  "purpose": "claims",
+  "sourceUrl": "https://www.guardianlife.com/contact-us/disability-insurance",
+  "confirmed": true,
+  "note": "Page fetched (HTTP 200). Under 'Exploring coverage from work' > 'Group Disability': 'Short Term Member Services Call Center 1-800-268-2525, Mon-Fri 8am-8pm EST', with a 'Submit a Claim' link directly beneath. Page label is 'Member Services' rather than 'Claims', but it is the member-facing group STD line, so dialing it for a group STD claim is sensible. Employer-sponsored group members only; not for individual policies."
+ },
+ {
+  "id": "guardian-life",
+  "phoneE164": "+18005384583",
+  "purpose": "claims",
+  "sourceUrl": "https://www.guardianlife.com/contact-us/disability-insurance",
+  "confirmed": true,
+  "note": "Page fetched (HTTP 200). Under 'Group Disability': 'Long Term Member Services Call Center 1-800-538-4583, Mon-Fri 8am-8pm EST'. Same caveat as the STD line: labeled 'Member Services', member-facing group LTD line; group members only, not individual policies."
+ },
+ {
+  "id": "guardian-life",
+  "phoneE164": "+18882625670",
+  "purpose": "claims",
+  "sourceUrl": "https://www.guardianlife.com/contact-us/disability-insurance",
+  "confirmed": true,
+  "note": "Page fetched (HTTP 200). Under 'Group Disability': 'TeleGuard Claims Call Center 1-888-262-5670, Mon-Fri 8am-8pm EST'. Explicit claims label. Group disability only."
+ },
+ {
+  "id": "guardian-life",
+  "phoneE164": "+18006274200",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.guardianlife.com/contact-us/disability-insurance",
+  "confirmed": false,
+  "note": "Digits ARE present on the page, but the number is mislabeled for this purpose. The page lists 800-627-4200 only under 'For employers/planholders - Speak to a Guardian Representative' and 'Group benefits brokers - Speak to a Guardian Representative'. It is not a member/policyholder customer-service line (the record's own notes concede 'not intended for individual members'). A consumer-facing voice agent dialing customer_service should not use it. Recommend re-tagging purpose as an employer/broker line or removing it from the dial list."
+ },
+ {
+  "id": "the-hartford",
+  "phoneE164": "+18664678730",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.thehartford.com/contact-the-hartford/business",
+  "confirmed": true,
+  "note": "Page fetched 2026-10-11 (HTTP 200, no redirect). Digits 866-467-8730 appear under 'Business Insurance Contact Information' labeled 'Business Customer Services', M-F: 8 a.m. to 8 p.m. ET, 'Spanish/Espa\u00f1ol available'. Label matches customer_service."
+ },
+ {
+  "id": "the-hartford",
+  "phoneE164": "+18664678730",
+  "purpose": "cancellation",
+  "sourceUrl": "https://www.thehartford.com/contact-the-hartford/business",
+  "confirmed": true,
+  "note": "Same 'Business Customer Services' line (866-467-8730, M-F 8-8 ET). The page publishes no dedicated cancellation number; a business policy-service line is the sensible place to request cancellation. Agent-placed policies may also be cancelled via the agent."
+ },
+ {
+  "id": "the-hartford",
+  "phoneE164": "+18772871316",
+  "purpose": "billing",
+  "sourceUrl": "https://www.thehartford.com/contact-the-hartford/business",
+  "confirmed": false,
+  "note": "Digits 877-287-1316 do appear on the page, but the label is 'Payroll Billing Service' under the heading 'For Employee Benefits & Benefit Administration' (group-benefits payroll billing), not billing for the P&C lines in this record (BOP, GL, workers' comp, commercial auto). Dialing it for business-policy billing is a misroute. Use 866-467-8730 (Business Customer Services) or 800-835-0385 (account service) for premium billing instead; consider re-labeling this contact as employee-benefits payroll billing or removing it."
+ },
+ {
+  "id": "the-hartford",
+  "phoneE164": "+18008350385",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.thehartford.com/business-insurance/customer-service",
+  "confirmed": true,
+  "note": "Page fetched 2026-10-11 (HTTP 200, no redirect), titled 'The Hartford Customer Service' under Business Insurance. Digits 800-835-0385 appear under 'The Hartford Customer Service Is Here to Help' labeled 'Account service and online help:', M-F: 8 a.m. to 8 p.m. ET. Label matches customer_service (business policyholder account service)."
+ },
+ {
+  "id": "the-hartford",
+  "phoneE164": "+18004477649",
+  "purpose": "billing",
+  "sourceUrl": "https://www.thehartford.com/business-insurance/customer-service",
+  "confirmed": true,
+  "note": "Digits 800-447-7649 appear on the same page labeled 'Premium audit help:', M-F: 8 a.m. to 8 p.m. ET. Scope caveat: this is the premium-audit line (audit-driven premium adjustments/bills for WC/GL), not general billing; for other billing questions the page's general line is 800-835-0385. Fine to dial for audit-related billing."
+ },
+ {
+  "id": "trupanion",
+  "phoneE164": "+18887332685",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.trupanion.com/about/contact",
+  "confirmed": true,
+  "note": "Digits appear exactly as '888.733.2685' under 'Call or email us' / 'Call us toll-free' on the Contact Us page, with 'We are open 24 hours a day, every day of the week' stated above it; the footer also shows '1.888.733.2685' for verifying the policy underwriter. Label is the general member line, so dialing it for customer service is sensible. Fetch method: curl (browser UA) and WebFetch both returned HTTP 403; page read via the built-in browser, loaded URL matched the cited sourceUrl with no redirect."
+ },
+ {
+  "id": "trupanion",
+  "phoneE164": "+18887332685",
+  "purpose": "cancellation",
+  "sourceUrl": "https://www.trupanion.com/pet-insurance-faq/article/cancel-my-trupanion-pet-insurance-policy",
+  "confirmed": true,
+  "note": "Page 'Can I cancel my Trupanion pet insurance policy at any time?' says under 'Step 1: Contact our pet-loving customer care team': 'calling directly at 888.733.2685 or emailing us at info@trupanion.com'. Digits exact and the page's own stated purpose for this number is cancellation. Page also states only the primary pet parent on the policy may cancel and the policy number is required. Fetch method: curl and WebFetch returned 403; read via built-in browser, loaded URL matched sourceUrl exactly."
+ },
+ {
+  "id": "trupanion",
+  "phoneE164": "+18552108749",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.trupanion.com/claims",
+  "confirmed": true,
+  "note": "Digits appear exactly as 'Call 855.210.8749' in the block 'We're always ready to help / Our customer care team is available 24/7/365. / Call 855.210.8749 / Chat online' on the claims page. Label is explicitly 'customer care team', so dialing it for customer service is sensible. Caveat: this is a sitewide pre-footer CTA (the identical block appears on the cancellation FAQ page), not a claims-specific line, and it differs from the primary 888.733.2685 shown on the Contact Us page; whether both route to the same queue is not stated on any fetched page. Fetch method: curl and WebFetch returned 403; read via built-in browser, loaded URL matched sourceUrl exactly."
+ },
+ {
+  "id": "cna",
+  "phoneE164": "+18002622000",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.cna.com/contact",
+  "confirmed": true,
+  "note": "Labeled 'GENERAL CONTACT : PHONE : (800)-CNA-2000' and also listed as the Policy Information department's BY PHONE number (contact?field_contact_department_target_id=46); that entry says existing-policy questions should go to your agent or broker, so a voice agent may be redirected, but nothing on the page says the line cannot access accounts. Digits confirmed: seen directly in the built-in browser 2026-10-11 (curl returned 403; WebFetch and browser both rendered the page), link href tel:800-262-2000, keypad C=2 N=6 A=2 -> 262. Same page, Billing & Collections entry (target_id=16), not in the record: Direct Bill Customer Service 877-276-7507 '(for immediate response)' is the page's closest match to a policyholder-service line and a candidate to add for billing/cancellation calls; also Small Business Service Center 877-724-2669 and Billing and Collections 866-958-2455."
+ },
+ {
+  "id": "cna",
+  "phoneE164": "+18775740540",
+  "purpose": "claims",
+  "sourceUrl": "https://www.cna.com/claims-center",
+  "confirmed": true,
+  "note": "Seen directly in the built-in browser 2026-10-11 on the 'Report an Insurance Claim | CNA Insurance' page: 'Need more Help? call: (877) 574-0540 / M - F , 8 am - 8 pm (Eastern)'. Plain text, no tel: link. Label fits the claims purpose. Note the contact page's Claims Department entry (contact?field_contact_department_target_id=26) lists 877-CNA-ASAP (877-262-2727) as the claims phone rather than this one; both are on cna.com."
+ },
+ {
+  "id": "geico",
+  "phoneE164": "+18002077847",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.geico.com/contact-us/phone/",
+  "confirmed": true,
+  "note": "Fetched the cited page directly (curl with browser UA, HTTP 200, title 'Contact GEICO | GEICO'). Digits 800-207-7847 appear 3 times in the HTML (visible text plus tel: links). Page label: 'Sales & Service (800) 207-7847', listed first on GEICO's official phone contact page. Label fits customer_service. No hours stated on the page. Do not confuse with the adjacent Emergency Roadside Service line (800) 424-3426 on the same page."
+ },
+ {
+  "id": "geico",
+  "phoneE164": "+18008618380",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.geico.com/contact-us/twitter/",
+  "confirmed": true,
+  "note": "Fetched the cited page directly (HTTP 200, title 'Contact GEICO on Twitter | GEICO'). Digits 800-861-8380 appear 2 times in the HTML. Page text: 'For time sensitive or complex insurance issues related to your policy, we still recommend calling us at (800) 861-8380.' Label fits customer_service (policy-issue line). No hours stated; the page does not say whether it routes to the same queue as (800) 207-7847."
+ },
+ {
+  "id": "geico",
+  "phoneE164": "+18008411587",
+  "purpose": "cancellation",
+  "sourceUrl": "https://www.geico.com/information/faq/cancel-insurance/",
+  "confirmed": true,
+  "note": "Fetched the cited page directly (HTTP 200, title 'How to Cancel Your GEICO Car Insurance Policy | GEICO'). Digits 800-841-1587 appear 6 times in the HTML (3 visible mentions plus tel: links). Page text: 'Call (800) 841-1587 to speak with a friendly, licensed agent. If prompted to speak to the Interactive Voice Response (IVR), say \"cancel insurance policy\" and then \"auto.\"' Exact match for cancellation. No hours stated."
+ },
+ {
+  "id": "geico",
+  "phoneE164": "+18008413000",
+  "purpose": "claims",
+  "sourceUrl": "https://www.geico.com/claims/claimsprocess/partner-claims-contacts/",
+  "confirmed": true,
+  "note": "Fetched the cited page directly (HTTP 200, title 'Claim Reporting | GEICO'). Digits 800-841-3000 appear 4 times in the HTML (2 visible mentions plus tel: links). Page text: 'For auto, motorcycle/ATV, and RV claims, you can: submit a claim online OR contact us at (800) 841-3000' and 'For all other policy types, please call (800) 841-3000 to report your claim.' Label fits claims. The 24/7 hours claim in the record comes from other pages, not this one. Commercial vehicle claims use a different number on this page, (866) 509-9444; do not use that for personal auto."
+ },
+ {
+  "id": "geico",
+  "phoneE164": "+18009328872",
+  "purpose": "billing",
+  "sourceUrl": "https://www.geico.com/information/faq/",
+  "confirmed": true,
+  "note": "Fetched the cited page directly (HTTP 200, title 'Frequently Asked Questions For Auto Policies | GEICO'). Digits 800-932-8872 appear 2 times in the HTML. Page text: 'Phone Pay: Call (800) 932-8872 and use our automated system to pay your bill.' CAVEAT: the page labels this as an automated payment system only. It is sensible to dial for making a payment, but it is unstaffed; a voice agent must NOT use it for billing disputes, duplicate charges, or refund questions. Route those to the Sales & Service line (800) 207-7847 or (800) 861-8380 instead. The record's own notes already state this restriction."
+ },
+ {
+  "id": "progressive",
+  "phoneE164": "+18886714405",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.progressive.com/contact-us/",
+  "confirmed": true,
+  "note": "Seen in raw page text (curl, HTTP 200) and as tel:1-888-671-4405: 'General Customer Service 1-888-671-4405' under 'Call \u2014 We're always open! You can call us 24/7.' Listed topics: Report an accident, File a claim, Make a change to my policy, Check my bill, Start a quote, Buy a policy, Need roadside assistance. Label matches purpose."
+ },
+ {
+  "id": "progressive",
+  "phoneE164": "+18886714405",
+  "purpose": "billing",
+  "sourceUrl": "https://www.progressive.com/contact-us/",
+  "confirmed": true,
+  "note": "Same General Customer Service line; 'Check my bill' is an explicitly listed topic on the page. Sensible to dial for billing."
+ },
+ {
+  "id": "progressive",
+  "phoneE164": "+18886714405",
+  "purpose": "cancellation",
+  "sourceUrl": "https://www.progressive.com/contact-us/",
+  "confirmed": true,
+  "note": "Page does not say 'cancel', but the General Customer Service line lists 'Make a change to my policy' and is the only general policy-service line. Auto FAQ (fetched) says 'contact us and a representative will help you cancel your policy' without naming a number. Note: the auto FAQ routes customer service/policy changes to 1-800-776-4737 ('representatives are available to help you 24/7'), so either official number should reach a rep; the contact page's labeled service line is the one in the record."
+ },
+ {
+  "id": "progressive",
+  "phoneE164": "+18007764737",
+  "purpose": "claims",
+  "sourceUrl": "https://www.progressive.com/claims/",
+  "confirmed": true,
+  "note": "Seen in raw page (HTTP 200): tel:1-800-776-4737 link labeled 'Claims center' (next to 'Roadside help' 1-877-537-7878), header '1-800-776-4737, Call us', and body text 'Call Progressive right away at 1-800-776-4737' to report an accident. Vanity decode P-R-O-G-R-E-S-S = 776-4737 consistent. Claims page shows no hours; auto FAQ states reps available 24/7 at this number."
+ },
+ {
+  "id": "progressive",
+  "phoneE164": "+18882409839",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.progressive.com/contact-us/",
+  "confirmed": true,
+  "note": "Page text: 'Commercial Customer Service 1-888-240-9839 Monday-Friday: 24 hours Saturday-Sunday: 6:30 AM - 2:00 AM EST'. Digits and hours match. Scope: commercial policies only, as the record says. Site bug: this number's tel: href is malformed ('System.Collections.Generic.Dictionary...') but the visible digits are correct."
+ },
+ {
+  "id": "progressive",
+  "phoneE164": "+18339514271",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.progressive.com/contact-us/",
+  "confirmed": true,
+  "note": "Page text: 'Servicio al Cliente y Reclamos en Espa\u00f1ol 1-833-951-4271 Departamento de Atenci\u00f3n al Cliente: 6:00 AM - 12:00 AM EST a diario; Departamento de Reclamos: 7:00 AM - 7:30 PM CST a diario'. Digits and hours match; Spanish-language service and claims line. Same malformed tel: href bug as above; visible digits correct."
+ },
+ {
+  "id": "prudential",
+  "phoneE164": "+18007782255",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.prudential.com/contact-us",
+  "confirmed": true,
+  "note": "Page (301 -> prudential.com/links/contact-us, same domain) prints '1-800-778-2255 (all policy numbers EXCEPT beginning with \"FE\")' under Individual Life Insurance > 'Questions about your policy or filing a death claim', Weekdays 8 AM - 8 PM ET. Digits and label match."
+ },
+ {
+  "id": "prudential",
+  "phoneE164": "+18336261865",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.prudential.com/contact-us",
+  "confirmed": true,
+  "note": "Page prints '1-833-626-1865 (policy numbers beginning with the letter \"FE\")' in the same Individual Life section, Weekdays 8 AM - 6 PM ET. Digits and label match; only for FE-prefixed policies."
+ },
+ {
+  "id": "prudential",
+  "phoneE164": "+18005757780",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.prudential.com/links/faq",
+  "confirmed": true,
+  "note": "FAQ 'How can I contact a Customer Service Representative about my insurance policy?' lists 'Intermediate & Weekly Premium Policies: 800-575-7780' (policy numbers beginning with M or nine digits), Mon-Fri 8:00 a.m.-8:00 p.m. ET. Digits and label match."
+ },
+ {
+  "id": "prudential",
+  "phoneE164": "+18007782255",
+  "purpose": "claims",
+  "sourceUrl": "https://www.prudential.com/contact-us",
+  "confirmed": true,
+  "note": "Same contact-us heading reads 'Questions about your policy or filing a death claim: 1-800-778-2255' (all policy numbers except FE). Digits match and the label explicitly covers filing a death claim."
+ },
+ {
+  "id": "prudential",
+  "phoneE164": "+18004961035",
+  "purpose": "claims",
+  "sourceUrl": "https://www.prudential.com/links/faq",
+  "confirmed": true,
+  "note": "FAQ 'How can I check the status of a death claim?' says call the Customer Service Center Mon-Fri 8 a.m.-8 p.m. ET at 1-800-496-1035. Digits match. This is the claim STATUS line, not first-notice filing (use 1-800-778-2255 or the online portal for that)."
+ },
+ {
+  "id": "prudential",
+  "phoneE164": "+18005240542",
+  "purpose": "claims",
+  "sourceUrl": "https://www.prudential.com/contact-us",
+  "confirmed": true,
+  "note": "Page prints 'Group Life Insurance-Claims or questions about your policy: 1-800-524-0542', Weekdays 8 AM - 8 PM ET. Digits and label match; employer-provided group life only."
+ },
+ {
+  "id": "prudential",
+  "phoneE164": "+18005629874",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.prudential.com/contact-us",
+  "confirmed": true,
+  "note": "Page prints 'Group Universal Life and Group Variable Universal Life-Group Policies provided through an Employer: 1-800-562-9874', Weekdays 8 AM - 8 PM ET. Digits match; label is the GUL/GVUL product line (no 'claims or questions' wording) which is fine for customer_service on those products."
+ },
+ {
+  "id": "prudential",
+  "phoneE164": "+18887782888",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.prudential.com/contact-us",
+  "confirmed": true,
+  "note": "Page prints 'Individual Prudential Annuities Contracts: 1-888-778-2888' in the Annuities section. Digits and label match. Hours are not attached to it on contact-us, but the fetched FAQ (annuities RMD answer) states 'Call us at 888-778-2888, Monday - Friday, 8 a.m. - 6 p.m. Eastern Time', which resolves the record's open hours question."
+ },
+ {
+  "id": "prudential",
+  "phoneE164": "+18007782255",
+  "purpose": "billing",
+  "sourceUrl": "https://www.prudential.com/links/faq",
+  "confirmed": true,
+  "note": "FAQ directs premium questions here: next premium amount/due date via the automated system at 1-800-778-2255 (Mon-Fri 8-8 ET), lapse-notice payments after the due date, and new coupon books. Digits match; sensible for billing."
+ },
+ {
+  "id": "prudential",
+  "phoneE164": "+18007782255",
+  "purpose": "cancellation",
+  "sourceUrl": "https://www.prudential.com/links/faq",
+  "confirmed": true,
+  "note": "FAQ: 'to perform a cash surrender of your policy, contact your Prudential professional, or call our Customer Service Center at 1-800-778-2255, Mon.-Fri., 8 a.m.-8 p.m. ET.' Digits match; surrender is the cancellation path."
+ },
+ {
+  "id": "prudential",
+  "phoneE164": "+18007784357",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.prudential.com/contact-us",
+  "confirmed": false,
+  "note": "Digits verified: page prints '1-800-PRU-HELP (1-800-778-4357)', Weekdays 8 AM - 9 PM ET, Sat/Sun closed. But the page label is 'If you are having access issues using www.prudential.com' under 'Assistance with Online Account Access' - a website/login help desk, not policy customer service. Not sensible to dial for a generic customer_service purpose; retag to an online-access/tech-support purpose rather than delete."
+ },
+ {
+  "id": "prudential",
+  "phoneE164": "+18447784255",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.prudential.com/contact-us",
+  "confirmed": false,
+  "note": "Digits verified: page prints '1-844-PRU-4ALL (778-4255)' and the keypad decode agrees. Page also shows Weekdays 9 AM - 6 PM ET (record has hours null). But the label is 'For Customers with Disabilities' with 711 relay language - an accessibility support line, not the general customer_service line. Retag/narrow the purpose; do not use as the default customer_service dial."
+ },
+ {
+  "id": "northwestern-mutual",
+  "phoneE164": "+18669504644",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.northwesternmutual.com/contact-us/",
+  "confirmed": true,
+  "note": "Fetched page (HTTP 200). Visible text: 'Contact us. We're here to help. For general questions (866) 950-4644 Mon-Fri, 7am-6pm CT. Have your policy or account number handy, if available.' Digits match; account-servicing general line, fits customer_service."
+ },
+ {
+  "id": "northwestern-mutual",
+  "phoneE164": "+18669504644",
+  "purpose": "billing",
+  "sourceUrl": "https://www.northwesternmutual.com/faq/",
+  "confirmed": true,
+  "note": "Fetched page (HTTP 200). Visible text: payment-history questions -> 'contact Northwestern Mutual directly at (866) 950-4644, Mon-Fri, 7am-6pm CT'; 'To sign up for a Billing Account, call our Customer Service Center at (866) 950-4644.' Digits match; billing purpose matches."
+ },
+ {
+  "id": "northwestern-mutual",
+  "phoneE164": "+18003888123",
+  "purpose": "billing",
+  "sourceUrl": "https://www.northwesternmutual.com/faq/life-insurance-faq/",
+  "confirmed": true,
+  "note": "Fetched page (HTTP 200). 1-800-388-8123 appears 7 times, labeled 'Northwestern Mutual directly ... 7am-6pm CT, Monday-Friday' for changing the automatic premium withdrawal date or bank, repaying a policy loan, Billing Account Plus signup, Early Payment Benefit form, and death-coverage inquiries. Digits match; billing purpose matches."
+ },
+ {
+  "id": "northwestern-mutual",
+  "phoneE164": "+18006358855",
+  "purpose": "claims",
+  "sourceUrl": "https://www.northwesternmutual.com/report-a-death/",
+  "confirmed": true,
+  "note": "Fetched page (HTTP 200). On the Report a Death form, directly above Submit: 'If you have any questions, call client services at 1-800-635-8855.' Digits match; it is the death-claim questions line, fits claims. No hours stated on the page."
+ },
+ {
+  "id": "northwestern-mutual",
+  "phoneE164": "+18773949524",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.northwesternmutual.com/faq/",
+  "confirmed": true,
+  "note": "Fetched page (HTTP 200). Visible text: 'Contacting Client Services at (877) 394-9524, Mon-Fri, 7am-6pm CT' as a route to obtain/return a Beneficiary Change form. Digits match; labeled Client Services, fits customer_service (page scopes it to beneficiary changes; record notes already say so)."
+ },
+ {
+  "id": "northwestern-mutual",
+  "phoneE164": "+18664643800",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.northwesternmutual.com/faq/",
+  "confirmed": true,
+  "note": "UNIVERSAL LIFE POLICIES ONLY. Fetched page (HTTP 200). Visible text: 'To make beneficiary changes on a Universal Life product, contact your financial representative or call Universal Life Services at (866) 464-3800.' Digits match; it is a product-specific servicing line, so do not dial it for term or whole life callers. No hours stated."
+ },
+ {
+  "id": "northwestern-mutual",
+  "phoneE164": "+18669504644",
+  "purpose": "cancellation",
+  "sourceUrl": "https://www.northwesternmutual.com/contact-us/",
+  "confirmed": true,
+  "note": "Fetched page (HTTP 200). Page labels the number 'For general questions' with 'Have your policy or account number handy' (an account-servicing line, not a switchboard). No cancellation or surrender line is published anywhere on the page; dialing this as the entry point is sensible but expect referral to the financial representative or a written surrender request."
+ },
+ {
+  "id": "liberty-mutual",
+  "phoneE164": "+18002908711",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.libertymutual.com/customer-support",
+  "confirmed": true,
+  "note": "Fetched via curl with browser UA (WebFetch is 403-blocked per record); HTTP 200, canonical URL matches, H1 'Get Liberty Mutual customer support now', no block/splash markers. Page text: 'By phone: For policy, billing, or other service questions, you can: Call us at 800-290-8711' with href tel:800-290-8711. Label matches purpose. Page routes claims to the Claims Center and says agency-bought policies should contact the agent for additional support."
+ },
+ {
+  "id": "liberty-mutual",
+  "phoneE164": "+18002908711",
+  "purpose": "billing",
+  "sourceUrl": "https://www.libertymutual.com/customer-support",
+  "confirmed": true,
+  "note": "Same page and same line as customer_service: 'For policy, billing, or other service questions ... Call us at 800-290-8711' (tel:800-290-8711). 'Billing' is explicitly in the page's label, so dialing for billing is sensible. Record correctly warns that 800-824-7317 (automated pay-by-phone) and 800-290-8102 (payroll deduction) are not dispute lines."
+ },
+ {
+  "id": "liberty-mutual",
+  "phoneE164": "+18002908711",
+  "purpose": "cancellation",
+  "sourceUrl": "https://www.libertymutual.com/cancelling-your-policy",
+  "confirmed": true,
+  "note": "Fetched via curl; HTTP 200, canonical URL matches, H1 'Cancelling your insurance policy'. Under 'How to cancel your policy': 'If you need to cancel your policy for any reason, we're happy to help. Call us anytime at 800-290-8711.' (tel:800-290-8711, appears twice on the page). Label matches purpose exactly."
+ },
+ {
+  "id": "liberty-mutual",
+  "phoneE164": "+18002252467",
+  "purpose": "claims",
+  "sourceUrl": "https://www.libertymutual.com/customer-support/claims-support",
+  "confirmed": true,
+  "note": "Fetched via curl; HTTP 200, canonical URL matches, H1 'Get claims support now'. Page text: 'Contact claims by phone: For claims support: 800-225-2467' with href tel:800-225-2467. Site footer also shows 'Personal insurance claims ... Or call: 800-2CLAIMS', which decodes on the keypad to 800-225-2467 (C=2 L=5 A=2 I=4 M=6 S=7), matching. Footer separately labels 844-325-2467 (small business) and 800-362-0000 (mid/large business), confirming 800-225-2467 is the personal-lines claims line."
+ },
+ {
+  "id": "allianz-global-assistance",
+  "phoneE164": "+18668843556",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.allianztravelinsurance.com/contact-us.htm",
+  "confirmed": true,
+  "note": "Seen directly in the page DOM via the built-in browser (curl returned HTTP 403; WebFetch also succeeded). Exact string '1-866-884-3556' with href tel:+18668843556. Label on the Contact Us section: 'Please feel free to contact us with any questions or comments you may have: Phone: 1-866-884-3556' (also 'Get Help 1-866-884-3556' in the nav). Page also shows 800-284-8300 only as the AGA Service Company legal-disclaimer contact, which is not this number. A hidden, non-visible 'This is a test environment' banner exists in the DOM on the production domain; treated as data, not acted on."
+ },
+ {
+  "id": "allianz-global-assistance",
+  "phoneE164": "+18668843556",
+  "purpose": "cancellation",
+  "sourceUrl": "https://www.allianztravelinsurance.com/travel/insurance-101/free-look-period.htm",
+  "confirmed": true,
+  "note": "Exact string '1-866-884-3556' (tel:+18668843556) inside the answer to 'How do I cancel my travel insurance plan within the 15-day review period?': '...click \"Cancel Policy\" in the menu. Need help? Call Support at 1-866-884-3556.' Label 'Support' is tied directly to the review-period cancellation/refund instruction. Only other number on the page is the 800-284-8300 disclaimer contact. Same hidden test-environment banner present in DOM, not visible."
+ },
+ {
+  "id": "allianz-global-assistance",
+  "phoneE164": "+18668843556",
+  "purpose": "appeals",
+  "sourceUrl": "https://www.allianztravelinsurance.com/faq.htm",
+  "confirmed": true,
+  "note": "Exact string '1-866-884-3556' (tel:+18668843556) under FAQ 'Why was my claim denied?': 'If you have questions about why your claim was denied, please call Customer Service at 1-866-884-3556.' The page's label is 'Customer Service', not 'appeals'; no formal appeal process, deadline or appeals line is published anywhere on the page. Dialing it to discuss or contest a denial is the only route the page gives. The emergency numbers 1-800-654-1908 / 1-804-281-5700 are separately labeled '24-Hour Hotline Assistance' and are not this number."
+ },
+ {
+  "id": "allianz-global-assistance",
+  "phoneE164": "+18668843556",
+  "purpose": "billing",
+  "sourceUrl": "https://www.allianztravelinsurance.com/faq.htm",
+  "confirmed": true,
+  "note": "Digits present many times on the page (tel:+18668843556), but the FAQ never uses the word 'billing' and attaches no billing label to the number. Its labels are 'customer service' ('1-866-884-3556 for customer service' in the international-calling FAQ), claim status, denial questions, required documents, and 'Can I change my preferred payment option? Please call customer service at 1-866-884-3556' (claim payout method, not premium billing). The review-period cancellation FAQ on this page lists no phone; overpayment/excess reimbursement goes to the Recovery Department by email/mail only (recovery@allianz.com, PO Box 72032, Richmond, VA 23294), no phone. Marked confirmed because it is the single consumer customer-service line (Contact Us: 'any questions or comments'), not a switchboard; the agent should ask for customer service, not a billing department. Downgrade if strict label matching is required."
+ },
+ {
+  "id": "state-farm",
+  "phoneE164": "+18007828332",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.statefarm.com/contact-us",
+  "confirmed": true,
+  "note": "Page fetched (HTTP 200). Digits present 9x as '800-STATE-FARM (800-782-8332)'; keypad decode S7 T8 A2 T8 E3 F3 A2 = 782-8332 matches. Label on this page: 'Comments or questions' under the General contact category (alongside Claims/Payment/Financial). Not literally labeled 'customer service' and no 'cannot access accounts' caveat. Note the FAQ page (faqs/insurance) labels this same number as the rate-quote line (business hours to a nearby agent, after-hours/weekends to a Customer Care Center rep) and names 855-733-7333 as the customer service number, so the record's open question about which line is primary stands."
+ },
+ {
+  "id": "state-farm",
+  "phoneE164": "+18557337333",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.statefarm.com/customer-care/faqs/insurance",
+  "confirmed": true,
+  "note": "Page fetched (HTTP 200). Digits present under 'What is the customer service phone number?': 'The State Farm toll-free customer service number is 855-733-7333.' Exact label match. No hours on the page."
+ },
+ {
+  "id": "state-farm",
+  "phoneE164": "+18772740543",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.statefarm.com/customer-care/faqs/insurance",
+  "confirmed": true,
+  "note": "Page fetched (HTTP 200). Digits present: 'Spanish-speaking representatives are available by calling 877-274-0543.' SPANISH-LANGUAGE line; do not dial for English-language service. No hours on the page."
+ },
+ {
+  "id": "state-farm",
+  "phoneE164": "+18007325246",
+  "purpose": "claims",
+  "sourceUrl": "https://www.statefarm.com/claims/home-and-property",
+  "confirmed": true,
+  "note": "Page fetched (HTTP 200). Digits present 38x in numeric form, e.g. 'call us at 800-SF-CLAIM (800-732-5246) to file' and 'Call 800-SF-CLAIM (800-732-5246) 24/7'. Keypad decode S7 F3 C2 L5 A2 I4 M6 = 732-5246 matches. Label (file a home/property claim; message or call claim handler with questions) matches purpose; '24/7' stated on page."
+ },
+ {
+  "id": "state-farm",
+  "phoneE164": "+18004400998",
+  "purpose": "billing",
+  "sourceUrl": "https://www.statefarm.com/customer-care/insurance-bill-pay",
+  "confirmed": true,
+  "note": "Page fetched (HTTP 200). Digits present: 'Phone. Call us, 24/7, at 800-440-0998. To access your bill information, you'll need to provide your phone number and date of birth. You can pay with a credit or debit card, or your bank account info.' Label is bill payment / bill information, which matches billing. Per the record, billing disputes are routed to the local agent, so this line is for payments and bill info rather than disputes."
+ },
+ {
+  "id": "state-farm",
+  "phoneE164": "+18007828332",
+  "purpose": "cancellation",
+  "sourceUrl": "https://www.statefarm.com/customer-care/manage-your-accounts/cancel-my-policy",
+  "confirmed": false,
+  "note": "Page fetched (HTTP 200) and digits ARE present (3x '800-782-8332' plus a tel link), but the cited page's only label for this number is in the 'Interested in switching agents? ... Change my agent ... Phone: Call us at 800-782-8332' block. The page's actual cancellation instructions ('Cancel by phone: Contact your local State Farm agent ...' / 'Cancel in person') point to the ZIP-code agent locator, not to this number. Right digits, wrong citation: this is the same 800-STATE-FARM general line confirmed on contact-us, and faqs/insurance documents that business-hours calls route to a nearby agent, so dialing it is a plausible path to an agent who can cancel. To make this entry pass, re-cite sourceUrl to https://www.statefarm.com/customer-care/faqs/insurance (or contact-us) and note the routing caveat."
+ },
+ {
+  "id": "state-farm",
+  "phoneE164": "+18007325246",
+  "purpose": "appeals",
+  "sourceUrl": "https://www.statefarm.com/claims/home-and-property",
+  "confirmed": true,
+  "note": "Page fetched (HTTP 200). Digits present as '800-SF-CLAIM (800-732-5246)'. The page labels the number for filing a claim and for claim questions ('Questions? ... message your claim handler(s) online or through the State Farm app. Or call us at 800-SF-CLAIM'). Its FAQ 'What happens if you deny my claim?' says a written letter explains the policy language behind a denial; no appeal line or appeal process is labeled anywhere on the page. 'Appeals' is the KB's mapping, not State Farm's label; dialing the claims line to question a denial reaches the same claim handlers, so it is sensible for this purpose, but expect no formal appeal queue."
+ },
+ {
+  "id": "usaa",
+  "phoneE164": "+18005318722",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.usaa.com/help/contact/",
+  "confirmed": true,
+  "note": "Cited URL 3xx-redirects (followed by curl -L from the cited URL) to https://www.usaa.com/support/?akredirect=true, title 'USAA Customer Service and Support'; fetched 2026-10-11. 'Main contact information' block: 'You can reach any department through our main number.' Phone number: 800-531-USAA (8722); TTY 711. Hours Mon-Fri 6 a.m.-10 p.m. CT, Sat 8 a.m.-8 p.m. CT, Sun closed, 'Days and times may vary' - matches record. Advisory: update sourceUrl to https://www.usaa.com/support/."
+ },
+ {
+  "id": "usaa",
+  "phoneE164": "+12105318722",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.usaa.com/help/contact/",
+  "confirmed": true,
+  "note": "Same redirect to /support/. Printed as '210-531-USAA (8722)' directly above 800-531-USAA (8722) under 'Phone number' in the 'Main contact information' block (digits 210-531-8722 also present in page markup); same 'any department' label and hours. Confirmed as the San Antonio local main number."
+ },
+ {
+  "id": "usaa",
+  "phoneE164": "+18005318722",
+  "purpose": "claims",
+  "sourceUrl": "https://www.usaa.com/help/contact/",
+  "confirmed": true,
+  "note": "Same redirect to /support/. The page labels this number as the claims line: Canada section 'Auto and property insurance claims phone number and hours of operation: Call: 800-531-USAA (8722), Open 24/7'; Europe sections 'From within the U.S.: Call: 800-531-8722, Open 24/7' for auto and property claims; main block 'You can reach any department through our main number.' Caveat: the US-mainland 'Auto and property insurance' section itself prints no claims phone line (only self-service links, 24/7 roadside 800-531-8555, fax 800-531-8877, claims fax 800-531-8669, claims mailing address), so US-mainland claims hours remain unstated, as the record says."
+ },
+ {
+  "id": "usaa",
+  "phoneE164": "+18005318722",
+  "purpose": "billing",
+  "sourceUrl": "https://www.usaa.com/support/insurance/auto-property-billing/faq/",
+  "confirmed": true,
+  "note": "Page fetched directly (title 'General Insurance Billing Frequently Asked Questions'). Number appears once, in the nonpayment-cancellation answer: 'You can make payments for the full amount online before the cancellation date. For other options, call us at 800-531-USAA (8722).' Billing label fits. Page states no hours; record's hours are carried from the contact page, as its notes say."
+ },
+ {
+  "id": "usaa",
+  "phoneE164": "+18005318722",
+  "purpose": "cancellation",
+  "sourceUrl": "https://www.usaa.com/support/insurance/auto/cancel/",
+  "confirmed": true,
+  "note": "Page fetched directly (title 'Cancel your Auto Insurance Policy'). 'How to cancel your auto policy ... All you need to do is talk to a representative. Call 800-531-USAA (8722). For TTY devices, dial 711.' Hours Mon-Fri 6 a.m.-10 p.m. CT, Sat 8 a.m.-8 p.m. CT, Sun closed, all major holidays closed. Strong label match; the number also appears in the refund FAQ on the same page."
+ },
+ {
+  "id": "usaa",
+  "phoneE164": "+18005318722",
+  "purpose": "appeals",
+  "sourceUrl": "https://www.usaa.com/support/insurance/claims/homeowners/faq/",
+  "confirmed": true,
+  "note": "Page fetched directly (title 'Homeowners Insurance Claims FAQs'). Weakest label match: the number is printed only under 'Still need help? If you can't find the information you need, call us at 800-531-USAA (8722).' The 'Denied claims' answer ('How do I dispute a denial or have my claim reevaluated? You can discuss it with your adjuster by phone or by sending them a message in the claims center') prints no number. No dedicated appeals line exists; this is USAA's single all-department number, so dialing it to reach the adjuster is sensible, but the agent should expect to be routed rather than reach an 'appeals' desk."
+ },
+ {
+  "id": "allstate",
+  "phoneE164": "+18007266033",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.allstate.com/help-support/contact/call-center",
+  "confirmed": true,
+  "note": "Fetched via curl (HTTP 200), page title 'Call Center | 24/7 Support | Allstate'. Digits '800-726-6033' appear twice: 'our licensed call center agents are available any time to answer your questions ... Call 800-726-6033 or chat now' and 'Call us at 800-726-6033, and our call center experts can help enroll you in My Account'. The existing-customer section on the same page says 'Reach out to our call center to ask about billing, discounts and additional coverage options'. Label (Allstate call center, 24/7, account-capable) matches customer_service."
+ },
+ {
+  "id": "allstate",
+  "phoneE164": "+18002557828",
+  "purpose": "claims",
+  "sourceUrl": "https://www.allstate.com/help-support/claims",
+  "confirmed": true,
+  "note": "Fetched via curl (HTTP 200), page title 'Claims Help | File or Track a Claim | Allstate Insurance'. Digits '800-255-7828' appear twice: 'Not an Allstate customer? Call 800-255-7828 to file your claim' and under 'Questions about your claim' as 'Auto and property 800-255-7828'. The vanity form 1-800-ALLSTATE is not printed on this page (it is on the claims FAQ page as '1-800-ALLSTATE (255-7828)'); keypad decode A2 L5 L5 S7 T8 A2 T8 = 255-7828 matches. Label matches claims. Note the page lists different numbers for life (800-366-3495) and annuity claims; this one is specifically auto and property."
+ },
+ {
+  "id": "allstate",
+  "phoneE164": "+18669988388",
+  "purpose": "billing",
+  "sourceUrl": "https://www.allstate.com/help-support/billing-payments/faqs",
+  "confirmed": true,
+  "note": "Fetched via curl (HTTP 200), page title 'Billing & Payments Frequently Asked Questions | Allstate'. Digits '1-866-998-8388' appear once: 'If you've missed a payment or if you think you will be late with a payment, contact your agent or call Allstate customer service at 1-866-998-8388 for more help.' Page labels it 'Allstate customer service' in a billing/payment context, so dialing it for billing is sensible. Hours are not stated on the page."
+ },
+ {
+  "id": "allstate",
+  "phoneE164": "+18009011732",
+  "purpose": "billing",
+  "sourceUrl": "https://www.allstate.com/help-support/billing-payments",
+  "confirmed": false,
+  "note": "Digits verified: fetched via curl (HTTP 200), page title 'Pay & Manage Your Bill Online & More | Allstate Insurance', text reads 'Call: Pay your bill via the automated payment system by calling 800-901-1732.' The billing FAQ page also lists it ('Calling Allstate at 800-901-1732' when My Account is down; 'call us at 1-800-901-1732' if a payment didn't go through). However the page's only label is 'automated payment system' -- an IVR for taking payments, with no human and no ability to handle disputes, duplicate charges or questions, which is what the record's own billing_dispute_process term anticipates. Not sensible for a voice-agent 'billing' call; use +18669988388 (or +18007266033) instead. Owner may flip to true only if the billing purpose is literally making a payment by phone."
+ },
+ {
+  "id": "allstate",
+  "phoneE164": "+18007266033",
+  "purpose": "cancellation",
+  "sourceUrl": "https://www.allstate.com/help-support/contact",
+  "confirmed": true,
+  "note": "Fetched via curl (HTTP 200), page title 'Contact Allstate: Chat, Find an Agent, Email & More | Allstate'. Digits appear once as '1 (800) 726-6033': 'if you'd like to speak with someone directly from our call center, you can call 1 (800) 726-6033.' The contact page itself does not mention cancellation; the two-hop chain was verified separately: the policy FAQ (https://www.allstate.com/help-support/my-policy/faqs, HTTP 200) answers 'How can I cancel my policy?' with 'Please contact Allstate for assistance' and its link target is exactly /help-support/contact. The call-center page confirms this line handles existing-customer billing and coverage matters, so it is the published route for cancellation; no dedicated cancellation line exists."
+ },
+ {
+  "id": "allstate",
+  "phoneE164": "+18002557828",
+  "purpose": "appeals",
+  "sourceUrl": "https://www.allstate.com/help-support/claims/faqs",
+  "confirmed": true,
+  "note": "Fetched via curl (HTTP 200), page title 'Claims Frequently Asked Questions| Allstate Insurance'. Digits appear three times: 'please call 1-800-255-7828 or message your claims contact within MyClaim', 'dial 1-800-ALLSTATE (255-7828)', and 'You can also call Allstate claims support at 1-800-255-7828.' The FAQ 'What if I don't agree with my Allstate claim representative's estimate?' answers 'Contact your claim representative with any concerns, and they'll work with you to find a fair solution.' No dedicated appeals line or formal appeal process is published; this number is labeled 'Allstate claims support' and is the published route to reach the assigned claim representative, so dialing it to dispute a claim decision is sensible. Expect to be routed to the assigned rep rather than an appeals desk."
+ },
+ {
+  "id": "new-york-life",
+  "phoneE164": "+18002255695",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.newyorklife.com/contact-us",
+  "confirmed": true,
+  "note": "Fetched (HTTP 200). Page prints 'Still have questions? Call 1 (800)-225-5695' with '1 (212)-576-6600 Toll number alternative', 'Monday through Friday 8am to 7pm ET', and 'If you have specific questions about your policy, claim, or application-our customer service experts are happy to help.' Footer also prints '1 (800) CALL-NYL' (C=2 A=2 L=5 L=5 N=6 Y=9 L=5 = 225-5695). Policyholder service line; label matches customer_service."
+ },
+ {
+  "id": "new-york-life",
+  "phoneE164": "+18002255695",
+  "purpose": "claims",
+  "sourceUrl": "https://www.newyorklife.com/claims/start-a-claim",
+  "confirmed": true,
+  "note": "Fetched (HTTP 200). Page prints only the vanity form: 'Need to speak with a customer service professional? Call (800) CALL-NYL and say the word \"Claims\" at any time. Our service team is available 8 am to 7 pm ET, Monday through Friday.' Keypad decode CALL-NYL = 225-5695 (digits are not printed on this page; the death-benefit FAQ PDF prints '(800) CALL-NYL (800-225-5695)'). Label matches claims; the IVR keyword 'Claims' is required."
+ },
+ {
+  "id": "new-york-life",
+  "phoneE164": "+18005982019",
+  "purpose": "claims",
+  "sourceUrl": "https://www.newyorklife.com/assets/docs/pdfs/nyl-internet/file-types/FAQs-concerning-death-benefit-proceeds.pdf",
+  "confirmed": true,
+  "note": "Fetched (HTTP 200, 2-page PDF 14721FAQ 09/2024; text extracted via PDFKit). 'Contact information' section: 'For Variable Life Insurance and Variable Annuities (policies that begin with a 57, 58, 63, 755 and 775 - 780) (800) 598-2019 (9 a.m. - 6 p.m. ET)'. Digits match. SCOPE RESTRICTION: variable products only; the same section routes 'Life Insurance and Fixed Annuities' to (800) CALL-NYL (800-225-5695) (8 a.m. - 7 p.m. ET). Days of week not stated. Do not dial for term or whole life claims."
+ },
+ {
+  "id": "new-york-life",
+  "phoneE164": "+18002255695",
+  "purpose": "billing",
+  "sourceUrl": "https://www.newyorklife.com/contact-us",
+  "confirmed": true,
+  "note": "Fetched (HTTP 200). Digits '1 (800)-225-5695' appear. The page does not label the number 'billing'; it is the general policyholder line for 'specific questions about your policy, claim, or application' handled by 'customer service experts', and the same page points payments/banking changes to My Account self-service. No corporate-switchboard or cannot-access-accounts caveat, so dialing it for a billing question is sensible. The form-8069 'Call us at 1-800-CALL-NYL' quote in the record's notes is from a different document, not the cited page, and was not used for this verdict."
+ },
+ {
+  "id": "new-york-life",
+  "phoneE164": "+18002255695",
+  "purpose": "cancellation",
+  "sourceUrl": "https://www.newyorklife.com/contact-us",
+  "confirmed": true,
+  "note": "Fetched (HTTP 200). Digits '1 (800)-225-5695' appear. No cancellation-specific label on the page; it is the general policy service line ('questions about your policy, claim, or application'), which is a sensible number to call about cancelling a policy. Record correctly notes that surrender/cancellation itself is completed by written request or service form, so the call may only start the process."
+ },
+ {
+  "id": "new-york-life",
+  "phoneE164": "+18002255695",
+  "purpose": "appeals",
+  "sourceUrl": "https://www.newyorklife.com/contact-us",
+  "confirmed": true,
+  "note": "Fetched (HTTP 200). Digits '1 (800)-225-5695' appear. No appeals or complaints label on the page; it is the general policy/claim service line, so it is a reasonable first call about a disputed claim or billing decision, but it is not a dedicated appeals unit. Employer-group (GBS) disability/life/AD&D claim matters are routed by the page to GBSClaimSolutions@newyorklife.com (email), not to this number."
+ },
+ {
+  "id": "massmutual",
+  "phoneE164": "+18002722216",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.massmutual.com/contact-us/life-insurance",
+  "confirmed": true,
+  "note": "Built-in browser 2026-10-11 (curl 403, WebFetch timed out). Page 'Contact us about your life insurance policy' reads: 'give us a call at 1-800-272-2216 Monday - Friday 8a.m. - 8p.m. ET'. Label is the life-insurance policy service line; matches customer_service and the stated hours."
+ },
+ {
+  "id": "massmutual",
+  "phoneE164": "+18002722216",
+  "purpose": "claims",
+  "sourceUrl": "https://www.massmutual.com/contact-us/account-faqs",
+  "confirmed": true,
+  "note": "Built-in browser 2026-10-11; accordion answer read from DOM. Under 'How do I file a claim?': 'You can also contact your financial professional or call our Service Center at 1-800-272-2216.' Hours are not stated in this answer; the 8am-8pm ET hours come from the billing answers on the same page and the life-insurance contact page."
+ },
+ {
+  "id": "massmutual",
+  "phoneE164": "+18002722216",
+  "purpose": "billing",
+  "sourceUrl": "https://www.massmutual.com/contact-us/account-faqs",
+  "confirmed": true,
+  "note": "Built-in browser 2026-10-11; accordion answers read from DOM. 'Can I change my billing frequency online?': 'contact our Customer Service Center at 1-800-272-2216 for assistance Monday - Friday 8 a.m. - 8 p.m. ET.' Same number and hours under 'How can I stop/change recurring payments on my policy?' and 'Can I use a credit card for an online payment?'."
+ },
+ {
+  "id": "massmutual",
+  "phoneE164": "+18002722216",
+  "purpose": "cancellation",
+  "sourceUrl": "https://www.massmutual.com/contact-us/account-faqs",
+  "confirmed": true,
+  "note": "Built-in browser 2026-10-11; accordion answer read from DOM. 'How do I cancel my policy?': 'To discuss alternative options or have us assist you with closure, please call 1-800-272-2216 or reach out to your financial professional.' Hours not stated in this answer; 8am-8pm ET comes from adjacent billing answers."
+ },
+ {
+  "id": "mutual-of-omaha",
+  "phoneE164": "+18007756000",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.mutualofomaha.com/support/contact-us",
+  "confirmed": true,
+  "note": "Fetched live page (HTTP 200) and grepped raw HTML: heading 'Individual Policy Owner' followed by 'Customer Service: 800-775-6000' (href tel:800-775-6000), then heading 'Covered by Employer' with 'Customer Service: 800-655-5142' (byte offsets confirm the pairing). No sales-only or cannot-access-accounts disclaimer on the page. The cited page shows no hours; the record's Mon-Fri 8:30-4:30 hours come from a different URL and were not verified here."
+ },
+ {
+  "id": "mutual-of-omaha",
+  "phoneE164": "+18884936902",
+  "purpose": "claims",
+  "sourceUrl": "https://www.mutualofomaha.com/support/claims",
+  "confirmed": true,
+  "note": "Fetched live page (HTTP 200) and grepped raw HTML: '888-493-6902' with href tel:+18884936902 under the life-insurance claims section ('Call us for help at:'), plus 'Fill out the form on this page (or you can call 1-888-493-6902) to begin the claims process.' Page states 'Individual coverage only. If your policy is through your employer, call 1-800-775-8805', so 888-493-6902 is the individual claims line; group policies must use 800-775-8805 instead. No hours shown."
+ },
+ {
+  "id": "mutual-of-omaha",
+  "phoneE164": "+18007756000",
+  "purpose": "billing",
+  "sourceUrl": "https://content.mutualofomaha.com/contactforms/sites/content.mutualofomaha.com.contactforms/files/_forms/Payment_Auth_M20777_0618_0.pdf",
+  "confirmed": true,
+  "note": "Downloaded the PDF (HTTP 200, application/pdf) and extracted text with pdfminer: '(800) 775-6000' appears under 'For more information related to your insurance policy: ... Call us at:' on the Payment Authorization Form (bank draft for premium payments). Caveat: the label is a general policy-information line, not an explicit 'billing' label; it is the only contact printed on the premium-draft instrument, so dialing it for billing is sensible. URL filename says 0618 but the served document is marked M20777_1123, matching the record's note."
+ },
+ {
+  "id": "mutual-of-omaha",
+  "phoneE164": "+18007756000",
+  "purpose": "cancellation",
+  "sourceUrl": "https://www.mutualofomaha.com/support/contact-us",
+  "confirmed": true,
+  "note": "Same evidence as customer_service: 'Individual Policy Owner' / 'Customer Service: 800-775-6000' on the live contact page, no sales-only or no-account-access disclaimer. Caveat: the page does not mention cancellation or surrender; this is the general individual-policy service line and the record itself flags the purpose as an inference. Acceptable under the 'policy service line is fine for cancellation' standard; the only documented cancellation method remains mailed form L3327."
+ },
+ {
+  "id": "lincoln-financial",
+  "phoneE164": "+18004871485",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.lincolnfinancial.com/public/individuals/support/customerservice/lifeinsuranceresources",
+  "confirmed": true,
+  "note": "Rendered the JS page in a browser and expanded the 'Contact us' tab > 'Life insurance customer service' accordion. Page text: 'For most life products (including First Penn Pacific Policies) 800-487-1485 Mon-Fri 8:00 a.m. - 6:00 p.m. Fax: 800-819-1987 Email: CustServSupportTeam@LFG.com' (times stated as Eastern). Page also says to enter the policy number into the automated system to be routed. Digits and label match."
+ },
+ {
+  "id": "lincoln-financial",
+  "phoneE164": "+18668353223",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.lincolnfinancial.com/public/individuals/support/customerservice/lifeinsuranceresources",
+  "confirmed": true,
+  "note": "Seen in the 'Policy prefix specific contact information' accordion: 'Some policies are supported by specific teams. Use this contact information for policies that begin with: 9 + 5 digits; 5 + 6 digits; 64, 66 or 68 + 7 digits; N, P, R or W + 8 digits; M or T + 7 digits. 866-835-3223 Mon-Fri 8:00 a.m. - 6:00 p.m. Fax: 402-479-0164'. Digits and label match, but it is a restricted line: dial ONLY when the policy number matches one of those prefix patterns; otherwise use 800-487-1485."
+ },
+ {
+  "id": "lincoln-financial",
+  "phoneE164": "+18006626142",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.lincolnfinancial.com/public/individuals/support/customerservice/lifeinsuranceresources",
+  "confirmed": true,
+  "note": "Seen in the 'Policies originally issued by Sovereign' accordion: '800-662-6142 Mon-Fri 8:00 a.m.-5:00 p.m. Fax: 336-759-3141', mailing/overnight address 4964 University Pkwy Ste. 107, Winston-Salem, NC 27106. Digits and label match; restricted to policies originally issued by Sovereign."
+ },
+ {
+  "id": "lincoln-financial",
+  "phoneE164": "+18772755462",
+  "purpose": "customer_service",
+  "sourceUrl": "https://www.lincolnfinancial.com/public/individuals/support/customerservice/lifeinsuranceresources",
+  "confirmed": false,
+  "note": "Digits are on the page: site header shows '877-ASK-LINC' and '877-275-5462' (keypad decode A2 S7 K5 L5 I4 N6 C2 = 275-5462 matches) and the footer shows 'Questions? 1-877-275-5462'. But the only label is a generic site-wide 'Questions?' with no department, product scope, or hours; it is not labeled as life-policy customer service anywhere on the page. Not sensible to dial for policy servicing when the page gives a dedicated life line (800-487-1485). Recommend downgrading or dropping this entry."
+ },
+ {
+  "id": "lincoln-financial",
+  "phoneE164": "+18004871485",
+  "purpose": "claims",
+  "sourceUrl": "https://www.lincolnfinancial.com/public/individuals/support/customerservice/lifeinsuranceresources",
+  "confirmed": true,
+  "note": "Seen in the 'Claims' accordion: 'Death Claims 800-487-1485; Option 4 Mon-Fri 8 a.m.-6 p.m. Fax: 336-814-0021 Email: IndividualClaims@LFG.com' and 'Individual Life Premium Waiver Benefits & Claims 800-487-1485; Option 4 Mon-Fri 8 a.m.-4:40 p.m.' (page really prints 4:40). Digits and label match; Option 4 is required. Caution: the same Claims accordion lists 800-423-2765 FIRST under 'Benefits from your employer' (employer-sponsored group benefits, claims@LFG.com, Omaha NE) and 877-546-3656 for 'Individual Disability Policy Claims'; neither applies to individual life death claims."
+ },
+ {
+  "id": "lincoln-financial",
+  "phoneE164": "+18004871485",
+  "purpose": "billing",
+  "sourceUrl": "https://www.lincolnfinancial.com/public/individuals/support/customerservice/lifeinsuranceresources",
+  "confirmed": true,
+  "note": "Confirmed on the page's FAQs tab, which carries an explicit billing label: 'Where can I find billing information? Log in and view your information by selecting Billing information under Account details. Or, speak with a Customer Contact Professional by calling 800-487-1485 or email us at CustServSupportTeam@LFG.com.' Hours from the customer service accordion: Mon-Fri 8:00 a.m. - 6:00 p.m. ET. Digits and label match."
+ },
+ {
+  "id": "lincoln-financial",
+  "phoneE164": "+18004871485",
+  "purpose": "cancellation",
+  "sourceUrl": "https://www.lincolnfinancial.com/public/individuals/support/customerservice/lifeinsuranceresources/loansandwithdrawals",
+  "confirmed": false,
+  "note": "Rendered the cited loans-and-withdrawals page fully; 800-487-1485 does NOT appear on it. The only phone digits on that page are the generic header/footer 877-275-5462. The 'Surrender a policy overview' section says 'We encourage you to contact your insurance professional to discuss the cancellation of your policy...' and 'You can also contact customer service here', where 'here' links to https://www.lincolnfinancial.com/public/individuals/support/customerservice/forms, not a phone number. The number itself is correct for this purpose on the PARENT page (lifeinsuranceresources FAQ: 'To determine if your policy allows for a partial withdrawal or partial surrender, and to obtain the appropriate form, please contact a Customer Care Professional by calling 800-487-1485'), so fix is to repoint sourceUrl to https://www.lincolnfinancial.com/public/individuals/support/customerservice/lifeinsuranceresources and re-verify."
+ },
+ {
+  "id": "lincoln-financial",
+  "phoneE164": "+18004871485",
+  "purpose": "appeals",
+  "sourceUrl": "https://www.lincolnfinancial.com/public/individuals/support/customerservice/lifeinsuranceresources",
+  "confirmed": false,
+  "note": "Digits appear on the page (Death Claims 800-487-1485; Option 4), but nothing on the page is labeled appeals, dispute, complaint, or reconsideration. The record itself says the routing is inferred. The nearest label is the Death Claims line (IndividualClaims@LFG.com, Claim Dept. - 5310, P.O. Box 21008, Greensboro, NC 27420-1008). Not confirmed for the stated purpose; if kept, label it as 'claims department (no published appeals line)' rather than appeals."
+ }
+]

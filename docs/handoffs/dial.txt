@@ -5,6 +5,38 @@ Implementation date: 2026-10-11
 Commit: use git log -1 --format=%H -- src/integrations/dial docs/handoffs/dial.txt
 The exact final commit is also saved in the Alike implementation handoff.
 
+INSURER KB UPTAKE — 2026-10-11
+The verified integration base 6590222 is preserved. Jonathan's KB-only changes
+from 98c63e8 and 1a0f523, plus the generated report from 3e47139, are integrated;
+Keewano is excluded. Read-only GET /api/insurers and server lookup helpers are
+available without changing V1. They do not automatically populate a case, choose
+a destination or enrich its call brief. Before later mapping selected facts into
+frozen authorization, require user review of the exact insurer/product/region and
+the contact's confidence, purpose and scope. Seed provenance was imported, not
+independently reverified here. Earlier integration results below describe the
+preserved base; this section records the newer KB integration snapshot.
+
+Independent probes found that multi-insurer text selected one insurer, duplicate
+exact aliases selected the first row, and generic UHC/Humana lookups selected a
+plan-specific line from several national candidates. The integration preserves
+the seed and adds narrow lookup guards: multiple insurer matches return null/404;
+distinct equally ranked phone candidates return null and require clarification;
+unknown/regulatory-default confidence never supplies a phone candidate. All
+contacts remain visible for review. A national tag or verified source does not
+establish customer applicability; no KB result authorizes a real call.
+
+Fresh checks on Node 25.2.1: 70/70 backend tests in 9 files passed, including the
+13 imported KB tests and 12 independent KB boundary tests. Typecheck and production
+build passed; the same non-blocking DATA_DIR tracing warning remains. A built-
+server localhost smoke passed 33-insurer listing, lookup, ambiguous/unknown name
+404s, oversized query 400, withheld ambiguous destination, and KB persistence
+after restart, then repeated the complete simulated refund/packet/dedup flow.
+The earlier 189/189 Dial suite remains applicable: Dial, canonical contracts and
+the case/Dial path are unchanged by this KB addition. Final independent review
+found no material remaining lookup issue for reference-only use. No provider
+credentials, real calls, external model/provider requests, deployment or main/T1
+merge occurred. Keewano and automatic KB-to-case/brief wiring are not included.
+
 SYNTHETIC DEMO AND QA KIT
 Start at src/integrations/dial/demo/README.txt and walkthrough.txt.
 Three scenario folders include text/plain evidence, proposed V1 fact projections,
@@ -429,10 +461,10 @@ T2 owns frozen authorization/case access, durable dispatch dedup before sending,
 unknown-dispatch locking, raw webhook acceptance/durable event dedup, unmatched
 retention, reconciliation and atomic outcome publication. Dial owns transport,
 normalization, authentication and explicit simulation. Canonical V1 fields and
-states remain unchanged. This integration does not add T1 UI, insurer knowledge,
-real support contact, deployment or a main-branch merge.
+states remain unchanged. This integration does not add T1 UI, real support
+contact, deployment or a main-branch merge. KB uptake is recorded at the top.
 
-INTEGRATION COMPLETION RECORD — VERIFIED 2026-10-11
+BASE INTEGRATION RECORD — 6590222, VERIFIED 2026-10-11
 Integrated source: T2's 43d099d plus T3 adapter/demo work and the regression fixes
 above, on codex/voice. The containing commit is the integration snapshot:
   git log -1 --format=%H -- src/server/cases src/integrations/dial docs/handoffs/dial.txt
@@ -441,7 +473,7 @@ No live call, provider/model request, deployment, purchase or real claim occurre
 in the combined verification. Earlier authenticated account/number reads remain
 separate live evidence; a real call and deployed webhook remain unverified.
 
-CHECKS ACTUALLY RUN
+BASE CHECKS ACTUALLY RUN (current KB results are at the top)
 All final integration checks ran on Node 25.2.1. The repository's .nvmrc recommends
 Node 24; this run did not independently verify Node 24 or its native SQLite build.
 - npm test: 45/45 backend tests passed in 7 files, comprising 39 tests in the
