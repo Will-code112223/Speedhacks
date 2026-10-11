@@ -377,3 +377,48 @@ describe("V1-only mode", () => {
     expect(await caseAt(65)).toMatchObject({ status: "awaiting_response", outcome: { decision: "requested" } });
   });
 });
+
+describe("the live transcript", () => {
+  const MARKER = "[SIMULATED] Fixture conversation. No phone call was placed.";
+  const LABEL: Record<string, string> = { support: "Support", agent: "Agent", user: "You" };
+  const asLines = (turns: { speaker: string; text: string }[] | undefined): string[] =>
+    (turns ?? []).map((t) => `${LABEL[t.speaker]}: ${t.text}`);
+
+  it("grows line by line during the duplicate charge and ends as the call's transcript", async () => {
+    const { live, caseAt } = await startedCall("duplicate_charge");
+    expect((await live(5)).turns).toEqual([]);
+    const counts: number[] = [];
+    for (const seconds of [10.4, 11, 12, 14, 21, 24, 29]) counts.push((await live(seconds)).turns?.length ?? -1);
+    expect(counts).toEqual([0, 1, 2, 4, 5, 6, 8]);
+    const first = (await live(11)).turns?.[0];
+    expect(first).toEqual({ at: iso(T0 + 10_500), speaker: "support", text: "Ridgeline Outfitters billing, this is Sam. How can I help?" });
+    const ended = await live(30);
+    expect(isLiveCallV2(ended)).toBe(true);
+    const ats = (ended.turns ?? []).map((t) => Date.parse(t.at));
+    expect(ats).toEqual([...ats].sort((a, b) => a - b));
+    expect((await caseAt(30)).calls[0]?.transcript).toBe([MARKER, ...asLines(ended.turns)].join("\n"));
+  });
+
+  it("speaks the answer the user chose, then the claim confirmation, matching the final transcript", async () => {
+    const { api, caseId, callId, live, caseAt } = await startedCall("insurance_claim");
+    const before = await live(18);
+    expect(asLines(before.turns).at(-1)).toBe("Support: This is the automated claims assistant. How can I help?");
+    const decision = (await live(26)).pendingDecision;
+    if (decision === null) throw new Error("Expected a pending decision at 26 s.");
+    await api.answerDecision(caseId, callId, decision.id, "decline");
+    expect(asLines((await live(27)).turns).at(-1)).toBe("Agent: Jordan Avery declines the visit for now.");
+    const ended = await live(47);
+    expect(ended.phase).toBe("ended");
+    expect((await caseAt(47)).calls[0]?.transcript).toBe([MARKER, ...asLines(ended.turns)].join("\n"));
+  });
+
+  it("says it could not confirm in time when the default applied", async () => {
+    const { live, caseAt } = await startedCall("insurance_claim");
+    const ended = await live(70);
+    expect(ended.phase).toBe("ended");
+    expect(asLines(ended.turns)).toContain(
+      "Agent: I could not confirm Tuesday with Jordan Avery in time. What other times are available?",
+    );
+    expect((await caseAt(70)).calls[0]?.transcript).toBe([MARKER, ...asLines(ended.turns)].join("\n"));
+  });
+});

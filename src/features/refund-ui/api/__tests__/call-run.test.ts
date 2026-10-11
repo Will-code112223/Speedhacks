@@ -224,3 +224,56 @@ describe("runCall: stepping in", () => {
       .toMatchObject({ phase: "ended", endedAt: 6_000 });
   });
 });
+
+describe("runCall: spoken lines", () => {
+  const SPOKEN: CallScript = {
+    steps: [
+      { at: 0, phase: "dialing" },
+      { at: 1_000, phase: "talking", counterpart: { who: "human", confidence: 0.8 } },
+      { at: 1_500, say: { speaker: "support", text: "Billing, this is Sam." } },
+      { at: 2_500, say: { speaker: "agent", text: "Hi Sam. I'm calling about a duplicate charge." } },
+      { at: 4_000, say: { speaker: "support", text: "I can see it." } },
+      { at: 6_000, phase: "ended" },
+    ],
+    gate: null,
+  };
+  const lines = (run: CallRun): string[] => run.turns.map((t) => `${t.at} ${t.speaker}: ${t.text}`);
+
+  it("emits each line as a turn event, in order, at its script time", () => {
+    expect(lines(runCall(SPOKEN, [], 2_000))).toEqual(["1500 support: Billing, this is Sam."]);
+    const done = runCall(SPOKEN, [], 10_000);
+    expect(lines(done)).toEqual([
+      "1500 support: Billing, this is Sam.",
+      "2500 agent: Hi Sam. I'm calling about a duplicate charge.",
+      "4000 support: I can see it.",
+    ]);
+    const events = done.events.flatMap((e) => (e.kind === "turn" ? [`${e.at} ${e.speaker}`] : []));
+    expect(events).toEqual(["1500 support", "2500 agent", "4000 support"]);
+  });
+
+  it("holds the next line while the user is on the call and plays it after the hand back", () => {
+    const joins: Intervention[] = [{ kind: "join", at: 2_000 }];
+    const joined = runCall(SPOKEN, joins, 2_000 + JOIN_WINDOW_MS - 1);
+    expect(joined.joined).toBe(true);
+    expect(lines(joined)).toEqual(["1500 support: Billing, this is Sam."]);
+    // Script time resumes at 2 s when the window ends, so the agent's line lands 0.5 s later.
+    const resumed = runCall(SPOKEN, joins, 2_000 + JOIN_WINDOW_MS + 500);
+    expect(lines(resumed).at(-1)).toBe(`${2_500 + JOIN_WINDOW_MS} agent: Hi Sam. I'm calling about a duplicate charge.`);
+  });
+
+  it("plays the default branch's lines when nobody answers and the chosen branch's when someone does", () => {
+    const gated: CallScript = {
+      ...GATED,
+      gate: {
+        ...GATED.gate!,
+        after: { yes: [{ at: 2_500, say: { speaker: "agent", text: "They accept." } }], no: [{ at: 2_500, say: { speaker: "agent", text: "They decline." } }] },
+        afterByDefault: { no: [{ at: 2_500, say: { speaker: "agent", text: "I could not reach them in time." } }] },
+      },
+    };
+    const byDefault = runCall(gated, [], 2_000 + 5_000 + 1_000);
+    expect(byDefault.resolution).toMatchObject({ optionId: "no", by: "default" });
+    expect(byDefault.turns.map((t) => t.text)).toEqual(["I could not reach them in time."]);
+    const byUser = runCall(gated, [{ kind: "answer", at: 3_000, optionId: "no" }], 5_000);
+    expect(byUser.turns.map((t) => t.text)).toEqual(["They decline."]);
+  });
+});
