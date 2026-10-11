@@ -1,0 +1,19 @@
+SYNTHETIC SAMPLE — NOT CLAIM EVIDENCE
+Prepared only for the Recourse upload-and-review walkthrough.
+Not issued by a repair shop. No inspection, quote, invoice or insurance claim exists.
+
+Example customer: Sam Rivera
+Example vehicle: silver 2022 Honda Civic
+Example damage: right rear bumper dent and scrape
+Illustrative estimate reference: SAMPLE-REPAIR-001
+
+Rear bumper repair labor: 3 hours at USD 100 = USD 300.00
+Paint labor: 2 hours at USD 100 = USD 200.00
+Paint materials: USD 150.00
+Illustrative subtotal: USD 650.00
+Tax, hidden damage and other work: not assessed; no payable total established.
+
+The USD 650.00 subtotal is an invented repair-cost example, not a refund demand,
+verified loss, coverage decision or approved payment. No policy number is supplied.
+Pair only with the visibly labeled synthetic damage illustrations.
+Do not upload this document to any real insurer, merchant or claims portal.

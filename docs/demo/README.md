@@ -1,5 +1,9 @@
 # Demo video recording
 
+For the real-service Amazon and insurance walkthrough, use
+[live-walkthrough.txt](live-walkthrough.txt). The older scripted video below uses
+fixtures and is not proof of live browser execution or live calling.
+
 This folder records the submission demo video with [sitereel](https://github.com/iksZ963/sitereel) 0.2.0.
 A scripted tour drives the fixture flow at `http://localhost:3000/?api=fixture` in headless Chromium at 1920x1080 and saves an `.mp4` and a `.webm`.
 Nothing is added to `package.json`; every command runs sitereel through `npx`.
