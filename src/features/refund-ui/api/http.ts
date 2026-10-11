@@ -176,6 +176,12 @@ export function createHttpCaseApi(options: HttpCaseApiOptions = {}): CaseApi {
       return envelope(res, "case", isCaseV1, CASE_NOT_FOUND_MESSAGE);
     },
 
+    async addFiles(caseId, files) {
+      const form = new FormData();
+      for (const file of files) form.append("files", file, file.name);
+      return envelope(await send("POST", `${casePath(caseId)}/files`, { form }), "case", isCaseV1, CASE_NOT_FOUND_MESSAGE);
+    },
+
     async authorize(caseId, expectedRevision, purpose) {
       const json = purpose === undefined ? { expectedRevision } : { expectedRevision, purpose };
       const res = await send("POST", `${casePath(caseId)}/authorize`, { json });

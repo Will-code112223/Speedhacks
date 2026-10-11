@@ -471,6 +471,146 @@ export class CaseService {
   }
 
   // -------------------------------------------------------------------------
+  // POST /api/cases/:id/files
+  // -------------------------------------------------------------------------
+  /**
+   * Adds files to an existing case. Extraction runs over the new documents only
+   * and fills facts that are still empty; a value the user already has is never
+   * overwritten. Always a new revision, so any authorization is cleared.
+   */
+  async addEvidence(ownerSession: string, id: string, files: UploadInput[]): Promise<CaseV1> {
+    const { config, repo, uploads, extractor } = this.deps;
+    if (files.length === 0) throw new ApiHttpError(400, "BAD_REQUEST", "Provide at least one file", ["files"]);
+    const before = this.ownedRow(ownerSession, id);
+    this.assertSameMode(before);
+    const assertEditable = () => {
+      if (hasActiveCall(repo.listCalls(id))) {
+        throw new ApiHttpError(409, "CALL_IN_PROGRESS", "Edits are rejected while a call is active or its dispatch is unknown");
+      }
+    };
+    assertEditable();
+    validateUploads(files, config.upload);
+
+    const now = this.nowIso();
+    const added: TimelineEntry[] = [];
+    const evidence: EvidenceRow[] = files.map((f) => {
+      const stored = uploads.store(id, f);
+      added.push(this.entry("evidence_added", `Attached ${stored.name} (${stored.mimeType}, ${stored.sizeBytes} bytes).`));
+      return { ...stored, caseId: id, createdAt: now };
+    });
+
+    let extracted: ExtractedFields = { ...EMPTY_FIELDS };
+    let extractedProvenance: Array<Omit<ProvenanceRow, "id" | "caseId" | "revision" | "createdAt">> = [];
+    try {
+      const result = await extractor.extract({
+        summary: before.doc.reason,
+        documents: evidence.map((e, i) => ({ evidenceId: e.id, name: e.name, mimeType: e.mimeType, bytes: files[i]?.bytes ?? new Uint8Array() })),
+      });
+      extracted = result.fields;
+      extractedProvenance = result.provenance.map((p) => ({
+        field: p.field,
+        value: p.value,
+        sourceKind: p.sourceKind,
+        sourceRef: p.sourceRef,
+        excerpt: p.excerpt,
+      }));
+      const found = Object.entries(extracted)
+        .filter(([, v]) => v !== null)
+        .map(([k]) => k);
+      added.push(
+        this.entry(
+          "facts_extracted",
+          found.length > 0
+            ? `Extracted ${found.join(", ")} (${extractor.kind}).`
+            : `No facts could be extracted (${extractor.kind}); fill them in manually.`,
+        ),
+      );
+      for (const note of result.notes) added.push(this.entry("extraction_note", note));
+    } catch (err) {
+      // Live extraction failure is visible, not silently skipped.
+      added.push(
+        this.entry("extraction_failed", `Fact extraction failed (${extractor.kind}): ${String((err as Error).message ?? err)}. Fill in the fields manually.`),
+      );
+    }
+
+    repo.transaction(() => {
+      const row = this.ownedRow(ownerSession, id);
+      assertEditable();
+      const empty = (v: string | number | null | undefined) => v === null || v === undefined || (typeof v === "string" && v.trim() === "");
+      const cur = row.doc;
+      const next: Facts = {
+        customer: { ...cur.customer },
+        merchant: { ...cur.merchant },
+        amountMinor: cur.amountMinor,
+        currency: cur.currency,
+        reason: cur.reason,
+        policyNumber: cur.policyNumber ?? null,
+        incidentDate: cur.incidentDate ?? null,
+        lossDescription: cur.lossDescription ?? null,
+        claimType: cur.claimType ?? null,
+      };
+      const filled = new Set<string>();
+      const fill = (field: string, value: string | number | null, current: string | number | null | undefined, apply: () => void) => {
+        if (value === null || value === undefined || !empty(current)) return;
+        apply();
+        filled.add(field);
+      };
+      const x = extracted;
+      fill("customerName", x.customerName, cur.customer.name, () => (next.customer.name = x.customerName));
+      fill("customerEmail", x.customerEmail, cur.customer.email, () => (next.customer.email = x.customerEmail));
+      fill("merchantName", x.merchantName, cur.merchant.name, () => (next.merchant.name = x.merchantName));
+      if (x.supportPhone && empty(cur.merchant.supportPhone)) {
+        const problem = config.mode === "live" ? liveDestinationProblem(x.supportPhone, config.dial.fromNumber) : null;
+        if (problem) {
+          added.push(this.entry("support_phone_rejected", `Ignored the support number found in your documents (${x.supportPhone}): ${problem}. Enter a North American support number.`));
+        } else {
+          next.merchant = { ...next.merchant, supportPhone: x.supportPhone, source: { kind: "document" } };
+          filled.add("supportPhone");
+        }
+      }
+      fill("amountMinor", x.amountMinor, cur.amountMinor, () => (next.amountMinor = x.amountMinor));
+      fill("currency", x.currency, cur.currency, () => (next.currency = x.currency ?? cur.currency));
+      fill("policyNumber", x.policyNumber, cur.policyNumber, () => (next.policyNumber = x.policyNumber));
+      fill("incidentDate", x.incidentDate, cur.incidentDate, () => (next.incidentDate = x.incidentDate));
+      fill("lossDescription", x.lossDescription, cur.lossDescription, () => (next.lossDescription = x.lossDescription));
+      fill("claimType", x.claimType, cur.claimType, () => (next.claimType = x.claimType));
+
+      const revision = row.revision + 1;
+      for (const e of evidence) repo.insertEvidence(e);
+      for (const p of extractedProvenance) {
+        if (!filled.has(p.field)) continue;
+        repo.insertProvenance({ id: randomUUID(), caseId: id, revision, createdAt: now, ...p });
+      }
+      const evidenceList = repo.listEvidence(id).map((e) => ({ id: e.id, name: e.name, mimeType: e.mimeType }));
+      const purpose = suggestedPurpose(next);
+      const missing = missingFields(next, purpose);
+      const doc: CaseDoc = {
+        ...cur,
+        ...next,
+        missingFields: missing,
+        draft: buildDraft(next, evidenceList, purpose),
+        authorization: null,
+        outcome: { decision: "unknown", referenceNumber: null, nextAction: null, paymentStatus: "unverified", supportingQuote: null },
+        timeline: [...cur.timeline, ...added],
+      };
+      doc.timeline.push(
+        this.entry(
+          "facts_updated",
+          filled.size > 0
+            ? `Evidence added (revision ${revision}); filled ${[...filled].join(", ")} from the new files; draft rebuilt.`
+            : `Evidence added (revision ${revision}); draft rebuilt.`,
+        ),
+      );
+      if (cur.authorization) {
+        doc.timeline.push(this.entry("authorization_cleared", `Authorization ${cur.authorization.id} cleared by new evidence.`));
+      }
+      if (missing.length > 0) doc.timeline.push(this.entry("needs_information", `Missing: ${missing.join(", ")}.`));
+      repo.updateCase(id, { doc, revision, updatedAt: now });
+    });
+    return this.assemble(id);
+  }
+
+  // -------------------------------------------------------------------------
   // POST /api/cases/:id/authorize  (idempotent per revision)
   // -------------------------------------------------------------------------
   authorize(ownerSession: string, id: string, expectedRevision: number, purpose: CallPurpose = "request_refund"): CaseV1 {

@@ -67,6 +67,14 @@ export function UploadIcon() {
   );
 }
 
+export function PaperclipIcon() {
+  return (
+    <Svg>
+      <path d="M13.25 7.5 8.1 12.65a3.25 3.25 0 0 1-4.6-4.6l5.3-5.3a2.15 2.15 0 0 1 3.05 3.05l-5.25 5.25a1.05 1.05 0 0 1-1.5-1.5L9.9 4.75" />
+    </Svg>
+  );
+}
+
 export function PhoneIcon() {
   return (
     <Svg>

@@ -186,6 +186,10 @@ export default function ChatColumn({ controller, fixture, live = false, phoneHin
         placeholder={placeholder}
         hint={hint}
         textareaRef={textareaRef}
+        pendingFiles={session ? undefined : controller.pendingFiles}
+        onAttach={!session || session.caseId !== null ? controller.attachFiles : undefined}
+        onRemovePending={controller.removePendingFile}
+        uploadsImmediately={session !== null}
       />
     </section>
   );
@@ -458,6 +462,7 @@ function ThreadEntry(props: ThreadEntryProps) {
                   : null
             }
             onApprove={controller.approve}
+            onSaveFacts={controller.saveFacts}
             onStartNewCase={startNewCase}
           />
         </li>

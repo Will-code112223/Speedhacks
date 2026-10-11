@@ -196,6 +196,30 @@ class FixtureCaseApi implements CaseApi {
     return this.view(record, now);
   };
 
+  /** Adds files to an open case: evidence rows, a timeline entry each, a new revision. No extraction. */
+  readonly addFiles = async (caseId: string, files: File[]): Promise<CaseV1> => {
+    await this.respond();
+    const now = this.now();
+    if (files.length === 0) fail(400, "BAD_REQUEST", "Provide at least one file", ["files"]);
+    if (files.length > 5) fail(400, "BAD_REQUEST", "At most 5 files per case", ["files"]);
+    const record = this.find(caseId);
+    if (hasActiveCall(this.project(record, now))) {
+      fail(409, "CALL_IN_PROGRESS", "Edits are rejected while a call is active or its dispatch is unknown");
+    }
+    for (const f of files) {
+      const e = { id: newId(), name: f.name || "upload", mimeType: f.type || "application/octet-stream", sizeBytes: f.size };
+      record.evidence.push(e);
+      this.log(record, now, "evidence_added", `Attached ${e.name} (${e.mimeType}, ${e.sizeBytes} bytes).`);
+    }
+    record.revision += 1;
+    this.log(record, now, "facts_updated", `Evidence added (revision ${record.revision}); draft rebuilt.`);
+    if (record.authorizationId !== null) {
+      this.log(record, now, "authorization_cleared", `Authorization ${record.authorizationId} cleared by new evidence.`);
+      record.authorizationId = null;
+    }
+    return this.view(record, now);
+  };
+
   readonly authorize = async (caseId: string, expectedRevision: number): Promise<CaseV1> => {
     await this.respond();
     const now = this.now();

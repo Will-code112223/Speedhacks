@@ -45,6 +45,14 @@ export interface CaseSessionController {
   /** Resolves false when the message was not accepted (for example while a case is being created). */
   send(text: string): Promise<boolean>;
   retryCreate(): void;
+  /** Files held for the next new case; sent with its first message. */
+  pendingFiles: readonly File[];
+  /**
+   * With an open case, uploads the files to it (errors go on the session). With no case yet,
+   * holds them as pending files. Resolves false when nothing was accepted.
+   */
+  attachFiles(files: File[]): Promise<boolean>;
+  removePendingFile(index: number): void;
   /** Resolves with the saved case, or null when the save failed (the error is on the session). */
   saveFacts(changes: CaseChanges, expectedRevision: number): Promise<CaseV1 | null>;
   reloadCase(): void;

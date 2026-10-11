@@ -221,6 +221,8 @@ export interface CaseApi {
   /** Optional cancellation applies only to this read, never to dispatch. */
   getCase(caseId: string, signal?: AbortSignal): Promise<CaseV1>;
   patchCase(caseId: string, expectedRevision: number, changes: CaseChanges): Promise<CaseV1>;
+  /** Adds files to an open case; the server fills only empty facts from them and bumps the revision. */
+  addFiles(caseId: string, files: File[]): Promise<CaseV1>;
   /** `purpose` absent means "request_refund", the V1 behavior. */
   authorize(caseId: string, expectedRevision: number, purpose?: UiCallPurpose): Promise<CaseV1>;
   startCall(caseId: string, input: StartCallInput): Promise<CallV1>;

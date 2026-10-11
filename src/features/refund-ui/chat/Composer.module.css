@@ -7,7 +7,7 @@
 /* The composer is an interactive container. */
 .composer {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: end;
   gap: 8px 16px;
   max-width: 720px;
@@ -74,6 +74,102 @@
 
 .sendLabel {
   font-size: 12px;
+}
+
+.composer[data-dragging] {
+  border-color: var(--rc-accent);
+  border-style: dashed;
+}
+
+.fileInput {
+  display: none;
+}
+
+.attach {
+  flex: none;
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  padding: 0;
+}
+
+.files {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 6px;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  min-height: 28px;
+  padding: 2px 4px 2px 8px;
+  border: 1px solid var(--rc-border);
+  border-radius: 999px;
+  font-size: 12px;
+  color: var(--rc-ink);
+}
+
+.chipName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chipRemove {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--rc-ink-2);
+  cursor: pointer;
+}
+
+.chipRemove:hover {
+  color: var(--rc-ink);
+  background: var(--rc-border);
+}
+
+.uploading,
+.attachError {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.uploading {
+  color: var(--rc-ink-2);
+}
+
+.attachError {
+  color: var(--rc-danger);
+}
+
+.hintText {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 12px;
+  min-width: 0;
+}
+
+.attachHint {
+  color: var(--rc-ink-2);
 }
 
 .hint {

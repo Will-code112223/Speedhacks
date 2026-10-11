@@ -39,7 +39,7 @@ import {
   type UiCallPurpose,
 } from "../api/types";
 import type { PlanRecord } from "../plans/store";
-import { attachmentsFor } from "./attachments";
+import { attachmentsFor, MAX_CASE_FILES } from "./attachments";
 import { currentCall } from "./call";
 import type { CaseSessionController, FixtureSettings } from "./controller";
 import { toUiError } from "./errors";
@@ -133,6 +133,8 @@ export function useCaseSession({ apiMode, plans, measuring }: UseCaseSessionOpti
   const [state, dispatch] = useReducer(sessionsReducer, initialSessionsState);
   const [scenario, setScenarioState] = useState<FixtureScenario | null>(null);
   const [fixtureSettings, setFixtureSettingsState] = useState<FixtureSettings>(DEFAULT_FIXTURE_SETTINGS);
+  const [pendingFiles, setPendingFiles] = useState<readonly File[]>([]);
+  const pendingFilesRef = useRef<File[]>([]);
 
   // http: one client for every case. fixture: each case gets its own engine, so
   // picker changes made later never change a case that already exists.
@@ -319,7 +321,17 @@ export function useCaseSession({ apiMode, plans, measuring }: UseCaseSessionOpti
         const key = createLocalId();
         const picked = current.apiMode === "fixture" ? (current.scenario ?? inferScenario(trimmed)) : null;
         const api = current.sharedApi ?? createFixtureApi(picked, current.fixtureSettings);
-        const attachments = attachmentsFor(trimmed, current.plans, current.apiMode);
+        const planAttachments = attachmentsFor(trimmed, current.plans, current.apiMode);
+        // Files the person attached come first; plans fill whatever room is left.
+        const own = pendingFilesRef.current;
+        const room = Math.max(0, MAX_CASE_FILES - own.length);
+        const attachments = {
+          ...planAttachments,
+          files: [...own, ...planAttachments.files.slice(0, room)],
+          names: [...own.map((f) => f.name), ...planAttachments.names.slice(0, room)],
+        };
+        pendingFilesRef.current = [];
+        setPendingFiles([]);
         const input: CreateCaseInput = { summary: trimmed, files: attachments.files, ...attachments.prefill };
         createInputs.current.set(key, input);
         dispatch({
@@ -354,6 +366,44 @@ export function useCaseSession({ apiMode, plans, measuring }: UseCaseSessionOpti
     },
     [create],
   );
+
+  const attachFiles = useCallback(
+    async (files: File[]): Promise<boolean> => {
+      if (files.length === 0) return false;
+      const session = latest.current.active;
+      if (session === null) {
+        // No case yet: hold the files until the first message creates it.
+        const next = [...pendingFilesRef.current, ...files].slice(0, MAX_CASE_FILES);
+        pendingFilesRef.current = next;
+        setPendingFiles(next);
+        return true;
+      }
+      if (session.caseId === null) return false;
+      const guard = `save:${session.key}`;
+      if (!claim(guard)) return false;
+      const { key, api } = session;
+      const caseId = session.caseId;
+      dispatch({ type: "save/started", key });
+      try {
+        const saved = await api.addFiles(caseId, files);
+        dispatch({ type: "save/succeeded", key, caseData: saved, liveCapable: latest.current.liveCapable, at: nowIso() });
+        adoptCase(key, saved);
+        return true;
+      } catch (error) {
+        dispatch({ type: "save/failed", key, error: toUiError(error) });
+        return false;
+      } finally {
+        release(guard);
+      }
+    },
+    [adoptCase, claim, release],
+  );
+
+  const removePendingFile = useCallback((index: number) => {
+    const next = pendingFilesRef.current.filter((_, i) => i !== index);
+    pendingFilesRef.current = next;
+    setPendingFiles(next);
+  }, []);
 
   const retryCreate = useCallback(() => {
     const session = latest.current.active;
@@ -635,6 +685,9 @@ export function useCaseSession({ apiMode, plans, measuring }: UseCaseSessionOpti
     send,
     retryCreate,
     saveFacts,
+    pendingFiles,
+    attachFiles,
+    removePendingFile,
     reloadCase,
     retryUpdates,
     approve,
