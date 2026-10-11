@@ -280,6 +280,52 @@ describe("real conversational preparation acceptance", () => {
     expect(replay.case.authorization).toBeNull();
   });
 
+  it.each([false, true])("clears a currency conflict when the latest user confirms the retained value (old source last: %s)", async oldLast => {
+    const h = harness(); const c = await start(h, "Amazon return");
+    fromMessage(h, "refund", { currency: "USD" });
+    const first = await h.service.message(OWNER, c.id, request(c.revision, "Currency: USD."));
+    fromMessage(h, "refund", { currency: "CAD" });
+    const second = await h.service.message(OWNER, c.id, request(first.case.revision, "The receipt shows CAD."));
+    const oldId = second.workflow.messages.filter(m => m.role === "user").at(-1)!.id;
+    expect(second.workflow.conflicts).toHaveLength(1);
+    h.extract.mockImplementationOnce(async ({ message }) => {
+      const correction = { key: "currency" as const, value: "USD", quote: "Correction: currency is USD", sourceId: message.id, resolvesConflict: true };
+      const old = { key: "currency" as const, value: "CAD", quote: "The receipt shows CAD", sourceId: oldId, resolvesConflict: false };
+      return { kind: "refund", facts: oldLast ? [correction, old] : [old, correction] };
+    });
+    const fixed = await h.service.message(OWNER, c.id, request(second.case.revision, "Correction: currency is USD."));
+    expect(fixed.workflow.conflicts).toEqual([]);
+    expect(fixed.workflow.facts.currency?.value).toBe("USD");
+    expect(fixed.workflow.brief.body).not.toContain("Which is correct?");
+    expect(h.startCall).not.toHaveBeenCalled();
+  });
+
+  it("does not clear a conflict merely because an unconfirmed candidate repeats the retained value", async () => {
+    const h = harness(); const c = await start(h, "Refund request");
+    fromMessage(h, "refund", { currency: "USD" });
+    const first = await h.service.message(OWNER, c.id, request(c.revision, "Currency USD."));
+    fromMessage(h, "refund", { currency: "CAD" });
+    const second = await h.service.message(OWNER, c.id, request(first.case.revision, "Another receipt says CAD."));
+    fromMessage(h, "refund", { currency: "USD" });
+    const third = await h.service.message(OWNER, c.id, request(second.case.revision, "One document says USD, but I am unsure which is correct."));
+    expect(third.workflow.conflicts).toHaveLength(1);
+    expect(third.workflow.facts.currency?.value).toBe("USD");
+    expect(third.case.authorization).toBeNull();
+  });
+
+  it.each([null, "USD", "CAD"])("does not infer or contradict currency %s from a bare dollar sign", async currency => {
+    const h = harness(); const c = await start(h, "Amazon return");
+    let revision = c.revision;
+    if (currency) {
+      fromMessage(h, "refund", { currency });
+      revision = (await h.service.message(OWNER, c.id, request(revision, `Currency: ${currency}.`))).case.revision;
+    }
+    fromMessage(h, "refund", { currency: "$" });
+    const result = await h.service.message(OWNER, c.id, request(revision, "The order shows $104.68."));
+    expect(result.workflow.facts.currency?.value ?? null).toBe(currency);
+    expect(result.workflow.conflicts).toEqual([]);
+  });
+
   it("retains uploaded bytes and clears old call approval even when extraction fails", async () => {
     const h = harness();
     const c = await h.cases.createCase(OWNER, { summary: "Duplicate settled subscription charge", files: [], fields: {
