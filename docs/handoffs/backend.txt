@@ -5,7 +5,32 @@ Agents: Claude Code (implementation, this file) + Codex (tests/integration/**, t
 COMMITS (base your branch on the latest)
 - db5f311  scaffold + canonical contracts (Next.js 16, TypeScript, Node 24, better-sqlite3, vitest)
 - 9cb849c  routes, SQLite persistence, case service, simulated voice, webhook dedup, tests/backend
-- (next)   T3 Dial adapter merged from codex/voice and wired at the composition root
+- 23bd75a  T3 Dial adapter merged from codex/voice (3ef5066) and wired at the composition root
+- (this)   T3 docs update 48541aa merged; env fixes; webhook-secret-pending behaviour; answers below
+
+ANSWERS TO T3 (Alike ask 0ecf15fd, 2026-10-11) — reviewable paths
+- Composition root: src/server/cases/composition.ts (buildVoiceResolver → createDialAdapter({mode:"live"}) in live
+  mode; T2's src/server/cases/simulated-voice.ts in simulated mode). Env is read by src/server/config.ts loadConfig()
+  from process.env at request time; the adapter captures process.env when the factory runs (lazily, first use).
+- Env loading: `npm run dev:live` / `npm run start:live` wrap Next with
+  node --env-file="$HOME/.config/speedhacks/dial.env" so the external 0600 file is loaded before the factory runs.
+  Exported shell variables still take precedence. .env.example now lists DIAL_FROM_NUMBER and keeps
+  DIAL_MAX_CALL_DURATION_SECONDS commented out (a blank value would be rejected).
+- Ownership confirmed (all T2, implemented): frozen authorization + session ownership; one persisted attempt per
+  authorization before startCall (UNIQUE authorization_id/request_id); dispatch_unknown blocks edits/authorize and
+  is never redialed; raw-body webhook → verifyWebhook → durable provider_events (PK event_id) → 204; unmatched
+  events retained and reconciled when the attempt learns its provider id; terminal never regresses; late transcript
+  handled by a bounded wait (TRANSCRIPT_WAIT_MS, poll-driven) and one atomic terminal publish. Adapter stays
+  transport/normalization/auth only; no T2 responsibility was moved into it; V1 types unchanged.
+- Pending webhook secret: dispatch and getCall need only DIAL_API_KEY + DIAL_FROM_NUMBER; while DIAL_WEBHOOK_SECRET
+  is unset, POST /api/webhooks/dial answers 503 LIVE_CONFIGURATION_MISSING (fields ["DIAL_WEBHOOK_SECRET"]) and
+  stores nothing; call results still arrive through bounded polling of GET /api/cases/:id. Adapter MISSING_CONFIG /
+  INVALID_CONFIG at construction or verification also surface as 503, never as 401.
+- V1 deviations: none. One literal reading to note: a definitive pre-dispatch refusal keeps its attempt as failed
+  and consumes the authorization (see KNOWN LIMITS). Your V1 mirror src/integrations/dial/types.ts was replaced
+  with canonical re-exports as your handoff instructs; nothing else in src/integrations/dial was changed.
+- Not done, by design: no deployment, no subscription, no live call. Deploying the receiver and registering the
+  webhook is a separately authorized phase.
 
 STATUS
 - [x] Scaffold, contracts, placeholder page (src/app/page.tsx mounts T1's RefundApp after handoff)

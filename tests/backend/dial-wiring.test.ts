@@ -21,6 +21,31 @@ afterEach(() => {
 });
 
 describe("Dial adapter wiring", () => {
+  it("live webhook route fails visibly (503) while DIAL_WEBHOOK_SECRET is pending; no event is stored", async () => {
+    const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "refund-wiring-"));
+    dirs.push(dataDir);
+    closeDatabase();
+    const config = loadConfig({
+      REFUND_MODE: "live",
+      DATA_DIR: dataDir,
+      LLM_MODEL: "configured-by-user",
+      OPENAI_API_KEY: "synthetic-test-key",
+      OPENAI_BASE_URL: "http://127.0.0.1:9/v1",
+      DIAL_API_KEY: "synthetic-dial-key",
+      DIAL_FROM_NUMBER: "+12025550100",
+    });
+    const service = buildCaseService(config);
+    const body = new TextEncoder().encode(JSON.stringify({ id: "evt", type: "call.ended", data: { callId: "call_x" } }));
+    try {
+      await service.handleWebhook(body, new Headers({ "x-dial-signature": "t=1,v1=00" }));
+      throw new Error("expected 503");
+    } catch (err) {
+      expect(err).toBeInstanceOf(ApiHttpError);
+      expect((err as ApiHttpError).status).toBe(503);
+      expect((err as ApiHttpError).fields).toEqual(["DIAL_WEBHOOK_SECRET"]);
+    }
+  });
+
   it("runs T3's simulated Dial adapter end to end: dispatch, poll, transcript, evidence-backed outcome", async () => {
     h = makeHarness({ voice: createDialAdapter({ mode: "simulated" }) });
     const c = await createReadyCase(h);
@@ -72,7 +97,7 @@ describe("Dial adapter wiring", () => {
       const e = err as ApiHttpError;
       expect(e.status).toBe(503);
       expect(e.code).toBe("LIVE_CONFIGURATION_MISSING");
-      expect(e.fields).toEqual(["DIAL_API_KEY", "DIAL_FROM_NUMBER", "DIAL_WEBHOOK_SECRET"]);
+      expect(e.fields).toEqual(["DIAL_API_KEY", "DIAL_FROM_NUMBER"]);
     }
     const after = await service.getCase(SESSION_A, c.id);
     expect(after.calls).toHaveLength(0);

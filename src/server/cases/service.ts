@@ -454,7 +454,13 @@ export class CaseService {
   // POST /api/webhooks/dial
   // -------------------------------------------------------------------------
   async handleWebhook(rawBody: Uint8Array, headers: Headers): Promise<{ status: 204 | 401; body?: unknown }> {
-    const { repo } = this.deps;
+    const { repo, config } = this.deps;
+    if (config.mode === "live" && !config.dial.webhookSecret) {
+      // No subscription secret yet (receiver not deployed/registered): fail visibly, never accept unverified events.
+      throw new ApiHttpError(503, "LIVE_CONFIGURATION_MISSING", "Live webhook verification requires DIAL_WEBHOOK_SECRET", [
+        "DIAL_WEBHOOK_SECRET",
+      ]);
+    }
     const adapter = this.deps.voice();
     let verified;
     try {

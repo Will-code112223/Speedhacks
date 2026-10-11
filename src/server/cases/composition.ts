@@ -33,10 +33,12 @@ function buildVoiceResolver(config: AppConfig): () => VoiceAdapter {
       simulated ??= createSimulatedVoiceAdapter(config.simulated);
       return simulated;
     }
+    // Dispatch and provider reads need the key and sending number. The webhook signing secret is
+    // only required by the webhook route (see CaseService.handleWebhook), so a live call can be
+    // placed and reconciled by polling before a receiver/subscription exists.
     const missing: string[] = [];
     if (!config.dial.apiKey) missing.push("DIAL_API_KEY");
     if (!config.dial.fromNumber) missing.push("DIAL_FROM_NUMBER");
-    if (!config.dial.webhookSecret) missing.push("DIAL_WEBHOOK_SECRET");
     if (missing.length > 0) {
       throw new ApiHttpError(503, "LIVE_CONFIGURATION_MISSING", `Live voice requires ${missing.join(", ")}`, missing);
     }

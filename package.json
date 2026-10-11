@@ -8,8 +8,10 @@
   },
   "scripts": {
     "dev": "next dev",
+    "dev:live": "node --env-file=\"$HOME/.config/speedhacks/dial.env\" node_modules/next/dist/bin/next dev",
     "build": "next build",
     "start": "next start",
+    "start:live": "node --env-file=\"$HOME/.config/speedhacks/dial.env\" node_modules/next/dist/bin/next start",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"
