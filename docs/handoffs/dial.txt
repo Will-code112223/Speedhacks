@@ -1,0 +1,191 @@
+TEAMMATE 3 — DIAL HANDOFF
+Branch: codex/voice
+Base: a8d0895 (the shared V1 prompts published to main)
+Implementation date: 2026-10-11
+Commit: use git log -1 --format=%H -- src/integrations/dial docs/handoffs/dial.txt
+The exact final commit is also saved in the Alike implementation handoff.
+
+DELIVERED
+src/integrations/dial/index.ts exports createDialAdapter({mode}):VoiceAdapter.
+The optional second argument injects config/fetch/clock/timeouts for isolated tests.
+It is structurally identical to V1. No network request occurs at import/factory time.
+All provider errors exposed by the adapter are sanitized; raw response/error text
+is never returned. Live failure never falls back to simulation.
+
+Runtime: Node server with native fetch, Headers, TextDecoder and node:crypto.
+No additional runtime dependency. Do not import from a client component or Edge route.
+Tests require Node >=22.18 with built-in TypeScript stripping (verified on 25.2.1),
+or T2 may use its chosen TypeScript runner. Type-only imports use .ts, as do test
+and script imports: set compilerOptions.allowImportingTsExtensions=true for
+noEmit checking. TypeScript >=5.0 and @types/node are development dependencies
+owned by T2, not added to the repository by this workstream.
+
+TEMPORARY CONTRACT BRIDGE
+Canonical src/contracts/* did not exist on origin/main when this was implemented.
+types.ts is the exact, isolated shared V1 mirror permitted by the prompts.
+When T2's scaffold lands, replace its definitions with:
+  export type {Mode} from "../../contracts/case";
+  export type {AuthorizedCallInput, StartCallResult, VoiceSnapshot,
+    VerifiedVoiceEvent, VoiceAdapter} from "../../contracts/voice";
+No routes, root manifests, lockfiles, database, or shared contracts were edited.
+
+SERVER CONFIGURATION (T2 adds to .env.example; never NEXT_PUBLIC_)
+DIAL_API_KEY                  Existing account API key.
+DIAL_FROM_NUMBER              Account-owned number ID, E.164 number, or nickname.
+DIAL_WEBHOOK_SECRET           Entire whsec_... subscription signing secret.
+DIAL_MAX_CALL_DURATION_SECONDS Optional integer 60..3600; default 300.
+Set the duration within the account's verified free guardrails; credit alone
+does not establish that free limits are lifted. Missing API key/from number
+rejects before dispatch; webhook verification only requires the webhook secret.
+An explicit injected config replaces environment config in full.
+
+LIVE ACCOUNT STATUS
+Read-only Firefox inspection confirmed a signed-in Dial account, an existing
+phone number, event credits, and an existing API key entry. No key was copied,
+created or committed; no number/credit purchase or settings change was made.
+DIAL_API_KEY, DIAL_FROM_NUMBER and DIAL_WEBHOOK_SECRET were absent from the
+terminal environment. Therefore authenticated account-limit lookup and live
+adapter requests have NOT been verified. The account settings cap was empty;
+that does not establish effective free duration/concurrency limits.
+The live API key and webhook signing secret still need secure server configuration.
+
+Read-only preflight after configuring a secure external environment file:
+  node --env-file=/secure/path/dial.env src/integrations/dial/check-account.mts
+It GETs /api/v1/account and prints only validated duration/concurrency limits.
+Missing limits is an error; explicit limits:null means free guardrails lifted.
+Per-call duration overrides configured number/account duration, then free limits
+apply. This account endpoint alone cannot prove number readiness or its limits.
+
+EXACT INTEGRATION EXAMPLE (T2)
+  import {createDialAdapter, DialAdapterError} from "@/integrations/dial";
+  const voice = createDialAdapter({mode: "live"}); // choose mode explicitly
+  const result = await voice.startCall({
+    attemptId: storedAttempt.id,
+    caseId: authorizedCase.id,
+    authorizationId: authorizedCase.authorization.id,
+    to: frozenAuthorization.supportPhone,
+    brief: frozenAuthorization.approvedBrief,
+  });
+T2 persists/locks one attempt per authorization before this invocation. Return
+the old attempt for repeated authorizationId/requestId. The adapter does not
+persist or verify customer authorization itself; never pass raw client facts.
+Capture accepted.providerCallId durably. On rejected, the documented request
+was refused before dispatch. On dispatch_unknown, preserve the attempt and
+block new dispatch/authorization. Do not turn uncertainty into a retry-safe503.
+
+The exact API is POST https://api.getdial.ai/api/v1/calls with Bearer auth,
+Idempotency-Key: attemptId, and {to,fromNumber,outboundInstruction,language,
+maxCallDurationSeconds}. Exactly one POST is sent per invocation. Current
+OpenAPI/SDK support the key, although older voice-call prose says otherwise.
+Successful 2xx requires a valid call.id. 409 idempotency_conflict, ambiguous409,
+5xx, transport/timeout errors, malformed success and unusable IDs remain unknown.
+Known HTTP400/401/402/403/404/429 and 409 calling_disabled are sanitized refusals.
+No fabricated correlation lookup. A provider ID is never guessed after loss.
+
+GET /api/v1/calls/{id} returns {call}. Queued/Ringing -> queued;
+In-Progress -> in_progress; Terminated/completed -> completed;
+Terminated/canceled -> cancelled; busy/no-answer/failed -> failed.
+Unknown states throw INVALID_PROVIDER_RESPONSE. Cancellation flags alone do
+not imply cancelled: an answered call can end completed after a manual stop.
+Transcript/duration null remains null; transcriptTurns is a speaker-labelled
+fallback. No snapshot infers a refund decision or confirmed payment.
+Reads default to one retry on transport/5xx failures (max2 configurable);
+each request including JSON body has a 10s deadline (max60s configurable).
+
+WEBHOOK ROUTE (T2 OWNS)
+Use Node runtime and obtain bytes BEFORE JSON parsing:
+  const raw = new Uint8Array(await request.arrayBuffer());
+  const event = await voice.verifyWebhook(raw, request.headers);
+Limit incoming HTTP body size to 1MiB before buffering; adapter also checks size.
+INVALID_WEBHOOK ->401; MISSING_CONFIG is server misconfiguration, not a forged
+request. Authenticated irrelevant event ->null, safe204. Relevant event returns
+{eventId,providerCallId,type:"call.ended"} only after signature/envelope/data checks.
+Durably accept/deduplicate before204; keep unknown call IDs queued so an event
+arriving before dispatch's response can reconcile. Bind the matched provider ID
+to an owned attempt; never trust a webhook's phone number as case ownership.
+Do not reject legitimate duplicates in memory: they pass verification each time.
+
+Authentication: X-Dial-Signature t=<unix-seconds>,v1=<64hex>, HMAC-SHA256 of
+UTF8(timestamp + ".") followed by the EXACT raw bytes, keyed by the entire
+subscription secret. Absolute skew >=300s is rejected. X-Dial-Event-ID and
+X-Dial-Event-Type must match signed id/type. Expected object:event/version:1,
+createdAt timestamp, matching call relatedObject and all documented ended data
+fields. Unknown fields are tolerated. Malformed authenticated payloads reject.
+Configure a public HTTPS subscription for call.ended only after T2 provides
+the running authenticated route. Nothing has been deployed or subscribed here.
+
+CRITICAL: LATE TRANSCRIPT RECONCILIATION
+call.ended has NO transcript and transcriptAvailable can be false. Dial emits
+call.transcribed later. V1 only normalizes call.ended, so call.transcribed returns
+null. T2 MUST persist a reconciliation job: fetch getCall after ended, retry
+bounded reads until transcript arrives, then atomically publish terminal CallV1
+plus evaluated outcome/timeline. Proposed job delays 0/2/5/10/20 seconds; if still
+missing, publish an explicit unknown outcome and a manual-review next step.
+Do not publish terminal state early and depend on UI polling to get the transcript.
+T2 may deliberately coordinate V2 call.transcribed support later; not changed here.
+
+SIMULATED MODE
+  const voice = createDialAdapter({mode:"simulated"});
+  const call = await voice.startCall({
+    attemptId:"11111111-1111-4111-8111-111111111111",
+    caseId:"22222222-2222-4222-8222-222222222222",
+    authorizationId:"33333333-3333-4333-8333-333333333333",
+    to:"+12025550123", brief:"Synthetic duplicate charge; request review only."
+  });
+  if (call.state === "accepted") console.log(await voice.getCall(call.providerCallId));
+The deterministic sim_dial_<hash> is derived from the captured input. getCall
+returns an immediate completed synthetic needs-information transcript with a
+fixed demo reference, explicitly labelled SIMULATED. It is stateless and does
+not prove that an attempt exists; T2 still checks its own attempt ownership.
+No config/transport is used. Cross-mode IDs and all external simulated webhooks
+are rejected. This fixture is independent of T2's early simulated-voice adapter.
+
+OPT-IN LIVE SMOKE TEST — PREPARED, NOT EXECUTED
+Only after the user explicitly authorizes a specific consenting test recipient:
+1. Configure DIAL_API_KEY, DIAL_FROM_NUMBER and DIAL_TEST_TO in a secure external
+   environment file; never commit real customer data or credentials.
+2. Set DIAL_TEST_CONSENT_TO to that exact recipient number and verify account
+   limits with the read-only preflight above. It is not authorization to call
+   another recipient or reuse a real merchant's number.
+3. Set DIAL_SMOKE_ATTEMPT_FILE to a new absolute file path outside the repository.
+4. Run:
+   node --env-file=/secure/path/dial.env src/integrations/dial/live-smoke.mts --live
+The script caps at60s, uses a synthetic test brief, reserves a0600 attempt file
+before dispatch and refuses an existing path. It prints only sanitized result
+and saves it atomically. A pending/unknown outcome requires manual dashboard
+reconciliation. Do not choose a new file just to bypass that guard.
+Retrieve the accepted provider ID using getCall after the call; no automatic
+redial. No real calls, support contact, refunds or claims occurred in development.
+
+CONTEXT MCP
+context-mcp-design.txt records the narrow proposed tool scope. No MCP server was
+implemented: account-wide identity and phone headers cannot securely select an
+authorized case. T2 must agree/verify a per-attempt capability binding first.
+
+VERIFICATION
+Run:
+  node --test src/integrations/dial/__tests__/adapter.test.ts
+Synthetic injected fetch only: normalization, dispatch refusal/uncertainty,
+no POST retry, input capture, abort/body deadlines, bounded GET retry, strict
+mode separation, exact-byte HMAC, stale/future/forged/malformed signatures,
+required event fields, enum type confusion, raw byte mutation, duplicate delivery,
+irrelevant events and malformed provider records. Result: 122/122 tests passed.
+Strict TypeScript5.9.3 noEmit checking with @types/node22 passes with targetES2022,
+module/moduleResolution NodeNext, libES2022,DOM, allowImportingTsExtensions.
+Compiler was installed only in a temporary directory outside the repo.
+Smoke/account commands were checked for fail-closed missing configuration only.
+No application build or T2 route integration is claimed: the scaffold is absent.
+
+OFFICIAL SOURCES CHECKED 2026-10-11
+https://getdial.ai/hackathon/speedhacks/quickstart
+https://docs.getdial.ai/openapi.json
+https://docs.getdial.ai/api-reference/rest-api/calls/make-call
+https://docs.getdial.ai/api-reference/rest-api/account/get-account
+https://docs.getdial.ai/api-reference/events/call-ended
+https://docs.getdial.ai/api-reference/events/call-transcribed
+https://docs.getdial.ai/documentation/platform/webhooks
+https://docs.getdial.ai/documentation/reference/usage-and-limits
+https://docs.getdial.ai/documentation/platform/context-mcp
+Official @getdial/sdk0.41.1 source corroborates /api/v1 paths, request fields,
+Idempotency-Key and {call} response unwrapping. Some guide examples omit /api;
+use the verified SDK/OpenAPI route here. Transcript-late behavior is documented.
