@@ -137,6 +137,20 @@ describe("workflow recovery and mutation ordering", () => {
 });
 
 describe("workflow evidence and action UI", () => {
+  it.each(["ready", "processing", "failed", "conflict", "missing fact", "no evidence", "busy", "uncertain"])("shows provider upload review only for a prepared local packet: %s", async state => {
+    const value = await response(4);
+    value.workflow.stage = "ready"; value.workflow.questions = [];
+    value.workflow.facts.insuranceProvider = { label: "Insurer", value: "AAA", source: "user", sourceRefs: ["m1"] };
+    if (state === "processing" || state === "failed") value.workflow.analysisStatus = state;
+    if (state === "conflict") value.workflow.conflicts = ["Incident date differs"];
+    if (state === "missing fact") value.workflow.questions = [{ id: "loss", field: "lossDate", question: "When?", required: true }];
+    const html = renderToStaticMarkup(<WorkflowPanel controller={{ ...EMPTY_WORKFLOW, workflow: value.workflow, busy: state === "busy", uncertain: state === "uncertain", refresh: async () => {}, upload: async () => false, retry: async () => false, analyze: async () => false }} evidence={state === "no evidence" ? [] : [{ id: "photo", name: "damage-photo.png", mimeType: "image/png" }, { id: "quote", name: "repair-estimate.txt", mimeType: "text/plain" }]} />);
+    if (state === "ready") {
+      expect(html).toContain("Packet prepared for AAA"); expect(html).toContain("Not uploaded");
+      expect(html).toContain("2 saved attachments"); expect(html).toContain("no files have been sent to the insurer");
+    } else expect(html).not.toContain('aria-label="Provider upload review"');
+    expect(html).not.toContain("Upload complete"); expect(html).not.toContain("Approved by AAA");
+  });
   it("keeps an insurance case out of the legacy refund facts and approval form", async () => {
     const value = await response();
     value.case.mode = "live";

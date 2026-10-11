@@ -17,6 +17,9 @@ export function publicContactUrl(value: string | null): string | null {
 export default function WorkflowPanel({ controller, evidence = [], onAction, onRetry }: { controller: WorkflowController; evidence?: CaseEvidence[]; onAction?: (action: WorkflowAction) => void; onRetry?: () => void }) {
   const workflow = controller.workflow;
   const headingId = useId();
+  const packetReady = workflow?.kind === "auto_insurance" && workflow.analysisStatus === "complete" &&
+    workflow.stage === "ready" && workflow.conflicts.length === 0 && !workflow.questions.some(question => question.required) &&
+    evidence.length > 0 && !controller.busy && !controller.loading && !controller.error && !controller.uncertain;
   return <section className={styles.panel} aria-label="Case preparation" aria-busy={controller.busy || controller.loading}>
     {controller.loading && !workflow ? <p className={styles.note} role="status">Preparing your questions and action list…</p> : null}
     {controller.error ? <div className={styles.error} role="alert"><p>{controller.error}</p>{controller.uncertain && onRetry ? <Button size="small" variant="primary" onClick={onRetry} busy={controller.busy} busyLabel="Checking previous update">Retry previous update</Button> : null}<Button size="small" variant="secondary" onClick={() => void controller.refresh()} disabled={controller.busy}>Refresh case plan</Button></div> : null}
@@ -33,6 +36,11 @@ export default function WorkflowPanel({ controller, evidence = [], onAction, onR
         <details open={workflow.stage === "ready"}><summary>{workflow.brief.title}</summary><p className={styles.brief}>{workflow.brief.body}</p></details>
         <p className={styles.note}>Revision {workflow.caseRevision} · Prepared from your saved information. Review before sharing.</p>
         {evidence.length ? <div aria-label="Saved evidence"><h4>Attached evidence</h4><ul className={styles.questions}>{evidence.map(file => <li key={file.id}>{file.name}</li>)}</ul></div> : null}
+        {packetReady ? <section className={styles.section} aria-label="Provider upload review">
+          <div className={styles.heading}><h4>Packet prepared{workflow.facts.insuranceProvider?.value ? ` for ${workflow.facts.insuranceProvider.value}` : " for insurer review"}</h4><span className={styles.status}>Not uploaded</span></div>
+          <p>Case brief and {evidence.length} saved {evidence.length === 1 ? "attachment" : "attachments"} prepared. Review before provider upload.</p>
+          <p className={styles.note}>Provider requirements still need confirmation. This packet remains in Recourse; no files have been sent to the insurer.</p>
+        </section> : null}
         {workflow.kind === "auto_insurance" ? <p className={styles.note}>Add requested photos or estimates below to update this packet. Prepared for your review; not submitted to an insurer.</p> : null}
       </section>
       {workflow.contacts.length ? <section className={styles.section} aria-labelledby={`${headingId}-contacts`}><h3 id={`${headingId}-contacts`}>Contacts</h3><ul className={styles.contacts}>{workflow.contacts.map(contact => <li key={contact.id}><strong>{contact.name}</strong><span>{contact.role.replaceAll("_", " ")}{contact.phone ? ` · ${contact.phone}` : ""}</span>{publicContactUrl(contact.url) ? <a href={publicContactUrl(contact.url)!} target="_blank" rel="noopener noreferrer">Open provider website</a> : null}{publicContactUrl(contact.sourceUrl) ? <a href={publicContactUrl(contact.sourceUrl)!} target="_blank" rel="noopener noreferrer">Contact source</a> : null}{contact.requiresConfirmation ? <small className={styles.note}>Confirm this is the right contact before using it.</small> : null}</li>)}</ul></section> : null}
