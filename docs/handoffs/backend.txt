@@ -79,6 +79,8 @@ STATUS
 - [x] Packet: GET /api/cases/:id/packet text/plain with facts, draft, evidence index (sha256), outcome, calls, timeline
 - [x] Session cookie ownership (refund_session, httpOnly); foreign/absent session -> 404
 - [x] T3 createDialAdapter wired (src/server/cases/composition.ts); its V1 mirror replaced by canonical re-exports
+- [x] Keewano (optional add-on, src/integrations/keewano): case mirror by case id + pre-authorization duplicate-charge
+      check frozen into the brief; fixture-backed in simulated mode without a token (see KEEWANO section)
 - [ ] Mount T1 RefundApp (waiting for docs/handoffs/frontend.txt)
 - [ ] Sparta merchant-side scenario (Codex, tests/sparta/**) — distinct from our consumer-side call integration
 - [ ] Live Dial smoke test: only with an explicitly consenting test recipient; never run in tests
@@ -140,3 +142,37 @@ KNOWN LIMITS / PROPOSED CONTRACT NOTES (not applied; coordinate before changing 
 - Transcript reconciliation is driven by GET polling (bounded), not a worker; if nobody polls, it resumes on the next GET.
 - Simulated mode is explicit in data (mode) and must be labeled in the UI.
 - npm 11 install-script gating: package.json allowScripts approves better-sqlite3 and esbuild.
+
+INSURER KNOWLEDGE BASE (T2, Claude lane) — src/server/insurers/**
+- What: 33 US insurers from the product brief (auto, life, title/property, health, disability, business, pet, travel) with support/claims/billing/cancellation/appeals lines and call-relevant terms (cancellation refund method, free-look, billing-dispute route, grace period, claim filing/timelines, appeal process, identity checks, arbitration). Every fact has sourceUrl, retrievedAt and confidence (verified_official | reported | regulatory_default | unknown); unknown = null, never guessed. Phones are strict US E.164; the loader rejects a bad seed.
+- Use: import { lookupInsurer, getRegulatoryDefaults, listInsurers, listOpenQuestions } from "@/server/insurers".
+  lookupInsurer("Geico") -> { id, name, supportPhone, supportPhoneConfidence, claimsPhone, needsPlanOrRegion, contacts[], terms[], openQuestions[], match } or null (unknown/ambiguous — never guess).
+  Fill merchant.supportPhone from supportPhone only when supportPhoneConfidence === "verified_official". If needsPlanOrRegion is true (Kaiser, Anthem, Aetna, UHC members), ask the customer for the number on their ID card / their region. Contacts with scope regional | plan_specific | corporate_only are never auto-dialed.
+  getRegulatoryDefaults("health") -> ACA/Medicare/ERISA/state fallbacks (appeal windows, free-look, grace, Reg E card dispute) for the call brief, labelled as "typically", not the insurer's statement.
+- Data: seed/insurers.json + seed/regulatory-defaults.json (source of truth); insurers.sqlite is built under DATA_DIR on first use. Human-readable report: docs/insurer-terms.md. Full details: src/server/insurers/README.md.
+- Tests: tests/backend/insurers.test.ts (seed validation, E.164, lookup, no regional auto-fill). Typecheck clean.
+- For T1: no HTTP route yet; request GET /api/insurers?name= in your handoff if the UI should show the insurer's terms. For T3: the server-generated call brief can carry the insurer's terms; no change to the voice contract.
+- Status: research done by per-category subagents restricted to official domains; a second pass re-verifies every verified_official number against its cited page. Numbers marked reported must be confirmed with the customer before dialing. Open questions per insurer are in the seed (listOpenQuestions()).
+
+KEEWANO (optional sponsor integration; nothing in the shared contract changed)
+- Code: src/integrations/keewano/** (events registry, REST ingest, batching sink, MirroredCaseRepository, MCP client,
+  KeewanoTransactionHistory + FixtureTransactionHistory, seed.mts / sql.mts CLIs). Port: src/server/cases/history.ts
+  (TransactionHistory, evaluateHistory, historyBriefLines). Wired in src/server/cases/composition.ts via createKeewano().
+- Mirror (KEEWANO_API_KEY): every timeline entry (own timestamp), derived status change, merchant, amount, call state,
+  outcome and history-check status → Keewano custom events 2000–2013, entity = case id. One-way, batched, best effort.
+- Duplicate-charge check (KEEWANO_ACCESS_TOKEN; fixture in simulated mode otherwise; KEEWANO_FIXTURE_HISTORY=off disables):
+  runs in createCase and once per revision on GET (so an edit re-checks); bounded by KEEWANO_TIMEOUT_MS (6000);
+  "unavailable" is retried after KEEWANO_RETRY_MS (30000). Result → timeline "history_checked" / "history_unavailable",
+  CaseDoc.history (internal, not on CaseV1), AuthorizationSnapshot.history + a "Transaction history evidence" section in
+  the frozen brief (same revision only), and a TRANSACTION HISTORY section in the packet. Never a source of facts; never
+  blocks authorization; never queried mid-call. Statuses: duplicate_found | recurring_only | single_charge | no_match |
+  no_history | unavailable.
+- Synthetic data only: src/integrations/keewano/seed/transactions.json (sam@example.com = the duplicate). npm run
+  keewano:seed backfills it (idempotent per customer); npm run keewano:sql -- --tools | --charges <email> | "<SQL>" [--raw].
+- Not verified live: no Keewano credentials on this machine. REST payloads follow the SpeedHacks quickstart + REST page;
+  MCP tool/argument names are discovered at runtime (override with KEEWANO_SQL_TOOL / KEEWANO_SQL_ARG) and result rows
+  are normalized from structuredContent / JSON / markdown / CSV. First live run: seed → wait a few minutes →
+  `npm run keewano:sql -- --charges sam@example.com --raw` and fix parsing if the shape differs.
+- New dependency: @modelcontextprotocol/sdk (MCP client). T1: nothing to do; the timeline already carries the finding.
+  Judging criteria from the quickstart: Keewano must be load-bearing (here: the brief changes with the finding) and at
+  least one live query must run in the demo (here: the check on case creation / review screen).

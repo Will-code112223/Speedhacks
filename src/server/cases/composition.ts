@@ -1,6 +1,7 @@
 import type { Mode } from "@/contracts/case";
 import type { VoiceAdapter } from "@/contracts/voice";
 import { createDialAdapter, type DialDependencies } from "@/integrations/dial";
+import { createKeewano } from "@/integrations/keewano";
 import { CaseService } from "@/server/cases/service";
 import { createSimulatedVoiceAdapter } from "@/server/cases/simulated-voice";
 import { type AppConfig, loadConfig } from "@/server/config";
@@ -8,7 +9,6 @@ import { type Extractor, HeuristicExtractor, OpenAIExtractor } from "@/server/do
 import { UploadStore } from "@/server/documents/storage";
 import { ApiHttpError } from "@/server/http/errors";
 import { openDatabase } from "@/server/persistence/db";
-import { CaseRepository } from "@/server/persistence/repository";
 
 /**
  * Composition root. Live voice is teammate 3's Dial adapter (src/integrations/dial,
@@ -85,9 +85,12 @@ function buildVoiceResolver(config: AppConfig, overrides: CompositionOverrides =
 
 export function buildCaseService(config: AppConfig = loadConfig(), overrides: CompositionOverrides = {}): CaseService {
   const db = openDatabase(config.dataDir);
+  // Keewano (optional): mirrors cases as they change and answers the pre-authorization history check.
+  const keewano = createKeewano(config);
   return new CaseService({
     config,
-    repo: new CaseRepository(db),
+    repo: keewano.repository(db),
+    history: keewano.history,
     uploads: new UploadStore(config.dataDir),
     extractor: buildExtractor(config),
     voice: buildVoiceResolver(config, overrides),

@@ -9,9 +9,11 @@ import {
   buildBrief,
   buildDraft,
   formatAmount,
+  isValidAmountMinor,
   missingFields,
   type Facts,
 } from "@/server/cases/facts";
+import { evaluateHistory, unavailableHistory, type HistoryCheck, type TransactionHistory } from "@/server/cases/history";
 import { analyzeTranscript, unknownOutcome } from "@/server/cases/outcome";
 import { type AppConfig, assertLiveLlmConfig, assertModeValid } from "@/server/config";
 import type { ExtractedFields, Extractor } from "@/server/documents/extractor";
@@ -48,10 +50,28 @@ export interface ServiceDeps {
   extractor: Extractor;
   /** Lazily resolves the voice adapter; throws a 503 ApiHttpError when live mode is not configured. */
   voice: () => VoiceAdapter;
+  /** Optional transaction-history source (Keewano or fixture); absent = no history check. */
+  history?: TransactionHistory | null;
   now?: () => Date;
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms} ms`)), ms);
+    p.then(
+      (v) => {
+        clearTimeout(timer);
+        resolve(v);
+      },
+      (e: unknown) => {
+        clearTimeout(timer);
+        reject(e);
+      },
+    );
+  });
+}
 
 /** Adapter rejection codes that mean "this server is misconfigured", not "the provider refused". */
 const CONFIG_REJECTION_CODES = new Set(["MISSING_CONFIG", "INVALID_CONFIG", "SERVER_ONLY", "INVALID_MODE"]);
@@ -189,6 +209,8 @@ export class CaseService {
 
     const missing = missingFields(facts);
     const evidenceList = evidence.map((e) => ({ id: e.id, name: e.name, mimeType: e.mimeType }));
+    // Pre-authorization transaction-history check (Keewano or the labeled fixture). Bounded; never blocks.
+    const history = await this.checkHistory(facts, 1);
     const doc: CaseDoc = {
       ...facts,
       missingFields: missing,
@@ -196,7 +218,9 @@ export class CaseService {
       authorization: null,
       outcome: { decision: "unknown", referenceNumber: null, nextAction: null, paymentStatus: "unverified", supportingQuote: null },
       timeline,
+      history,
     };
+    if (history) doc.timeline.push(this.historyEntry(history));
     if (missing.length > 0) doc.timeline.push(this.entry("needs_information", `Missing: ${missing.join(", ")}.`));
     else doc.timeline.push(this.entry("ready_for_approval", "All required facts present; draft generated."));
 
@@ -214,6 +238,7 @@ export class CaseService {
   async getCase(ownerSession: string, id: string): Promise<CaseV1> {
     this.ownedRow(ownerSession, id);
     await this.reconcileDueCalls(id);
+    await this.ensureHistoryChecked(id);
     return this.assemble(id);
   }
 
@@ -301,6 +326,8 @@ export class CaseService {
       const evidence = repo.listEvidence(id).map((e) => ({ id: e.id, name: e.name, mimeType: e.mimeType }));
       const merchant = { name: row.doc.merchant.name as string, supportPhone: row.doc.merchant.supportPhone as string };
       const amountMinor = row.doc.amountMinor as number;
+      // Only a check of this exact revision is frozen; a stale one is evidence about other facts.
+      const history = row.doc.history && row.doc.history.revision === row.revision ? row.doc.history : null;
       const snapshot: AuthorizationSnapshot = {
         caseId: id,
         revision: row.revision,
@@ -319,8 +346,10 @@ export class CaseService {
           currency: row.doc.currency,
           reason: row.doc.reason,
           evidence,
+          history,
         }),
         permittedActions: [...PERMITTED_ACTIONS],
+        history,
       };
       const authorization = { id: randomUUID(), caseId: id, revision: row.revision, approvedAt: now, snapshot };
       repo.insertAuthorization(authorization);
@@ -470,8 +499,9 @@ export class CaseService {
   // GET /api/cases/:id/packet
   // -------------------------------------------------------------------------
   packet(ownerSession: string, id: string): string {
-    this.ownedRow(ownerSession, id);
-    return buildPacket(this.assemble(id), this.deps.repo.listEvidence(id));
+    const row = this.ownedRow(ownerSession, id);
+    const history = row.doc.history && row.doc.history.revision === row.revision ? row.doc.history : null;
+    return buildPacket(this.assemble(id), this.deps.repo.listEvidence(id), history);
   }
 
   // -------------------------------------------------------------------------
@@ -524,6 +554,55 @@ export class CaseService {
     }
     // Unmatched events stay queued until the call attempt learns its provider id.
     return { status: 204 };
+  }
+
+  // -------------------------------------------------------------------------
+  // Transaction history (Keewano or fixture): checked before authorization, shown on
+  // the timeline, frozen into the brief. Never a source of facts, never queried mid-call.
+  // -------------------------------------------------------------------------
+  private historyEntry(check: HistoryCheck): TimelineEntry {
+    return this.entry(check.status === "unavailable" ? "history_unavailable" : "history_checked", check.summary);
+  }
+
+  /** Bounded and never throws: an unreachable source yields an explicit "unavailable" result. */
+  private async checkHistory(facts: Facts, revision: number): Promise<HistoryCheck | null> {
+    const source = this.deps.history;
+    if (!source) return null;
+    const merchantName = facts.merchant.name?.trim();
+    const amountMinor = facts.amountMinor;
+    if (!merchantName || !isValidAmountMinor(amountMinor)) return null;
+    if (!facts.customer.email?.trim() && !facts.customer.name?.trim()) return null;
+    const { keewano } = this.deps.config;
+    const opts = { revision, checkedAt: this.nowIso(), source: source.kind, windowMinutes: keewano.historyWindowMinutes };
+    try {
+      const charges = await withTimeout(source.listCharges(facts.customer), keewano.timeoutMs, `${source.kind} history lookup`);
+      return evaluateHistory(charges, { merchantName, amountMinor, currency: facts.currency }, opts);
+    } catch (err) {
+      return unavailableHistory(opts, String((err as Error).message ?? err));
+    }
+  }
+
+  /** Once per revision (a fact edit re-triggers it); an unavailable result is retried after a pause. */
+  private async ensureHistoryChecked(id: string): Promise<void> {
+    const { repo, config } = this.deps;
+    if (!this.deps.history) return;
+    const row = repo.getCase(id);
+    if (!row) return;
+    const prev = row.doc.history ?? null;
+    if (prev && prev.revision === row.revision) {
+      if (prev.status !== "unavailable") return;
+      if (Date.parse(this.nowIso()) - Date.parse(prev.checkedAt) < config.keewano.retryMs) return;
+    }
+    const check = await this.checkHistory(row.doc, row.revision);
+    if (!check) return;
+    repo.transaction(() => {
+      const latest = repo.getCase(id);
+      if (!latest || latest.revision !== check.revision) return; // facts changed meanwhile; the next GET re-checks
+      const current = latest.doc.history ?? null;
+      if (current && current.revision === check.revision && (current.status !== "unavailable" || current.checkedAt === check.checkedAt)) return;
+      const doc: CaseDoc = { ...latest.doc, history: check, timeline: [...latest.doc.timeline, this.historyEntry(check)] };
+      repo.updateCase(id, { doc, updatedAt: this.nowIso() });
+    });
   }
 
   // -------------------------------------------------------------------------

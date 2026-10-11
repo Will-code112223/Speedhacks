@@ -1,4 +1,5 @@
 import type { CaseChanges, CaseV1 } from "@/contracts/case";
+import { historyBriefLines, type HistoryCheck } from "@/server/cases/history";
 import type { CaseDoc } from "@/server/persistence/repository";
 
 /** E.164 with at least 8 digits, matching the Dial adapter's own validation so dispatch never fails on format. */
@@ -177,6 +178,8 @@ export function buildBrief(input: {
   currency: string;
   reason: string;
   evidence: CaseV1["evidence"];
+  /** Transaction-history check for this exact revision, if one ran. */
+  history?: HistoryCheck | null;
 }): string {
   const amount = formatAmount(input.amountMinor, input.currency);
   return [
@@ -190,6 +193,7 @@ export function buildBrief(input: {
     `- Amount: ${amount}`,
     `- Reason given by the customer: ${input.reason}`,
     `- Evidence on file: ${input.evidence.length > 0 ? input.evidence.map((e) => e.name).join(", ") : "none"}`,
+    ...(input.history ? ["", ...historyBriefLines(input.history)] : []),
     "",
     "Permitted actions:",
     ...PERMITTED_ACTIONS.map((a) => `- ${a}`),

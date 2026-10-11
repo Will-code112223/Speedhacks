@@ -1,0 +1,45 @@
+{
+  "$comment": "SYNTHETIC transaction history for the Speedhacks demo. Every person, merchant, amount and id here is invented. Sam Rivera has a duplicate (two $49.99 Acme Streaming charges 3.5 minutes apart on Oct 3); Priya has a single charge; Diego has a normal monthly recurring charge; Mei has a duplicate at a different merchant.",
+  "customers": [
+    {
+      "name": "Sam Rivera",
+      "email": "sam@example.com",
+      "charges": [
+        { "chargeId": "txn_3b00aa", "merchant": "Acme Streaming", "amountMinor": 4999, "currency": "USD", "at": "2026-09-03T14:01:58Z" },
+        { "chargeId": "txn_0e55d9", "merchant": "Bay Area Transit", "amountMinor": 2500, "currency": "USD", "at": "2026-10-01T08:12:40Z" },
+        { "chargeId": "txn_1c77b2", "merchant": "Blue Bottle Coffee", "amountMinor": 650, "currency": "USD", "at": "2026-10-02T16:20:05Z" },
+        { "chargeId": "txn_2a91f0", "merchant": "ACME STREAMING INC", "amountMinor": 4999, "currency": "USD", "at": "2026-10-03T14:02:11Z" },
+        { "chargeId": "txn_2a91f7", "merchant": "ACME STREAMING INC", "amountMinor": 4999, "currency": "USD", "at": "2026-10-03T14:05:40Z" },
+        { "chargeId": "txn_4d12c3", "merchant": "Blue Bottle Coffee", "amountMinor": 725, "currency": "USD", "at": "2026-10-05T09:02:17Z" }
+      ]
+    },
+    {
+      "name": "Priya Natarajan",
+      "email": "priya@example.com",
+      "charges": [
+        { "chargeId": "txn_5e9a01", "merchant": "ACME STREAMING INC", "amountMinor": 4999, "currency": "USD", "at": "2026-10-03T09:15:02Z" },
+        { "chargeId": "txn_5e9a22", "merchant": "Northwind Gym", "amountMinor": 3900, "currency": "USD", "at": "2026-10-04T07:30:11Z" },
+        { "chargeId": "txn_5e9a35", "merchant": "Bay Area Transit", "amountMinor": 2500, "currency": "USD", "at": "2026-10-06T08:05:44Z" }
+      ]
+    },
+    {
+      "name": "Diego Alvarez",
+      "email": "diego@example.com",
+      "charges": [
+        { "chargeId": "txn_7f10b1", "merchant": "ACME STREAMING INC", "amountMinor": 4999, "currency": "USD", "at": "2026-08-03T14:00:31Z" },
+        { "chargeId": "txn_7f10b9", "merchant": "ACME STREAMING INC", "amountMinor": 4999, "currency": "USD", "at": "2026-09-03T14:00:47Z" },
+        { "chargeId": "txn_7f10c4", "merchant": "ACME STREAMING INC", "amountMinor": 4999, "currency": "USD", "at": "2026-10-03T14:01:05Z" },
+        { "chargeId": "txn_7f10d0", "merchant": "Blue Bottle Coffee", "amountMinor": 550, "currency": "USD", "at": "2026-10-04T15:41:09Z" }
+      ]
+    },
+    {
+      "name": "Mei Chen",
+      "email": "mei@example.com",
+      "charges": [
+        { "chargeId": "txn_9a44e2", "merchant": "Northwind Gym", "amountMinor": 3900, "currency": "USD", "at": "2026-10-02T06:58:20Z" },
+        { "chargeId": "txn_9a44e8", "merchant": "Northwind Gym", "amountMinor": 3900, "currency": "USD", "at": "2026-10-02T07:00:03Z" },
+        { "chargeId": "txn_9a44f1", "merchant": "ACME STREAMING INC", "amountMinor": 4999, "currency": "USD", "at": "2026-10-03T14:03:27Z" }
+      ]
+    }
+  ]
+}

@@ -14,9 +14,12 @@
     "start:live": "node --env-file=\"$HOME/.config/speedhacks/dial.env\" node_modules/next/dist/bin/next start",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "keewano:seed": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --env-file-if-exists=.env.local src/integrations/keewano/seed.mts",
+    "keewano:sql": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --env-file-if-exists=.env.local src/integrations/keewano/sql.mts"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.1",
     "better-sqlite3": "^12.11.1",
     "next": "^16.4.0",
     "react": "^19.2.0",

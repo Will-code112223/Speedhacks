@@ -1,9 +1,10 @@
 import type { CaseV1 } from "@/contracts/case";
 import { formatAmount } from "@/server/cases/facts";
+import { historyBriefLines, type HistoryCheck } from "@/server/cases/history";
 import type { EvidenceRow } from "@/server/persistence/repository";
 
 /** Plain-text refund request packet with an evidence index. PDF is optional later. */
-export function buildPacket(c: CaseV1, evidence: EvidenceRow[]): string {
+export function buildPacket(c: CaseV1, evidence: EvidenceRow[], history: HistoryCheck | null = null): string {
   const amount = formatAmount(c.amountMinor, c.currency);
   const lines: string[] = [];
   lines.push("REFUND REQUEST PACKET");
@@ -39,6 +40,13 @@ export function buildPacket(c: CaseV1, evidence: EvidenceRow[]): string {
     lines.push(`   type: ${e.mimeType}   size: ${e.sizeBytes} bytes   sha256: ${e.sha256.slice(0, 16)}…   id: ${e.id}`);
   });
   lines.push("");
+  if (history) {
+    lines.push("TRANSACTION HISTORY");
+    lines.push("-".repeat(60));
+    lines.push(`Checked:  ${history.checkedAt}   source: ${history.source}   status: ${history.status}`);
+    for (const l of historyBriefLines(history).slice(1)) lines.push(l);
+    lines.push("");
+  }
   lines.push("OUTCOME");
   lines.push("-".repeat(60));
   lines.push(`Decision:        ${c.outcome.decision}`);

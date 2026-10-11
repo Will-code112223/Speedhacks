@@ -67,3 +67,24 @@ npm run build
 ```
 
 Tests use temporary SQLite files, synthetic fixtures and no network. See `docs/handoffs/backend.txt` for status, error codes and integration notes.
+
+## Keewano (optional sponsor integration)
+
+[Keewano](https://docs.keewano.com/getting-started/speedhacks-quickstart) stores ordered, typed events per entity and answers questions over MCP. It is an add-on: the refund flow works without it. Code lives in `src/integrations/keewano/`; the case engine only sees a `TransactionHistory` port (`src/server/cases/history.ts`).
+
+Two uses, both one-way and both outside the call:
+
+1. **Case mirror** (`KEEWANO_API_KEY`): every timeline entry, derived status change, merchant, amount, call state, outcome and history-check result is sent to Keewano as it is persisted, keyed by case id, with the entry's own timestamp (REST ingest, batched, best effort — a dead endpoint never breaks a case). Ask Keewano things like "which merchants approve refunds" or "where do cases stall".
+2. **Pre-authorization duplicate-charge check** (`KEEWANO_ACCESS_TOKEN`): when a case has a customer, merchant and amount, the server reads that customer's charge history from Keewano (SQL over MCP), looks for charges of the same merchant and amount within 24 hours, writes the finding to the timeline (`history_checked` / `history_unavailable`), and freezes it into the call brief at authorization. The agent may cite the transaction references only when a duplicate was found. Facts never come from Keewano, authorization is never blocked, and nothing is queried mid-call (the brief is immutable once authorized).
+
+Without a token in simulated mode the check reads the same synthetic customers from a local fixture, labeled `fixture` everywhere it appears. `sam@example.com` has the duplicate (`COMPLETE_FIELDS` in the tests); see `src/integrations/keewano/seed/transactions.json`.
+
+```bash
+# 1. sign up, send "#SpeedHacks" in the in-app chat, create an API key and an access token, put them in .env.local
+npm run keewano:seed                       # backfill the synthetic charge history (idempotent per customer)
+npm run keewano:sql -- --tools             # what the MCP server offers (set KEEWANO_SQL_TOOL/ARG if the guess is wrong)
+npm run keewano:sql -- --charges sam@example.com   # the exact query the duplicate check runs (--raw to see the tool result)
+npm run keewano:sql -- "SELECT count(DISTINCT user_id) AS entities, count(*) AS events FROM events"
+```
+
+Events become queryable a few minutes after ingestion. The in-app check and both CLIs are verified against a fake transport only; the live MCP tool names and result shape are discovered at runtime (`npm run keewano:sql -- --raw` shows what came back if parsing fails).

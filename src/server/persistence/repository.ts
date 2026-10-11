@@ -1,4 +1,5 @@
 import type { CallState, CaseV1, Mode } from "@/contracts/case";
+import type { HistoryCheck } from "@/server/cases/history";
 import type { Db } from "@/server/persistence/db";
 
 /** Mutable case fields stored as one JSON document; calls/evidence live in their own tables. */
@@ -13,6 +14,8 @@ export interface CaseDoc {
   authorization: CaseV1["authorization"];
   outcome: CaseV1["outcome"];
   timeline: CaseV1["timeline"];
+  /** Pre-authorization transaction-history check (Keewano/fixture); absent on older rows. */
+  history?: HistoryCheck | null;
 }
 
 export interface CaseRow {
@@ -60,6 +63,8 @@ export interface AuthorizationSnapshot {
   evidence: CaseV1["evidence"];
   brief: string;
   permittedActions: string[];
+  /** History evidence frozen with the brief (same revision only). */
+  history?: HistoryCheck | null;
 }
 
 export interface AuthorizationRow {

@@ -27,6 +27,19 @@ export interface AppConfig {
     /** Stop looking for a late transcript this long after the attempt was created. */
     lateTranscriptWindowMs: number;
   };
+  /** Optional Keewano sponsor integration (src/integrations/keewano). Nothing is required. */
+  keewano: {
+    apiKey: string | null;
+    accessToken: string | null;
+    ingestUrl: string;
+    mcpUrl: string;
+    sqlTool: string | null;
+    sqlArg: string | null;
+    historyWindowMinutes: number;
+    timeoutMs: number;
+    retryMs: number;
+    fixtureHistory: boolean;
+  };
 }
 
 function str(v: string | undefined): string | null {
@@ -81,6 +94,19 @@ export function loadConfig(env: EnvSource = process.env): AppConfig {
       transcriptWaitMs: int(env.TRANSCRIPT_WAIT_MS, 45_000),
       lateTranscriptIntervalMs: int(env.LATE_TRANSCRIPT_INTERVAL_MS, 30_000),
       lateTranscriptWindowMs: int(env.LATE_TRANSCRIPT_WINDOW_MS, 24 * 60 * 60 * 1000),
+    },
+    keewano: {
+      apiKey: str(env.KEEWANO_API_KEY),
+      accessToken: str(env.KEEWANO_ACCESS_TOKEN),
+      ingestUrl: str(env.KEEWANO_INGEST_URL) ?? "https://api.keewano.com/event/ingress/v1/json",
+      mcpUrl: str(env.KEEWANO_MCP_URL) ?? "https://api.keewano.com/mcp",
+      sqlTool: str(env.KEEWANO_SQL_TOOL),
+      sqlArg: str(env.KEEWANO_SQL_ARG),
+      historyWindowMinutes: int(env.KEEWANO_HISTORY_WINDOW_MINUTES, 24 * 60) || 24 * 60,
+      timeoutMs: int(env.KEEWANO_TIMEOUT_MS, 6000) || 6000,
+      retryMs: int(env.KEEWANO_RETRY_MS, 30_000),
+      // In simulated mode without a token the check reads the labeled local fixture.
+      fixtureHistory: (env.KEEWANO_FIXTURE_HISTORY ?? "").trim().toLowerCase() !== "off",
     },
   };
 }
