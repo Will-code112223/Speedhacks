@@ -1,0 +1,39 @@
+BACKEND HANDOFF — teammate 2 (case engine, scaffold, contracts, integration)
+Branch: codex/case-engine
+
+STATUS
+- [x] Scaffold: Next.js 16 App Router + TypeScript, npm, Node 24 (.nvmrc), better-sqlite3, vitest. `npm run build` and `npm run typecheck` pass; placeholder page serves.
+- [x] Canonical contracts: src/contracts/case.ts, src/contracts/voice.ts (V1 shapes verbatim + additive helpers).
+- [ ] HTTP routes under src/app/api/** (next)
+- [ ] SQLite persistence (src/server/persistence/**)
+- [ ] Case service, authorization snapshots, call attempts, event dedup (src/server/cases/**)
+- [ ] Document ingestion + extraction + packet (src/server/documents/**)
+- [ ] Simulated voice adapter (src/server/cases/simulated-voice.ts)
+- [ ] Webhook route POST /api/webhooks/dial
+- [ ] Integration tests (tests/integration/**)
+- [ ] Mount T1 RefundApp in src/app/page.tsx after handoff
+- [ ] Wire T3 createDialAdapter at the composition root after handoff
+
+EXPORTED INTERFACES
+- @/contracts/case: Mode, CaseStatus, CallState, CallV1, CaseV1, CaseChanges, ApiError; helpers CaseResponse, CallResponse, PatchCaseRequest, AuthorizeCaseRequest, StartCallRequest, ApiErrorCode, ACTIVE_CALL_STATES, TERMINAL_CALL_STATES.
+- @/contracts/voice: AuthorizedCallInput, StartCallResult, VoiceSnapshot, VerifiedVoiceEvent, VoiceAdapter; helpers INVALID_WEBHOOK, VoiceWebhookError, isInvalidWebhookError. The webhook route treats any thrown error with code === "INVALID_WEBHOOK" as 401; using the class is optional.
+
+HOW TO BASE YOUR BRANCH
+  git fetch origin && git checkout -b <your-branch> origin/codex/case-engine
+  nvm use && npm install && cp .env.example .env.local && npm run dev
+T1: create src/features/refund-ui/RefundApp.tsx (default export, "use client"). Do not edit src/app/**.
+T3: create src/integrations/dial/index.ts exporting createDialAdapter({mode}). Do not edit src/server/**.
+
+DEPENDENCY / ENV REQUESTS FROM TEAMMATES
+(none yet — put requests in your own handoff file; T2 applies them to package.json / .env.example)
+
+MOCK VS LIVE
+- simulated: default, no credentials, labeled in data (mode field) and UI.
+- live: needs LLM_MODEL + OPENAI_API_KEY (extraction) and Dial variables (T3 documents exact names). Missing config fails visibly with 503; no silent fallback.
+
+KNOWN LIMITS
+- Local disk persistence (SQLite file + private uploads under DATA_DIR) is a hackathon setup; not suitable for ephemeral serverless disks.
+- npm 11 gates install scripts; package.json allowScripts approves better-sqlite3 and esbuild so `npm install` builds the native module without prompts.
+
+COMMITS
+- scaffold + contracts: (see git log; ID reported in the team message and Alike decision)
