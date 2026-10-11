@@ -1,5 +1,5 @@
 import type { CaseChanges, CaseV1 } from "@/contracts/case";
-import { CALL_PLAN_ACTIONS } from "@/contracts/voice";
+import { CALL_PLAN_ACTIONS, CALL_PLAN_LIMITS, type CallPlanV1, type CallPurpose } from "@/contracts/voice";
 import { historyBriefLines, type HistoryCheck } from "@/server/cases/history";
 import { merchantRecordLines, type FrozenMerchantRecord } from "@/server/cases/insights";
 import type { CaseDoc } from "@/server/persistence/repository";
@@ -20,12 +20,13 @@ export const REQUIRED_FIELDS = [
 
 export type Facts = Pick<CaseDoc, "customer" | "merchant" | "amountMinor" | "currency" | "reason">;
 
-export function missingFields(facts: Facts): string[] {
+/** Required facts for authorization. gather_information does not need an amount (V1.1). */
+export function missingFields(facts: Facts, purpose: CallPurpose = "request_refund"): string[] {
   const missing: string[] = [];
   if (!facts.customer.name?.trim()) missing.push("customer.name");
   if (!facts.merchant.name?.trim()) missing.push("merchant.name");
   if (!facts.merchant.supportPhone || !E164.test(facts.merchant.supportPhone)) missing.push("merchant.supportPhone");
-  if (!isValidAmountMinor(facts.amountMinor)) missing.push("amountMinor");
+  if (purpose === "request_refund" && !isValidAmountMinor(facts.amountMinor)) missing.push("amountMinor");
   if (!CURRENCY.test(facts.currency)) missing.push("currency");
   if (!facts.reason.trim()) missing.push("reason");
   return missing;
@@ -166,7 +167,7 @@ export function buildBrief(input: {
   revision: number;
   customer: CaseV1["customer"];
   merchant: { name: string; supportPhone: string };
-  amountMinor: number;
+  amountMinor: number | null;
   currency: string;
   reason: string;
   evidence: CaseV1["evidence"];
@@ -174,11 +175,17 @@ export function buildBrief(input: {
   history?: HistoryCheck | null;
   /** Merchant track record for this exact revision, if one was captured. */
   merchantRecord?: FrozenMerchantRecord | null;
+  /** V1.1; absent = request_refund (the V1 brief, byte-identical). */
+  purpose?: CallPurpose;
 }): string {
-  const amount = formatAmount(input.amountMinor, input.currency);
+  const purpose = input.purpose ?? "request_refund";
+  const amount = input.amountMinor === null ? "unknown" : formatAmount(input.amountMinor, input.currency);
+  const actions = CALL_PLAN_ACTIONS[purpose];
   return [
     `You are calling ${input.merchant.name} customer support on behalf of ${input.customer.name ?? "the customer"}.`,
-    `Purpose: request a refund of ${amount} for a duplicate charge.`,
+    purpose === "request_refund"
+      ? `Purpose: request a refund of ${amount} for a duplicate charge.`
+      : "Purpose: gather information about a charge. Do not request a refund or file a claim.",
     "",
     "Approved facts (do not alter):",
     `- Customer name: ${input.customer.name ?? "unknown"}`,
@@ -191,11 +198,76 @@ export function buildBrief(input: {
     ...(input.merchantRecord ? ["", ...merchantRecordLines(input.merchantRecord)] : []),
     "",
     "Permitted actions:",
-    ...PERMITTED_ACTIONS.map((a) => `- ${a}`),
+    ...actions.permitted.map((a) => `- ${a}`),
     "",
     "Not permitted:",
-    ...FORBIDDEN_ACTIONS.map((a) => `- ${a}`),
+    ...actions.forbidden.map((a) => `- ${a}`),
     "",
     `Case reference: ${input.caseId} (revision ${input.revision}).`,
   ].join("\n");
+}
+
+/** Facts the agent may say aloud under V1.1: the same facts the V1 brief already carried. */
+const PLAN_DISCLOSURES: CallPlanV1["permittedDisclosures"] = [
+  "customerName",
+  "customerEmail",
+  "merchantName",
+  "amountMinor",
+  "currency",
+  "reason",
+  "evidenceNames",
+  "history",
+];
+
+/**
+ * V1.1 structured call plan, frozen with the authorization next to the brief. Built only
+ * from server-side facts; actions are the server constants for the purpose. Callers must
+ * run validateCallPlan before freezing it.
+ */
+export function buildCallPlan(input: {
+  purpose: CallPurpose;
+  caseId: string;
+  revision: number;
+  customer: CaseV1["customer"];
+  merchantName: string;
+  amountMinor: number | null;
+  currency: string;
+  reason: string;
+  evidence: CaseV1["evidence"];
+  history?: HistoryCheck | null;
+  merchantRecord?: FrozenMerchantRecord | null;
+}): CallPlanV1 {
+  const questions: CallPlanV1["questions"] =
+    input.purpose === "request_refund"
+      ? [
+          { id: "reference", text: "What is the reference or confirmation number for this refund request?" },
+          { id: "timeline", text: "When should the customer expect the refund to appear?" },
+        ]
+      : [
+          ...(input.amountMinor === null ? [{ id: "amount", text: "What amount was charged, and on what date?" }] : []),
+          { id: "requirements", text: "What does the customer need to provide to resolve this charge?" },
+          { id: "reference", text: "Is there a reference or case number for this inquiry?" },
+        ];
+  const duplicate = input.history?.status === "duplicate_found" ? input.history : null;
+  return {
+    version: 1,
+    purpose: input.purpose,
+    facts: {
+      customerName: input.customer.name?.trim() ? input.customer.name : null,
+      customerEmail: input.customer.email?.trim() ? input.customer.email : null,
+      merchantName: input.merchantName,
+      amountMinor: input.amountMinor,
+      currency: input.amountMinor === null ? null : input.currency,
+      reason: input.reason,
+      evidenceNames: input.evidence.map((e) => e.name),
+      // Only a duplicate finding may be cited; anything else stays out of the plan.
+      history: duplicate ? { status: duplicate.status, transactionRefs: duplicate.matches.map((m) => m.chargeId) } : null,
+    },
+    permittedDisclosures: [...PLAN_DISCLOSURES],
+    questions,
+    permittedActions: [...CALL_PLAN_ACTIONS[input.purpose].permitted],
+    forbiddenActions: [...CALL_PLAN_ACTIONS[input.purpose].forbidden],
+    caseRef: { caseId: input.caseId, revision: input.revision },
+    ...(input.merchantRecord ? { guidance: merchantRecordLines(input.merchantRecord).slice(1).map((l) => l.replace(/^- /, "").slice(0, CALL_PLAN_LIMITS.guidanceChars)) } : {}),
+  };
 }

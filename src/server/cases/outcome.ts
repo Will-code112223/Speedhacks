@@ -85,15 +85,17 @@ function classify(s: Sentence): Decisive | "needs_info" | null {
 
 export function analyzeTranscript(
   transcript: string | null,
-  context: { amountMinor: number; currency: string; merchantName: string },
+  context: { amountMinor: number | null; currency: string; merchantName: string },
 ): CaseOutcome {
-  const amount = formatAmount(context.amountMinor, context.currency);
+  // An information-only authorization may have no amount: say "the charge", never "[amount missing]".
+  const charge = context.amountMinor === null ? "charge" : `${formatAmount(context.amountMinor, context.currency)} charge`;
+  const refund = context.amountMinor === null ? "refund" : `${formatAmount(context.amountMinor, context.currency)} refund`;
   const base = { referenceNumber: null as string | null, paymentStatus: "unverified" as const, supportingQuote: null as string | null };
   if (!transcript || transcript.trim().length === 0) {
     return {
       ...base,
       decision: "unknown",
-      nextAction: `No transcript was available. Contact ${context.merchantName} support again with the refund packet, or dispute the ${amount} charge with your card issuer.`,
+      nextAction: `No transcript was available. Contact ${context.merchantName} support again with the refund packet, or dispute the ${charge} with your card issuer.`,
     };
   }
 
@@ -114,7 +116,7 @@ export function analyzeTranscript(
       decision: "approved",
       referenceNumber,
       supportingQuote: decisive.quote,
-      nextAction: `Watch your statement for a ${amount} refund from ${context.merchantName}. Keep ${
+      nextAction: `Watch your statement for a ${refund} from ${context.merchantName}. Keep ${
         referenceNumber ? `reference ${referenceNumber}` : "the transcript"
       }; if it has not posted in 10 business days, follow up or dispute with your card issuer.`,
     };
@@ -125,7 +127,7 @@ export function analyzeTranscript(
       decision: "denied",
       referenceNumber,
       supportingQuote: decisive.quote,
-      nextAction: `${context.merchantName} declined on the call. Dispute the ${amount} charge with your card issuer and attach the refund packet and transcript.`,
+      nextAction: `${context.merchantName} declined on the call. Dispute the ${charge} with your card issuer and attach the refund packet and transcript.`,
     };
   }
   if (needsInfo) {

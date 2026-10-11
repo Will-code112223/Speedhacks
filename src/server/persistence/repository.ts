@@ -1,4 +1,5 @@
 import type { CallState, CaseV1, Mode } from "@/contracts/case";
+import type { CallPlanV1, CallPurpose } from "@/contracts/voice";
 import type { HistoryCheck } from "@/server/cases/history";
 import type { FrozenMerchantRecord } from "@/server/cases/insights";
 import type { Db } from "@/server/persistence/db";
@@ -60,11 +61,16 @@ export interface AuthorizationSnapshot {
   revision: number;
   customer: CaseV1["customer"];
   merchant: { name: string; supportPhone: string };
-  amountMinor: number;
+  /** null only for a gather_information authorization (V1.1). */
+  amountMinor: number | null;
   currency: string;
   reason: string;
   evidence: CaseV1["evidence"];
   brief: string;
+  /** V1.1; absent on pre-V1.1 rows = request_refund. */
+  purpose?: CallPurpose;
+  /** V1.1 plan frozen with the brief; absent on pre-V1.1 rows (adapter then uses the brief). */
+  plan?: CallPlanV1;
   permittedActions: string[];
   /** History evidence frozen with the brief (same revision only). */
   history?: HistoryCheck | null;

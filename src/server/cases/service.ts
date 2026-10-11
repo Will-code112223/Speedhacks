@@ -1,12 +1,12 @@
 import { randomUUID } from "node:crypto";
 import { TERMINAL_CALL_STATES, type CallV1, type CaseChanges, type CaseV1, type TimelineEntry } from "@/contracts/case";
-import type { VoiceAdapter, VoiceSnapshot } from "@/contracts/voice";
-import { isInvalidWebhookError } from "@/contracts/voice";
+import type { CallPurpose, VoiceAdapter, VoiceSnapshot } from "@/contracts/voice";
+import { CALL_PLAN_ACTIONS, isInvalidWebhookError, validateCallPlan } from "@/contracts/voice";
 import { assembleCase, hasActiveCall, toCallV1 } from "@/server/cases/assemble";
 import {
-  PERMITTED_ACTIONS,
   applyChanges,
   buildBrief,
+  buildCallPlan,
   buildDraft,
   formatAmount,
   isValidAmountMinor,
@@ -303,7 +303,7 @@ export class CaseService {
   // -------------------------------------------------------------------------
   // POST /api/cases/:id/authorize  (idempotent per revision)
   // -------------------------------------------------------------------------
-  authorize(ownerSession: string, id: string, expectedRevision: number): CaseV1 {
+  authorize(ownerSession: string, id: string, expectedRevision: number, purpose: CallPurpose = "request_refund"): CaseV1 {
     const { repo } = this.deps;
     repo.transaction(() => {
       const row = this.ownedRow(ownerSession, id);
@@ -315,16 +315,25 @@ export class CaseService {
       if (expectedRevision !== row.revision) {
         throw new ApiHttpError(409, "REVISION_CONFLICT", `Case is at revision ${row.revision}, not ${expectedRevision}`);
       }
-      const missing = missingFields(row.doc);
+      const missing = missingFields(row.doc, purpose);
       if (missing.length > 0) {
         throw new ApiHttpError(422, "MISSING_REQUIRED_FACTS", "Authorization requires every required fact", missing);
       }
       const existing = repo.findAuthorization(id, row.revision);
       if (existing) {
+        // One authorization per revision: a different purpose would silently reuse the other plan.
+        const existingPurpose = existing.snapshot.purpose ?? "request_refund";
+        if (existingPurpose !== purpose) {
+          throw new ApiHttpError(
+            409,
+            "AUTHORIZATION_CONFLICT",
+            `Revision ${row.revision} is already authorized for ${existingPurpose}; edit the case to authorize a different purpose`,
+          );
+        }
         if (row.doc.authorization?.id !== existing.id) {
           const doc: CaseDoc = {
             ...row.doc,
-            authorization: { id: existing.id, revision: existing.revision, approvedAt: existing.approvedAt },
+            authorization: { id: existing.id, revision: existing.revision, approvedAt: existing.approvedAt, purpose: existingPurpose },
           };
           repo.updateCase(id, { doc, updatedAt: this.nowIso() });
         }
@@ -333,7 +342,8 @@ export class CaseService {
       const now = this.nowIso();
       const evidence = repo.listEvidence(id).map((e) => ({ id: e.id, name: e.name, mimeType: e.mimeType }));
       const merchant = { name: row.doc.merchant.name as string, supportPhone: row.doc.merchant.supportPhone as string };
-      const amountMinor = row.doc.amountMinor as number;
+      // gather_information may authorize without an amount; request_refund passed missingFields.
+      const amountMinor = isValidAmountMinor(row.doc.amountMinor) ? row.doc.amountMinor : null;
       // Only a check of this exact revision is frozen; a stale one is evidence about other facts.
       const history = row.doc.history && row.doc.history.revision === row.revision ? row.doc.history : null;
       const merchantRecord = row.doc.merchantRecord && row.doc.merchantRecord.revision === row.revision ? row.doc.merchantRecord : null;
@@ -357,21 +367,43 @@ export class CaseService {
           evidence,
           history,
           merchantRecord,
+          purpose,
         }),
-        permittedActions: [...PERMITTED_ACTIONS],
+        permittedActions: [...CALL_PLAN_ACTIONS[purpose].permitted],
         history,
         merchantRecord,
+        purpose,
+        plan: buildCallPlan({
+          purpose,
+          caseId: id,
+          revision: row.revision,
+          customer: row.doc.customer,
+          merchantName: merchant.name,
+          amountMinor,
+          currency: row.doc.currency,
+          reason: row.doc.reason,
+          evidence,
+          history,
+          merchantRecord,
+        }),
       };
+      // Validate before freezing: an adapter-side rejection would consume the authorization.
+      const planErrors = validateCallPlan(snapshot.plan);
+      if (planErrors.length > 0) {
+        throw new ApiHttpError(422, "MISSING_REQUIRED_FACTS", `The call plan is invalid: ${planErrors.join("; ")}`);
+      }
       const authorization = { id: randomUUID(), caseId: id, revision: row.revision, approvedAt: now, snapshot };
       repo.insertAuthorization(authorization);
       const doc: CaseDoc = {
         ...row.doc,
-        authorization: { id: authorization.id, revision: row.revision, approvedAt: now },
+        authorization: { id: authorization.id, revision: row.revision, approvedAt: now, purpose },
         timeline: [
           ...row.doc.timeline,
           this.entry(
             "authorized",
-            `Authorized revision ${row.revision}: call ${merchant.supportPhone} (${merchant.name}) about ${formatAmount(amountMinor, row.doc.currency)}.`,
+            purpose === "request_refund"
+              ? `Authorized revision ${row.revision}: call ${merchant.supportPhone} (${merchant.name}) about ${formatAmount(amountMinor, row.doc.currency)}.`
+              : `Authorized revision ${row.revision}: call ${merchant.supportPhone} (${merchant.name}) to gather information only (no refund request).`,
           ),
         ],
       };
@@ -449,6 +481,7 @@ export class CaseService {
         authorizationId: input.authorizationId,
         to: frozen.merchant.supportPhone,
         brief: frozen.brief,
+        ...(frozen.plan ? { plan: frozen.plan } : {}),
       });
     } catch (err) {
       // The request may have reached the provider: never retry blindly.

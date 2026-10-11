@@ -231,3 +231,13 @@ VOICE CONTRACT V1.1 (agreed with T3, Alike reply 4383d1e6, 2026-10-11) — canon
 - facts.ts PERMITTED_ACTIONS/FORBIDDEN_ACTIONS now alias CALL_PLAN_ACTIONS.request_refund (identical text).
 - Deferred: status events/SSE (slice 3). Next T2: build/freeze plan at authorization, purpose-aware missing facts.
   Next T3: render planForProvider output after a purpose-conditional mandatory instruction.
+V1.1 IMPLEMENTED (T2 + T3 adapter, Jonathan took ownership of the adapter part; Benjamin reviews adversarially)
+- Adapter (6a2d609): input.plan validated (validateCallPlan + caseRef.caseId === caseId), cloned before any await, and sent
+  as a purpose-conditional mandatory instruction + planForProvider(plan) INSTEAD of the brief. No plan → V1 bytes unchanged.
+  INSTRUCTION constant untouched (codex/claims-demo edits it). Contract: optional CallPlanV1.guidance (≤6×400, server-made).
+- Server: POST /api/cases/:id/authorize accepts purpose ("request_refund" default | "gather_information"; other → 400).
+  gather_information skips amountMinor in the authorize gate only; plan built by buildCallPlan, validated, frozen in the
+  snapshot (snapshot.purpose/plan; amountMinor may be null) and sent with the brief. Same revision + different purpose →
+  409 AUTHORIZATION_CONFLICT. CaseV1.authorization.purpose is set. Brief/outcome text never says "[amount missing]".
+- T1 note: CaseV1.missingFields/status keep V1 semantics (a case without an amount shows needs_information) even though
+  it can be authorized for gather_information. Not yet built: slice 2 behavior (transcript answers → proposedUpdates).
