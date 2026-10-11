@@ -1,0 +1,176 @@
+You are teammate 1, responsible for the refund assistant frontend. Implement your work, not just a plan. Use branch codex/frontend.
+
+YOUR DELIVERABLE
+Build an accessible, polished client interface for this flow:
+1. Upload receipt(s) or enter the problem.
+2. Review editable customer/merchant/amount/reason fields and missing information.
+3. Preview the generated refund request and evidence index.
+4. Clearly authorize the displayed facts and intended support call.
+5. Start the call with a single stable requestId per action.
+6. Display the case timeline, call lifecycle, transcript, reference number, next action and decision. Display approval and payment separately.
+7. Download the packet.
+
+Own only src/features/refund-ui/** and docs/handoffs/frontend.txt. Export default RefundApp from src/features/refund-ui/RefundApp.tsx with "use client"; use scoped CSS/CSS modules. Teammate 2 owns page.tsx, layout.tsx, global CSS and scaffold. Do not overwrite those files or edit package/lock/config files.
+
+Put API calls behind a small client abstraction in your folder. Implement a deterministic UI-local mock matching the exact shared types and endpoints so you can build in parallel. Mock mode is visibly labeled and explicitly selected; network errors must never automatically substitute fake results. Provide loading, missing-information, revision-conflict, unauthorized, provider-failure and dispatch_unknown states. Prevent double clicks. Reuse requestId after a retry. Poll GET case every 2–3 seconds only while an action is pending and stop on terminal state/unmount. Treat server state as authoritative.
+
+Include fixtures for a synthetic duplicate $49.99 charge, a request needing evidence, an uncertain dispatch, and a completed call with refund still unconfirmed. Do not invent user-savings numbers; measure actual active user time separately from elapsed waiting.
+
+Verify the full fixture flow and narrow/mobile layouts. Document exactly how T2 mounts the component and switches the API client from fixture mode to real backend. Do not block on missing backend credentials. Leave optional charts, insurance UI, notifications and extra sponsor integrations until the core flow works.
+
+
+SHARED CONTRACT V1 — IDENTICAL FOR ALL THREE TEAMMATES
+
+Project: https://github.com/Will-code112223/Speedhacks
+Goal: a hackathon refund assistant. First scenario: a duplicate charge. Upload evidence, review extracted facts, authorize one support call, then see the transcript and an evidence-backed outcome. Insurance is a later extension. Build the working refund path first.
+
+TECHNICAL BASELINE AND OWNERSHIP
+Use Next.js App Router + TypeScript, npm, Node runtime for server routes, and local SQLite persistence for the hackathon. This is a proposed baseline: if live repository/Alike context reveals an already-agreed stack, reconcile that explicitly before changing it.
+- Teammate 1 owns src/features/refund-ui/** and docs/handoffs/frontend.txt.
+- Teammate 2 owns src/app/**, src/contracts/**, src/server/cases/**, src/server/documents/**, src/server/persistence/**, tests/integration/**, tests/sparta/**, root manifests/lockfile/configuration, .env.example, and docs/handoffs/backend.txt.
+- Teammate 3 owns src/integrations/dial/** and docs/handoffs/dial.txt.
+- T2 alone owns canonical shared types, HTTP routes, scaffold, dependency installation/lockfile, and final integration wiring.
+- T1 exports a default RefundApp component from src/features/refund-ui/RefundApp.tsx. T2 mounts it in src/app/page.tsx.
+- T3 exports createDialAdapter from src/integrations/dial/index.ts. T2 injects it into the case service and mounts the webhook route.
+- Do not edit another owner's files, reset other work, change unrelated code, or merge main without a team handoff. Put dependency/environment requests in your own handoff file.
+- Inspect git status, branches, AGENTS.md and existing implementation first. Use your assigned branch, or reuse your own suitable existing branch.
+- T2 publishes a minimal scaffold/type-contract commit first. T1/T3 can start their owned modules and fixtures before it lands; they must not create competing root scaffolds or shared files. If needed, keep temporary contract mirrors inside the owned folder, then replace them with canonical imports after synchronization.
+- Never silently change contract V1. Record a proposed change and coordinate it before integrating.
+
+ALIKE — REQUIRED DEVELOPMENT WORKFLOW
+Read the installed alike skill and applicable AGENTS.md. Discover available tools; do not invent tool names or assume every CLI tool is supported.
+At the start, resolve your own work item using your feature branch and reference this coordination task:
+urn:alike:task:febf1da19fe5d226343fe9776b9ce6722ef2a7d66d4f4059bc74d1be829abd04
+Shared coordination decision: urn:alike:decision:e6426d2c0d74a73a7c21792034b20d445f5c8c0791c4882ad814fae3716751aa
+Read relevant coordination pointers with get_entity(urn), then get_entity(urn, include:["sources","related"]); add history if decisions changed. When supported, use search_environment(query, data_types:["agent_session"]) and query_entities to recall Speedhacks decisions and the other workstreams.
+The local fallback is ~/.alike/bin/alike; run --help and tools before using it. It is not necessarily on PATH. The coordinator's current CLI supports reading entities, resolving work, briefings and decisions; session search and entity queries were unavailable over that CLI. Unsupported searches are not proof that no records exist.
+Record implementation decisions with rationale and task/repository-relative path anchors; supersede old decisions when necessary. Save a sanitized handoff with exported interfaces, actual tests, mock/live status, remaining blockers and commit ID. If create_entity is unavailable, use your owned handoff file and record_decision.
+Alike shares development context. Do not put API keys, real claim documents, financial/medical details, or customer transcripts in shared notes. Use synthetic fixtures.
+When an Alike record affects your work, include a user-visible "Alike:" line naming the record, its returned origin and date when available, and what it changed. Do not invent provenance.
+Confirm with your user before sending messages or delegating to another person, including their agent. Do not automatically message teammates merely because they appear in Alike.
+
+CANONICAL DATA TYPES
+T2 creates src/contracts/case.ts and src/contracts/voice.ts. Export these names. All timestamps are ISO-8601 UTC, IDs are UUIDs except opaque provider IDs, monetary amounts are integer minor units, currency is a three-letter code (MVP USD). Unknown facts are null, never fabricated. Empty collections are [].
+
+type Mode = "simulated" | "live";
+type CaseStatus = "needs_information" | "ready_for_approval" | "authorized" | "calling" | "awaiting_response" | "approved" | "denied";
+type CallState = "dispatch_pending" | "queued" | "in_progress" | "completed" | "failed" | "cancelled" | "dispatch_unknown";
+
+interface CallV1 {
+  id: string;
+  requestId: string;
+  authorizationId: string;
+  providerCallId: string | null;
+  mode: Mode;
+  state: CallState;
+  transcript: string | null;
+  error: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+interface CaseV1 {
+  schemaVersion: 1;
+  id: string;
+  revision: number;
+  mode: Mode;
+  status: CaseStatus;
+  customer: { name: string | null; email: string | null };
+  merchant: { name: string | null; supportPhone: string | null };
+  amountMinor: number | null;
+  currency: string;
+  reason: string;
+  evidence: { id: string; name: string; mimeType: string }[];
+  missingFields: string[];
+  draft: { subject: string; body: string } | null;
+  authorization: { id: string; revision: number; approvedAt: string } | null;
+  calls: CallV1[];
+  outcome: {
+    decision: "unknown" | "requested" | "needs_information" | "approved" | "denied";
+    referenceNumber: string | null;
+    nextAction: string | null;
+    paymentStatus: "unverified" | "confirmed";
+    supportingQuote: string | null;
+  };
+  timeline: { id: string; at: string; type: string; message: string }[];
+  createdAt: string;
+  updatedAt: string;
+}
+interface CaseChanges {
+  customer?: { name: string | null; email: string | null };
+  merchant?: { name: string | null; supportPhone: string | null };
+  amountMinor?: number | null;
+  currency?: string;
+  reason?: string;
+}
+interface ApiError {
+  error: { code: string; message: string; fields?: string[] };
+}
+
+SHARED HTTP API — T2 IMPLEMENTS, T1 CONSUMES
+- POST /api/cases: multipart/form-data; summary:string and optional repeated files fields. At least summary or one file is required. Optional text fields: customerName, customerEmail, merchantName, supportPhone, amountMinor, currency. Returns 201 {case:CaseV1}.
+- GET /api/cases/:id: returns 200 {case:CaseV1}.
+- PATCH /api/cases/:id: JSON {expectedRevision:number, changes:CaseChanges}; returns 200 {case:CaseV1}.
+- POST /api/cases/:id/authorize: JSON {expectedRevision:number}; returns 200 {case:CaseV1}, including authorization.id.
+- POST /api/cases/:id/calls: JSON {authorizationId:string, requestId:string}; returns 202 {call:CallV1}. requestId is a client-generated UUID, reused for retries of the same action.
+- GET /api/cases/:id/packet: returns text/plain; charset=utf-8 as a downloadable refund request with evidence index. PDF is optional after the working flow.
+- POST /api/webhooks/dial: accepts raw provider bytes and headers, verifies through the voice adapter, durably deduplicates the event, and processes authenticated call details. Returns 204 only after durably accepting a valid event; invalid signatures return 401.
+- Failures use ApiError. Use 400 malformed input, 404 unknown case, 409 revision/authorization/conflicting action, 422 missing required facts, 503 missing live configuration/provider unavailable before dispatch. Do not report an ambiguous dispatch as a safe-to-retry 503; persist dispatch_unknown.
+
+AUTHORIZATION AND STATE RULES
+revision starts at 1 and increments only for changes to case facts; timeline/call updates do not increment it. Material edits clear authorization and rebuild the draft. Reject edits while a call is active or dispatch_unknown; preserve the approved snapshot and evidence.
+Authorization requires a known customer name, merchant name, E.164 support number, positive integer amountMinor, currency and nonempty reason. /authorize is idempotent for an unchanged revision: reuse its authorization ID, never mint a fresh ID to bypass dispatch deduplication. Reject new authorization while a call is active or dispatch_unknown.
+Authorization freezes the exact case revision, contact destination, amount, factual call brief and permitted actions. Never trust replacement facts supplied to the calls endpoint.
+MVP permits one dispatch attempt per authorization ID. Atomically persist an attempt before calling Dial. Repeated requestId or authorizationId returns the stored attempt; concurrent requests cannot create two calls.
+Once a network request may have reached Dial, timeout/connection loss is dispatch_unknown. Do not automatically redial. Reconcile with provider evidence before a new attempt. If no provider call ID was returned, require a documented correlation/search mechanism or manual verification; never guess a matching call.
+Publish a terminal CallV1 state and its processed case outcome/timeline atomically so the UI cannot stop polling before the result appears. If analysis fails, publish an explicit unknown outcome with a next action rather than inventing success.
+Maintain call lifecycle separately from refund decisions. A completed call does not imply a refund was approved or paid. An explicit support statement may support "approved" with a quote/reference, while paymentStatus remains unverified without separate payment evidence.
+API keys remain server-side. Enforce case ownership using a session-bound cookie or equivalent local-demo access control. Do not expose customer cases through unauthenticated public routes.
+Simulated mode must be explicit in data and UI. Never silently fall back to simulation when live operations fail. No real calls during tests; a live test requires a deliberately configured, consenting test recipient.
+
+SHARED VOICE ADAPTER — T3 IMPLEMENTS, T2 CONSUMES
+Export these types from src/contracts/voice.ts (reuse Mode and CallState from case.ts):
+interface AuthorizedCallInput {
+  attemptId: string;
+  caseId: string;
+  authorizationId: string;
+  to: string;
+  brief: string; // server-generated immutable approved facts and allowed actions
+}
+type StartCallResult =
+  | {state:"accepted"; mode:Mode; providerCallId:string}
+  | {state:"rejected"; mode:Mode; code:string; message:string}
+  | {state:"dispatch_unknown"; mode:Mode; message:string};
+interface VoiceSnapshot {
+  providerCallId: string;
+  mode: Mode;
+  state: "queued" | "in_progress" | "completed" | "failed" | "cancelled";
+  transcript: string | null;
+  durationSeconds: number | null;
+}
+interface VerifiedVoiceEvent {
+  eventId: string;
+  providerCallId: string;
+  type: "call.ended";
+}
+interface VoiceAdapter {
+  startCall(input: AuthorizedCallInput): Promise<StartCallResult>;
+  getCall(providerCallId: string): Promise<VoiceSnapshot>;
+  verifyWebhook(rawBody: Uint8Array, headers: Headers): Promise<VerifiedVoiceEvent | null>;
+}
+T3's src/integrations/dial/index.ts exports createDialAdapter({mode}:{mode:Mode}):VoiceAdapter.
+verifyWebhook validates the currently documented authentication mechanism and timestamp freshness, and rejects invalid authentication or malformed events with a typed error code "INVALID_WEBHOOK". It returns null only for authenticated irrelevant events. Legitimate redeliveries must pass authentication and reach T2 durable event deduplication; already-accepted duplicate events receive 204. Do not reject an otherwise valid duplicate solely because its eventId was seen. If current provider authentication differs from the verified docs, report the integration gap and reconcile the contract rather than inventing a scheme.
+T2 owns durable event deduplication by eventId and business-state changes. T3 does not write the case database. T2 queues unmatched events so a webhook arriving before the startCall response can be reconciled. Terminal states never regress due to late events.
+T2 owns a separate simulated adapter in src/server/cases/simulated-voice.ts for early integration. T3's simulated adapter uses only its own fixtures. No import-time network calls.
+
+RESOURCES AND SCOPE
+Event: https://hackersquad.io/events/speedhacks-oct11/resources?tab=resources
+Alike: https://alike.help
+Dial quickstart: https://getdial.ai/hackathon/speedhacks/quickstart
+Dial calls: https://docs.getdial.ai/documentation/capabilities/place-a-voice-call
+Dial webhooks: https://docs.getdial.ai/documentation/platform/webhooks
+Dial Context MCP: https://docs.getdial.ai/documentation/platform/context-mcp
+OpenAI MCP: https://developers.openai.com/api/docs/guides/tools-connectors-mcp
+OpenAI file inputs: https://developers.openai.com/api/docs/guides/file-inputs
+Sparta guide: https://drive.google.com/file/d/1vyvaVjRqXXKsiad3zwK1iXFGfhoIxwVW/view
+Sparta is synthetic merchant-side testing, not access to actual merchant refund accounts or insurers. Dial's documentation MCP is not a calling tool; Context MCP separately exposes our tools to the live voice agent. Read current official documentation before implementing provider interfaces.
+End each task with files changed, run commands, actual verification, dependency/env requests, mock versus live status, and concrete integration instructions. Commit only your scoped work; do not deploy, spend money, submit actual claims or contact real support as part of development.
