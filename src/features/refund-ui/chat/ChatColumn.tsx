@@ -21,7 +21,11 @@ import ActivityGraph from "../activity/ActivityGraph";
 import type { CaseSessionController } from "../state/controller";
 import type { SummaryController } from "../state/useCaseSession";
 import type { CaseSession, EventTone, ThreadItem } from "../state/session";
+import { initialPurpose } from "../state/purpose";
+import { useResolutionPlan, type ResolutionPlanState } from "../api/plan";
+import type { UiCallPurpose } from "../api/types";
 import ApprovalCard from "./ApprovalCard";
+import PlanCard from "./PlanCard";
 import Composer from "./Composer";
 import FactsCard from "./FactsCard";
 import ResultBlock from "./ResultBlock";
@@ -64,6 +68,13 @@ export default function ChatColumn({ controller, fixture, live = false, phoneHin
   const [dirtyFacts, setDirtyFacts] = useState<Record<string, boolean>>({});
   const reportFactsDirty = useCallback(
     (key: string, dirty: boolean) => setDirtyFacts((current) => (Boolean(current[key]) === dirty ? current : { ...current, [key]: dirty })),
+    [],
+  );
+
+  // The purpose chosen on the approval step, per case, so the plan card above it follows the choice.
+  const [purposes, setPurposes] = useState<Record<string, UiCallPurpose>>({});
+  const choosePurpose = useCallback(
+    (key: string, purpose: UiCallPurpose) => setPurposes((current) => (current[key] === purpose ? current : { ...current, [key]: purpose })),
     [],
   );
 
@@ -147,6 +158,8 @@ export default function ChatColumn({ controller, fixture, live = false, phoneHin
               phoneHint={phoneHint}
               factsDirty={dirtyFacts[session.key] ?? false}
               onFactsDirty={reportFactsDirty}
+              purpose={session.caseData ? (purposes[session.key] ?? initialPurpose(session.caseData, session.summary)) : null}
+              onPurposeChange={choosePurpose}
             />
           ) : null}
         </div>
@@ -186,6 +199,8 @@ function Thread({
   phoneHint,
   factsDirty,
   onFactsDirty,
+  purpose,
+  onPurposeChange,
 }: {
   session: CaseSession;
   controller: ChatController;
@@ -194,10 +209,20 @@ function Thread({
   phoneHint: string | null;
   factsDirty: boolean;
   onFactsDirty: (key: string, dirty: boolean) => void;
+  purpose: UiCallPurpose | null;
+  onPurposeChange: (key: string, purpose: UiCallPurpose) => void;
 }) {
   const caseData = session.caseData;
   const call = currentCall(caseData, session.startedCall);
   const lastOpenApproval = [...session.thread].reverse().find((item) => item.kind === "approval" && item.callId === null);
+  // Once the current revision is authorized the server answers with the frozen plan, whatever the choice.
+  const authorized = caseData?.authorization && caseData.authorization.revision === caseData.revision ? caseData.authorization : null;
+  const planPurpose = authorized ? (authorized.purpose ?? "request_refund") : purpose;
+  const hasApproval = session.thread.some((item) => item.kind === "approval");
+  // Before any approval step is offered (facts still missing), the plan stands on its own at the
+  // end of the thread so the person sees what to gather; once a step exists it sits above it.
+  const standalonePlan = caseData !== null && lastOpenApproval === undefined && caseData.calls.length === 0 && session.startedCall === null && !authorized;
+  const plan = useResolutionPlan(hasApproval || standalonePlan ? caseData : null, planPurpose, fixture);
 
   return (
     <ol className={styles.items}>
@@ -219,9 +244,17 @@ function Thread({
             phoneHint={phoneHint}
             factsDirty={factsDirty}
             onFactsDirty={onFactsDirty}
+            plan={plan}
+            purpose={purpose}
+            onPurposeChange={(next) => onPurposeChange(session.key, next)}
           />
         );
       })}
+      {standalonePlan && (plan.plan || plan.loading || plan.error) ? (
+        <li className={[styles.assistant, styles.grouped].join(" ")}>
+          <PlanCard plan={plan.plan} loading={plan.loading} error={plan.error} onRetry={plan.retry} />
+        </li>
+      ) : null}
       {session.create.busy ? (
         <li className={styles.assistant}>
           <MessageMeta who="Recourse" at={null} />
@@ -314,6 +347,10 @@ interface ThreadEntryProps {
   phoneHint: string | null;
   factsDirty: boolean;
   onFactsDirty: (key: string, dirty: boolean) => void;
+  /** The server's resolution plan for this case (fixture: built locally). */
+  plan: ResolutionPlanState;
+  purpose: UiCallPurpose | null;
+  onPurposeChange: (purpose: UiCallPurpose) => void;
 }
 
 function lockedReason(session: CaseSession, caseData: CaseV1, call: CallV1 | null): string | null {
@@ -325,7 +362,7 @@ function lockedReason(session: CaseSession, caseData: CaseV1, call: CallV1 | nul
 }
 
 function ThreadEntry(props: ThreadEntryProps) {
-  const { item, grouped, session, caseData, call, currentApprovalId, controller, fixture, live, phoneHint, factsDirty, onFactsDirty } = props;
+  const { item, grouped, session, caseData, call, currentApprovalId, controller, fixture, live, phoneHint, factsDirty, onFactsDirty, plan, purpose, onPurposeChange } = props;
   const startNewCase = () => controller.selectCase(null);
   const groupedClass = grouped ? styles.grouped : "";
 
@@ -394,16 +431,22 @@ function ThreadEntry(props: ThreadEntryProps) {
       if (item.callId && !placed) return null;
       const current = item.callId === null && item.id === currentApprovalId;
       if (!placed && !current) return null;
+      // The open step shows the plan the approval covers; a placed call keeps the frozen plan it ran with, folded.
+      const showPlan = current || (placed !== null && plan.plan?.frozen === true && placed.authorizationId === caseData.authorization?.id);
       return (
         <li className={[styles.assistant, groupedClass].join(" ")}>
           {grouped ? null : <MessageMeta who="Recourse" at={item.at} />}
+          {showPlan ? (
+            <PlanCard plan={plan.plan} loading={plan.loading} error={plan.error} onRetry={plan.retry} collapsed={placed !== null} />
+          ) : null}
           <ApprovalCard
             caseData={caseData}
             placedCall={placed}
             current={current}
             live={live}
             requestText={session.summary}
-            planPreview={!fixture}
+            {...(purpose ? { purpose } : {})}
+            onPurposeChange={onPurposeChange}
             busy={session.approval.busy}
             stage={session.approval.stage}
             error={current ? session.approval.error : null}

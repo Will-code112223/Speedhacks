@@ -3,7 +3,7 @@ import type { CaseV1 } from "../../../../contracts/case";
 import type { PlanRecord } from "../../plans/store";
 import { attachmentsFor, namesSomeone } from "../attachments";
 import { changesFromDraft, draftFromCase, validateFacts } from "../facts";
-import { anyPurposeReady, blockingMissingFields, inferPurpose, initialPurpose, previewPlan } from "../purpose";
+import { anyPurposeReady, blockingMissingFields, inferPurpose, initialPurpose } from "../purpose";
 
 function caseWith(overrides: Partial<CaseV1>): CaseV1 {
   return {
@@ -50,27 +50,6 @@ describe("blockingMissingFields", () => {
     expect(blockingMissingFields(caseData, "request_refund")).toEqual(["amountMinor", "customer.name"]);
     expect(blockingMissingFields(caseData, "file_claim")).toEqual(["customer.name"]);
     expect(blockingMissingFields(caseData, "gather_information")).toEqual(["customer.name"]);
-  });
-});
-
-describe("previewPlan", () => {
-  it("names the policy, the loss and the claim ask from the facts", () => {
-    const caseData = caseWith({ policyNumber: "SF-1234", claimType: "water damage", incidentDate: "2026-10-03", amountMinor: 120000 });
-    const steps = previewPlan(caseData, "file_claim");
-    expect(steps.map((step) => step.title)).toEqual([
-      "Reach State Farm",
-      "Identify the policy",
-      "Report the loss",
-      "Open the claim",
-      "Record the outcome",
-    ]);
-    expect(steps[1]?.detail).toContain("SF-1234");
-    expect(steps[2]?.detail).toContain("Water damage on Oct 3, 2026");
-    expect(steps[3]?.detail).toContain("$1,200.00");
-  });
-
-  it("says an unknown policy number is unknown", () => {
-    expect(previewPlan(caseWith({}), "gather_information")[1]?.detail).toMatch(/No policy number/);
   });
 });
 

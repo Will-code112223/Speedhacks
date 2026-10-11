@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { TERMINAL_CALL_STATES, type CallV1, type CaseChanges, type CaseV1, type MerchantSourceV1, type TimelineEntry } from "@/contracts/case";
+import { TERMINAL_CALL_STATES, type CallV1, type CaseChanges, type CaseV1, type MerchantSourceV1, type ResolutionPlanV1, type TimelineEntry } from "@/contracts/case";
 import type { CallPurpose, VoiceAdapter, VoiceSnapshot } from "@/contracts/voice";
 import { CALL_PLAN_ACTIONS, isInvalidWebhookError, validateCallPlan } from "@/contracts/voice";
 import { assembleCase, hasActiveCall, toCallV1 } from "@/server/cases/assemble";
@@ -19,6 +19,7 @@ import {
 import { evaluateHistory, unavailableHistory, type HistoryCheck, type TransactionHistory } from "@/server/cases/history";
 import { merchantRecordSummary, type FrozenMerchantRecord, type MerchantInsights, type MerchantInsightsResult } from "@/server/cases/insights";
 import { proposeUpdates } from "@/server/cases/answers";
+import { buildResolutionPlan } from "@/server/cases/resolution";
 import { analyzeTranscript, unknownOutcome } from "@/server/cases/outcome";
 import { type AppConfig, assertLiveLlmConfig, assertModeValid } from "@/server/config";
 import { EMPTY_FIELDS, type ExtractedFields, type Extractor } from "@/server/documents/extractor";
@@ -821,6 +822,34 @@ export class CaseService {
     const row = this.ownedRow(ownerSession, id);
     const history = row.doc.history ?? null;
     return { history, current: history !== null && history.revision === row.revision };
+  }
+
+  // -------------------------------------------------------------------------
+  // GET /api/cases/:id/plan (additive, V1.3)
+  // -------------------------------------------------------------------------
+  /**
+   * The resolution plan the person reads before approving. Read-only: it never freezes,
+   * authorizes or re-checks anything. When the current revision is authorized the call
+   * section is the frozen plan (what the agent got) and `purpose` is ignored; otherwise it
+   * is built for `purpose` (default: the case's suggestedPurpose) from the current facts.
+   */
+  resolutionPlan(ownerSession: string, id: string, purpose?: CallPurpose): ResolutionPlanV1 {
+    const row = this.ownedRow(ownerSession, id);
+    const caseDoc = this.assemble(id);
+    const auth = row.doc.authorization && row.doc.authorization.revision === row.revision ? row.doc.authorization : null;
+    const frozen = auth ? (this.deps.repo.getAuthorization(auth.id)?.snapshot.plan ?? null) : null;
+    const chosen = frozen?.purpose ?? auth?.purpose ?? purpose ?? caseDoc.suggestedPurpose ?? "request_refund";
+    let insurer: InsurerLookup | null = null;
+    const name = caseDoc.merchant.name?.trim();
+    if (name) {
+      try {
+        insurer = this.insurerDirectory().lookup(name);
+      } catch (err) {
+        // The registry is reference data: without it the plan says what the insurer does not publish.
+        console.warn("[plan] insurer lookup failed", err);
+      }
+    }
+    return buildResolutionPlan({ caseDoc, purpose: chosen, insurer, frozen });
   }
 
   // -------------------------------------------------------------------------

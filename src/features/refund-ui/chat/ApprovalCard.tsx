@@ -15,7 +15,7 @@ import { Banner, Button, KeyValueList, Mono, Pill } from "../ui/primitives";
 import { formatClock, formatMoney, formatPhone } from "../ui/format";
 import type { UiError } from "../state/errors";
 import { labelForServerField } from "../state/facts";
-import { blockingMissingFields, initialPurpose, previewPlan, PURPOSE_LABELS, purposeNeedsAmount } from "../state/purpose";
+import { blockingMissingFields, initialPurpose, PURPOSE_LABELS, purposeNeedsAmount } from "../state/purpose";
 import styles from "./ApprovalCard.module.css";
 
 export interface ApprovalCardProps {
@@ -28,8 +28,12 @@ export interface ApprovalCardProps {
   live?: boolean;
   /** The person's own request, used to prefill what the call is for. */
   requestText?: string;
-  /** Shows what the agent will say and ask, built from the facts and the chosen purpose. */
-  planPreview?: boolean;
+  /**
+   * The chosen purpose, when the parent owns it (the plan card above reads it). Absent:
+   * the card keeps its own choice, starting from initialPurpose.
+   */
+  purpose?: UiCallPurpose;
+  onPurposeChange?: (purpose: UiCallPurpose) => void;
   busy: boolean;
   stage: "authorizing" | "dispatching" | null;
   error: UiError | null;
@@ -99,11 +103,16 @@ function provenance(source: CaseV1["merchant"]["source"]): string {
 }
 
 export default function ApprovalCard(props: ApprovalCardProps) {
-  const { caseData, placedCall, current, live = false, requestText, planPreview = false, busy, stage, error, blockedReason, onApprove, onStartNewCase } = props;
+  const { caseData, placedCall, current, live = false, requestText, busy, stage, error, blockedReason, onApprove, onStartNewCase, onPurposeChange } = props;
   const checkboxId = useId();
   const headingId = useId();
   const purposeName = useId();
-  const [purpose, setPurpose] = useState<UiCallPurpose>(() => initialPurpose(caseData, requestText ?? ""));
+  const [ownPurpose, setOwnPurpose] = useState<UiCallPurpose>(() => initialPurpose(caseData, requestText ?? ""));
+  const purpose = props.purpose ?? ownPurpose;
+  const setPurpose = (next: UiCallPurpose) => {
+    setOwnPurpose(next);
+    onPurposeChange?.(next);
+  };
   // The confirmation belongs to the revision the person saw; new facts need a new confirmation.
   const [confirmedRevision, setConfirmedRevision] = useState<number | null>(null);
   const confirmed = confirmedRevision === caseData.revision;
@@ -214,23 +223,6 @@ export default function ApprovalCard(props: ApprovalCardProps) {
           { key: "Facts", value: `Revision ${caseData.revision}` },
         ]}
       />
-
-      {planPreview ? (
-        <div className={styles.preview} data-testid="approval-plan">
-          <h4 className={styles.previewLabel}>What the agent will say and ask</h4>
-          <ol className={styles.previewList}>
-            {previewPlan(caseData, purpose).map((step, index) => (
-              <li key={step.title} className={styles.previewItem}>
-                <span className={styles.previewNumber}>{String(index + 1).padStart(2, "0")}</span>
-                <span className={styles.previewBody}>
-                  <span className={styles.previewTitle}>{step.title}</span>
-                  <span className={styles.previewDetail}>{step.detail}</span>
-                </span>
-              </li>
-            ))}
-          </ol>
-        </div>
-      ) : null}
 
       <p className={styles.destination} data-testid="approval-destination">
         <span className={styles.destinationNumber}>

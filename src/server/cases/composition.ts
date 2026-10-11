@@ -107,7 +107,8 @@ export function getCaseService(): CaseService {
   const config = loadConfig();
   const key = `${config.mode}|${config.dataDir}`;
   const cached = globalCache.__refundService;
-  if (cached && cached.key === key) return cached.service;
+  // A dev reload re-evaluates CaseService; an instance of the previous class would lack new methods.
+  if (cached && cached.key === key && cached.service instanceof CaseService) return cached.service;
   const service = buildCaseService(config);
   globalCache.__refundService = { key, service };
   return service;
