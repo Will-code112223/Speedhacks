@@ -45,3 +45,25 @@ See `team-prompts/00-shared-contract.txt` → "SHARED HTTP API". Routes are unde
 ## Modes
 
 `REFUND_MODE=simulated` (default) runs end to end with no credentials and labels everything as simulated. `REFUND_MODE=live` requires the provider configuration in `.env.example`; a missing value fails visibly (503) and never falls back to simulation.
+
+Simulated call scenarios are chosen by the last four digits of the merchant support number:
+
+| Suffix | Result |
+| --- | --- |
+| 0001 | rejected before dispatch (503, attempt kept as failed) |
+| 0002 | dispatch_unknown (no provider id, no redial) |
+| 0003 | completed, refund denied |
+| 0004 | completed, support needs more information |
+| 0005 | failed |
+| 0006 | cancelled |
+| other | completed, refund approved with a reference number (payment still unverified) |
+
+## Testing
+
+```bash
+npm run typecheck
+npm test          # tests/backend (T2 implementation) + tests/integration (verification)
+npm run build
+```
+
+Tests use temporary SQLite files, synthetic fixtures and no network. See `docs/handoffs/backend.txt` for status, error codes and integration notes.

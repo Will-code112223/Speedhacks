@@ -1,5 +1,6 @@
 import type { Mode } from "@/contracts/case";
 import type { VoiceAdapter } from "@/contracts/voice";
+import { createDialAdapter } from "@/integrations/dial";
 import { CaseService } from "@/server/cases/service";
 import { createSimulatedVoiceAdapter } from "@/server/cases/simulated-voice";
 import { type AppConfig, loadConfig } from "@/server/config";
@@ -10,12 +11,11 @@ import { openDatabase } from "@/server/persistence/db";
 import { CaseRepository } from "@/server/persistence/repository";
 
 /**
- * Composition root. Live voice is wired here once teammate 3 hands off
- * src/integrations/dial: replace `liveVoiceFactory` with
- *   import { createDialAdapter } from "@/integrations/dial";
- *   const liveVoiceFactory = createDialAdapter;
+ * Composition root. Live voice is teammate 3's Dial adapter (src/integrations/dial,
+ * handoff in docs/handoffs/dial.txt); simulated mode uses T2's own adapter so the
+ * demo never depends on provider credentials.
  */
-const liveVoiceFactory: ((opts: { mode: Mode }) => VoiceAdapter) | null = null;
+const liveVoiceFactory: ((opts: { mode: Mode }) => VoiceAdapter) | null = createDialAdapter;
 
 function buildExtractor(config: AppConfig): Extractor {
   if (config.mode === "live" && config.llm.model && config.llm.apiKey) {
