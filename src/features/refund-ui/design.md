@@ -149,7 +149,7 @@ Transcripts sit in a figure with a visually hidden caption, since `aria-label` i
 ## Copy
 
 Sentence case everywhere.
-Buttons name the outcome: "Approve this call", "Step into the call", "Download packet".
+Buttons name the outcome: "Approve this call", "Step in now", "Hand back to the agent", "Download packet".
 Status words come from the contract and are shown as written, never reworded to sound better.
 Simulated and fixture modes are always labelled where the data appears.
 
@@ -207,3 +207,16 @@ a browser task never authorizes a call.
 Verification for this addition is unit, HTTP-transport stubs and server-rendered markup.
 No live browser/provider action or visual browser inspection is implied by those checks.
 The app runtime now always uses HTTP; fixtures remain isolated to development tests.
+
+### Call plan and step-in
+
+The call screen shows the agent's plan as a map of ordered steps and a one-line dashboard of the step it is on.
+The plan is the agent's intent; a step reads as done only when the backend reports it done.
+The user can step in at any point of a live call, dialing included, and the agent pauses until they hand back.
+The step-in controls stay pinned to the bottom of the call column so they are reachable without scrolling.
+
+| Decision | Source | Role | Why |
+| --- | --- | --- | --- |
+| Plan map and dashboard line | user brief (October 11: see what the agent will do and which step it is on), dividers over cards | live call | the plan is a numbered list between dividers, no card, so it reads as status and not as a control |
+| Progress bar token roles | October 11 lock: graphite primary, cobalt for the active item, amber pending | live call | done steps in ink, the current step in the accent, a paused step in warning, upcoming in the border tone; no green, since nothing has been paid or approved |
+| Step in at any time | user brief (October 11: interrupt the agent at any time), buttons name the outcome | live call | "Step in now" is enabled in every live phase and "Hand back to the agent" resumes it; the plan marks the interrupted step "Paused - you are on the line" |

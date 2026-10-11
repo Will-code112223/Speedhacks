@@ -74,9 +74,10 @@ export default function ChatColumn({ controller, fixture, phoneHint, callBar, me
   };
 
   // New items keep the view pinned to the bottom unless the person scrolled up to read.
+  // The empty state has nothing to follow, so it stays at the top.
   useLayoutEffect(() => {
     const node = scrollerRef.current;
-    if (!node) return;
+    if (!node || itemCount === 0) return;
     if (stickToBottom.current) {
       node.scrollTop = node.scrollHeight;
     } else if (itemCount > 0) {
@@ -84,12 +85,12 @@ export default function ChatColumn({ controller, fixture, phoneHint, callBar, me
     }
   }, [itemCount]);
 
-  // A different case starts at its newest message.
+  // A different case starts at its newest message; a new case starts at the top.
   useLayoutEffect(() => {
     stickToBottom.current = true;
     setUnseen(false);
     const node = scrollerRef.current;
-    if (node) node.scrollTop = node.scrollHeight;
+    if (node) node.scrollTop = draftKey === "new" ? 0 : node.scrollHeight;
   }, [draftKey]);
 
   const jumpToLatest = () => {

@@ -26,7 +26,7 @@ function readOnlyApi(getCase: CaseApi["getCase"]): CaseApi {
   const forbidden = vi.fn(async (): Promise<never> => { throw new Error("Recovery must never mutate server state"); });
   return { mode: "http", getCase: vi.fn(getCase), createCase: forbidden, patchCase: forbidden,
     authorize: forbidden, startCall: forbidden, downloadPacket: forbidden, capabilities: forbidden,
-    getLiveCall: forbidden, stepIn: forbidden, answerDecision: forbidden };
+    getLiveCall: forbidden, stepIn: forbidden, answerDecision: forbidden, sendSummary: forbidden };
 }
 
 describe("HTTP tab recovery", () => {

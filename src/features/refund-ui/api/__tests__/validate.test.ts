@@ -48,12 +48,27 @@ describe("isLiveCallV2", () => {
     expect(isLiveCallV2(sampleLiveCall({ phase: "waiting_for_user", pendingDecision }))).toBe(true);
   });
 
+  it("accepts a live call with a plan, without one, or with a null one", () => {
+    const plan = {
+      steps: [
+        { id: "reach", title: "Reach the billing team", detail: "Dialing, phone menu and hold.", status: "done" as const },
+        { id: "explain", title: "Explain the duplicate charge", status: "paused" as const },
+        { id: "record", title: "Record the outcome", status: "upcoming" as const },
+      ],
+    };
+    expect(isLiveCallV2(sampleLiveCall({ progress: plan }))).toBe(true);
+    expect(isLiveCallV2(sampleLiveCall({ progress: null }))).toBe(true);
+    expect(isLiveCallV2(sampleLiveCall())).toBe(true);
+  });
+
   it.each<[string, unknown]>([
     ["an unknown phase", { ...sampleLiveCall(), phase: "connecting" }],
     ["a string confidence", { ...sampleLiveCall(), counterpartConfidence: "0.8" }],
     ["an unknown tone", { ...sampleLiveCall(), pendingDecision: { id: "d", question: "q", defaultOptionId: "a", options: [{ id: "a", label: "A", tone: "loud" }], expiresAt: "x" } }],
     ["a note without text", { ...sampleLiveCall(), notes: [{ at: "x" }] }],
     ["no calling party", { ...sampleLiveCall(), calling: null }],
+    ["a plan step with an unknown status", { ...sampleLiveCall(), progress: { steps: [{ id: "reach", title: "Reach the billing team", status: "skipped" }] } }],
+    ["a plan without steps", { ...sampleLiveCall(), progress: {} }],
   ])("rejects %s", (_label, value) => {
     expect(isLiveCallV2(value)).toBe(false);
   });

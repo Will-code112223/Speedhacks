@@ -12,7 +12,7 @@ import { useId } from "react";
 import type { CallV1, CaseV1 } from "../../../contracts/case";
 import { Banner, Button, Disclosure, KeyValueList, Mono, MonoBlock, Pill, SourcePill, type Tone } from "../ui/primitives";
 import { DownloadIcon } from "../ui/icons";
-import { formatDateTime, statusWord } from "../ui/format";
+import { formatDateTime, formatMoney, statusWord } from "../ui/format";
 import { hasCallOutcome } from "../state/call";
 import type { RequestState } from "../state/session";
 import styles from "./ResultBlock.module.css";
@@ -78,6 +78,25 @@ function paymentNote(status: PaymentStatus): string {
       return unreachable;
     }
   }
+}
+
+/**
+ * The outcome in one line: the contract status word, then the money when
+ * support approved it, else the reference they gave, else the merchant.
+ */
+function OutcomeHeadline({ caseData }: { caseData: CaseV1 }) {
+  const { decision, referenceNumber } = caseData.outcome;
+  const word = statusWord(decision);
+  const amount = decision === "approved" ? formatMoney(caseData.amountMinor, caseData.currency) : null;
+  if (amount) {
+    return (
+      <>
+        {word} - <span className={styles.amount} data-testid="outcome-amount">{amount}</span> refund
+      </>
+    );
+  }
+  if (referenceNumber) return <>{`${word} - reference ${referenceNumber}`}</>;
+  return <>{caseData.merchant.name ? `${word} - ${caseData.merchant.name}` : word}</>;
 }
 
 function PacketButton({ packet, onDownloadPacket }: Pick<ResultBlockProps, "packet" | "onDownloadPacket">) {
@@ -185,8 +204,10 @@ export default function ResultBlock({ caseData, call, latest, fixture, packet, o
     <section className={styles.outcome} aria-labelledby={headingId} data-testid="outcome-card">
       <div className={styles.outcomeHeader}>
         <div>
-          <p className={styles.eyebrow}>Outcome record</p>
-          <h3 id={headingId} className={styles.outcomeTitle}>Call result</h3>
+          <p className={styles.eyebrow}>Outcome</p>
+          <h3 id={headingId} className={styles.outcomeTitle} data-testid="outcome-heading">
+            <OutcomeHeadline caseData={caseData} />
+          </h3>
         </div>
         <SourcePill fixture={fixture} simulated={caseData.mode === "simulated"} />
       </div>

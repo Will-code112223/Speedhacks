@@ -23,6 +23,8 @@ export interface ScriptStep {
   phase?: ScriptPhase;
   note?: string;
   counterpart?: { who: Counterpart; confidence: number };
+  /** The agent enters the plan step with this id here. */
+  step?: string;
 }
 
 export interface DecisionGate {
@@ -66,13 +68,15 @@ export interface CallRun {
   resolution: { optionId: string; by: "user" | "default"; at: number } | null;
   joined: boolean;
   endedAt: number | null;
+  /** The plan step the agent entered last; null before the first tagged step. */
+  stepId: string | null;
 }
 
 /** How long stepping in pauses the agent when no decision answer ends it sooner. */
 export const JOIN_WINDOW_MS = 20_000;
 
-export const JOIN_NOTE = "You joined the call. The agent is listening and will take over again when you leave.";
-export const LEAVE_NOTE = "The agent took over the call again.";
+export const JOIN_NOTE = "You stepped in. The agent is paused and takes over again when you hand back.";
+export const LEAVE_NOTE = "You handed back. The agent took over the call again.";
 
 interface Occurrence {
   at: number;
@@ -95,6 +99,7 @@ export function runCall(script: CallScript, interventions: readonly Intervention
   let resolution: CallRun["resolution"] = null;
   let joinedUntil: number | null = null;
   let endedAt: number | null = null;
+  let stepId: string | null = null;
   let nextIntervention = 0;
 
   const paused = (): boolean => pending !== null || joinedUntil !== null;
@@ -114,6 +119,7 @@ export function runCall(script: CallScript, interventions: readonly Intervention
   };
 
   const applyStep = (step: ScriptStep): void => {
+    if (step.step !== undefined) stepId = step.step;
     if (step.phase !== undefined && step.phase !== scriptPhase) {
       scriptPhase = step.phase;
       events.push({ kind: "phase", at: clock, phase: step.phase });
@@ -229,6 +235,7 @@ export function runCall(script: CallScript, interventions: readonly Intervention
     resolution,
     joined: joinedUntil !== null,
     endedAt,
+    stepId,
   };
 }
 

@@ -216,7 +216,8 @@ It is single-process only; shared multi-worker orchestration is not implemented.
 
 CHECKS COMPLETED FOR THIS CHANGE
 
-- npm test -- --reporter=dot: 560 tests passed across 40 files.
+- npm test -- --reporter=dot: 573 tests passed across 40 files after incorporating
+  main's 9323d4f frontend call-plan/transcript updates into the feature branch.
 - npm run typecheck: passed.
 - npm run build: passed without warnings after excluding runtime DATA_DIR from
   Turbopack tracing. Seventeen trace manifests contained zero .env or private

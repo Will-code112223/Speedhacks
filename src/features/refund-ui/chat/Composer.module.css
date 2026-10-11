@@ -56,7 +56,8 @@
   overflow-y: auto;
 }
 
-.input:focus-visible {
+/* Only the container draws the ring; this outranks the app-wide :focus-visible outline. */
+.composer .input:focus-visible {
   outline: none;
 }
 

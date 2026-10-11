@@ -52,7 +52,9 @@
   cursor: not-allowed;
 }
 
+/* Contains the button's visually hidden status so it cannot stretch the scroller. */
 .actions {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 12px;
