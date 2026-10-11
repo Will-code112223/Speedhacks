@@ -262,7 +262,7 @@
   padding-bottom: 8px;
 }
 
-.prompts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.prompts { display: flex; flex-wrap: wrap; gap: 8px; max-width: 720px; margin: 0 auto 12px; }
 .prompt { min-height: 36px; max-width: 100%; padding: 8px 12px; border: 1px solid var(--rc-border); border-radius: var(--rc-radius); background: var(--rc-canvas); color: var(--rc-ink-2); font: inherit; font-size: 12px; line-height: 1.4; text-align: left; cursor: pointer; }
 .prompt:hover { border-color: var(--rc-border-strong); background: var(--rc-surface); color: var(--rc-ink); }
 .prompt:focus-visible { outline: 2px solid var(--rc-accent); outline-offset: 2px; }

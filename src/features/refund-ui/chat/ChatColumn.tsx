@@ -120,9 +120,6 @@ export default function ChatColumn({ controller, fixture, phoneHint, callBar, me
                 <li><span className={styles.stepNumber} aria-hidden="true">02</span><span>Attach supporting documents</span></li>
                 <li><span className={styles.stepNumber} aria-hidden="true">03</span><span>Review details and approve the action</span></li>
               </ol>
-              <div className={styles.prompts} role="group" aria-label="Sample requests">
-                {SAMPLE_PROMPTS.map((prompt) => <button className={styles.prompt} type="button" key={prompt} onClick={() => { setDraft(prompt); textareaRef.current?.focus(); }}>{prompt}</button>)}
-              </div>
             </div>
           ) : null}
           <ActivityGraph
@@ -153,6 +150,11 @@ export default function ChatColumn({ controller, fixture, phoneHint, callBar, me
       </div>
       {metrics}
       <Composer
+        suggestions={!session ? (
+          <div className={styles.prompts} role="group" aria-label="Sample requests">
+            {SAMPLE_PROMPTS.map((prompt) => <button className={styles.prompt} type="button" key={prompt} onClick={() => { setDraft(prompt); textareaRef.current?.focus(); }}>{prompt}</button>)}
+          </div>
+        ) : null}
         value={draft}
         onChange={setDraft}
         onSend={controller.send}

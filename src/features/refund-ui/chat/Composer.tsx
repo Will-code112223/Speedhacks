@@ -6,7 +6,7 @@
  * until the controller accepts it.
  */
 
-import { useId, useLayoutEffect, useRef, type KeyboardEvent, type Ref } from "react";
+import { useId, useLayoutEffect, useRef, type KeyboardEvent, type ReactNode, type Ref } from "react";
 import { Button } from "../ui/primitives";
 import { SendIcon } from "../ui/icons";
 import styles from "./Composer.module.css";
@@ -22,10 +22,11 @@ export interface ComposerProps {
   busyLabel: string;
   placeholder: string;
   hint: string | null;
+  suggestions?: ReactNode;
   textareaRef?: Ref<HTMLTextAreaElement>;
 }
 
-export default function Composer({ value, onChange, onSend, busy, busyLabel, placeholder, hint, textareaRef }: ComposerProps) {
+export default function Composer({ value, onChange, onSend, busy, busyLabel, placeholder, hint, suggestions, textareaRef }: ComposerProps) {
   const inputId = useId();
   const hintId = useId();
   const localRef = useRef<HTMLTextAreaElement | null>(null);
@@ -67,6 +68,7 @@ export default function Composer({ value, onChange, onSend, busy, busyLabel, pla
 
   return (
     <div className={styles.wrap}>
+      {suggestions}
       <form
         className={styles.composer}
         onSubmit={(event) => {
