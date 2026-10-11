@@ -12,14 +12,15 @@ briefs, authorization limits, conversation rehearsals and acceptable outcomes:
 - duplicate-charge: complete fictional receipt and duplicate posted charges;
 - fictional-insurance: reimbursement review under an explicitly invented policy;
 - needs-clarification: conflicting evidence and unknown required facts; no call.
-acceptance-checklist.txt assigns future checks to T1/T2/T3 and keeps the four
-pinned backend findings visible pending fresh verification. coverage-map.txt
+acceptance-checklist.txt assigns checks to T1/T2/T3 and records the corrected
+backend findings alongside remaining integration verification. coverage-map.txt
 identifies existing coverage and the narrow adapter tests added for this kit.
 These files do not implement a case engine or duplicate T2 insurer knowledge.
 The adapter's explicit simulated mode still returns one fixed generic transcript;
 it does not enact the scripted scenarios. Mocked live-mode tests verify transport
 and normalization only, not model behavior, real conversations or claim outcomes.
-The kit authorizes no real calls, deployment or branch integration.
+The kit authorizes no real calls or deployment. The user separately authorized
+integration of T2 and T3 on codex/voice; T1 and main remain untouched.
 Kit verification on 2026-10-11: 189/189 standalone tests passed (six added tests,
 including subtests); strict TypeScript/noUncheckedIndexedAccess passed across
 all owned sources, scripts and tests. The exact forbidden-network simulation
@@ -42,26 +43,26 @@ Test and script value imports use .ts: set compilerOptions.allowImportingTsExten
 separate noEmit check. TypeScript >=5.0 and @types/node are development dependencies
 owned by T2, not added to the repository by this workstream.
 
-CONTRACT BRIDGE AND PINNED T2 SNAPSHOT
-Teammate 2 has published its backend service/routes at pinned commit 23bd75a on
-codex/case-engine. That branch independently includes Dial adapter 3ef5066 and
-replaces its types.ts mirror with re-exports from canonical src/contracts/*.
-Our codex/voice branch remains separate at 48541aa before this handoff update;
-no T2 code or branch was merged here. This branch's types.ts remains the exact,
-isolated shared V1 mirror permitted by the prompts. T2's canonical bridge is:
+CURRENT T2 + T3 INTEGRATION — 2026-10-11
+The user authorized integration of T2's backend and T3's Dial work. Pinned backend
+43d099d is integrated on codex/voice together with the late-transcript fixes below.
+The combined backend, standalone adapter, production build and local HTTP flow
+have been verified synthetically. Use the containing commit for the final source
+snapshot. This includes the Next.js scaffold, canonical
+contracts, SQLite persistence, case routes and the Dial composition root. T1's
+frontend was not merged or mounted, and main was not changed.
+src/integrations/dial/types.ts now re-exports canonical types; no mirror remains:
   export type {Mode} from "../../contracts/case";
   export type {AuthorizedCallInput, StartCallResult, VoiceSnapshot,
     VerifiedVoiceEvent, VoiceAdapter} from "../../contracts/voice";
-No routes, root manifests, lockfiles, database, or shared contracts were edited
-by this workstream. The lead's earlier temporary projection against db5f311
-established source compatibility: production
-files pass T2's strict compiler flags (including noUncheckedIndexedAccess and
-without allowImportingTsExtensions), and both canonical type directions match.
-The V1 equality/production compile check also passed against 23bd75a's canonical
-types. Compilation does not establish correct runtime wiring or live verification;
-pending boundary findings appear below.
+T2's composition root passes validated Dial config explicitly to the adapter.
+Source/type compatibility was previously checked against db5f311 and 23bd75a;
+current integration verification is recorded below separately. Backend ownership
+remains with T2, transport/normalization/authentication with T3. No V1 fields or
+business states were invented for this integration. A local merge and synthetic
+checks are not a live call, a deployed webhook or a completed T1 application.
 
-SERVER CONFIGURATION (T2 adds to .env.example; never NEXT_PUBLIC_)
+SERVER CONFIGURATION (listed in T2's .env.example; never NEXT_PUBLIC_)
 DIAL_API_KEY                  Existing account API key.
 DIAL_FROM_NUMBER              Account-owned number ID, E.164 number, or nickname.
 DIAL_WEBHOOK_SECRET           Entire whsec_... subscription signing secret.
@@ -71,19 +72,30 @@ does not establish that free limits are lifted. Missing API key/from number
 rejects before dispatch; webhook verification only requires the webhook secret.
 The API key must be a nonempty visible-ASCII bearer token without whitespace.
 An explicit injected config replaces environment config in full.
-The pinned T2 .env.example at 23bd75a now includes DIAL_FROM_NUMBER. Its optional
-DIAL_MAX_CALL_DURATION_SECONDS is still blank: T2 must set 300 or comment out
-the variable. A blank duration is parsed as 0 and correctly rejected.
+The integrated template includes DIAL_FROM_NUMBER and comments out the optional
+duration. T2's loadConfig defaults absent/blank duration to 300 and validates
+60..3600 before dispatch. Direct standalone adapter/preflight usage still rejects
+an explicitly blank duration; use 300 or omit it in the external env file.
+Dispatch and provider reads require the API key and sending number. The webhook
+secret is required only for webhook verification: without it, the integrated
+route returns 503 LIVE_CONFIGURATION_MISSING and persists no event. Polling can
+retrieve an authorized call's result while the webhook receiver is unconfigured.
 
 LOCAL SERVER STARTUP WITH THE EXTERNAL ENV FILE
 The user-configured local credentials live in ~/.config/speedhacks/dial.env,
-outside git with file permissions0600. Next.js does not automatically load this
-external path. Load it BEFORE createDialAdapter captures the environment; on the
-combined, installed T2 application using Node >=22.18 (Node24 supported):
+outside git with file permissions 0600. Next.js does not automatically load this
+external path. T2's dev:live and start:live scripts load it before server config
+and adapter creation, but their names DO NOT select REFUND_MODE=live. Use Node 24
+for the integrated backend/native SQLite environment. For separately authorized
+live server operation, select the mode explicitly:
+  REFUND_MODE=live npm run dev:live
+For an already-built application use REFUND_MODE=live npm run start:live.
+The underlying script is:
   node --env-file="$HOME/.config/speedhacks/dial.env" node_modules/next/dist/bin/next dev
-For an already-built application use the same command with start instead of dev.
-No root package script was changed here. These commands start the application;
-they do not authorize dispatch or deployment. Existing exported environment
+With no mode selection the backend defaults to simulated. Live case creation
+also requires LLM_MODEL and OPENAI_API_KEY; setting Dial values alone does not
+make extraction ready. These commands start the application; they do not
+authorize a call or deployment. Existing exported environment
 variables take precedence over Node's --env-file, so remove stale conflicting
 Dial values before launch. Keep all four Dial values server-only.
 
@@ -91,16 +103,17 @@ LIVE ACCOUNT STATUS
 The credential-setup side chat recorded the user's authorized local setup in
 Alike decision "Speedhacks local Dial credentials verified; webhook awaits
 deployed backend" (MCP source). The existing API key and sending number are now
-configured as DIAL_API_KEY and DIAL_FROM_NUMBER in the external0600 file above,
-with DIAL_MAX_CALL_DURATION_SECONDS=300. Authenticated read-only GET/api/v1/account
-and GET/api/v1/numbers succeeded there. The configured account cap and account
+configured as DIAL_API_KEY and DIAL_FROM_NUMBER in the external 0600 file above,
+with DIAL_MAX_CALL_DURATION_SECONDS=300. Authenticated read-only GET /api/v1/account
+and GET /api/v1/numbers succeeded there. The configured account cap and account
 limits were both null. These read-only checks replace the earlier audit's
 credentials-absent state; they do not establish a successful outgoing call.
 No credential values are included in this handoff or git.
-The lead refreshed the account preflight successfully at2026-10-11T19:33:05Z:
-account cap and free guardrails remain null; requested300s is permitted by those
+The lead refreshed the account preflight successfully at 2026-10-11T19:33:05Z:
+account cap and free guardrails remain null; requested 300 s is permitted by those
 guardrails. A separate injected-transport check verified the external env reaches
-the server factory and a missing webhook secret fails closed as MISSING_CONFIG.
+the server factory and missing webhook verification configuration fails closed
+as MISSING_CONFIG at the adapter boundary (503 at the integrated HTTP route).
 That dispatch check made zero provider requests; no call was placed.
 
 DIAL_WEBHOOK_SECRET remains unset. There is no deployed public HTTPS receiver
@@ -114,14 +127,20 @@ Read-only preflight using the configured external environment file:
 It GETs /api/v1/account and prints only validated duration/concurrency limits.
 Missing limits is an error; explicit limits:null means free guardrails lifted.
 The command also validates DIAL_MAX_CALL_DURATION_SECONDS, compares that request
-cap and the fixed60s smoke cap against free limits, and exits1 if the configured
+cap and the fixed 60 s smoke cap against free limits, and exits 1 if the configured
 request cap exceeds them. A failed check is not permission to buy an upgrade.
 Per-call duration overrides configured number/account duration, then free limits
 apply. This account endpoint alone cannot prove number readiness or its limits.
 
 EXACT INTEGRATION EXAMPLE (T2)
   import {createDialAdapter, DialAdapterError} from "@/integrations/dial";
-  const voice = createDialAdapter({mode: "live"}); // choose mode explicitly
+  // T2 validates key/fromNumber/duration before constructing the live adapter.
+  const voice = createDialAdapter({mode: "live"}, {config: {
+    apiKey: config.dial.apiKey!,
+    fromNumber: config.dial.fromNumber!,
+    webhookSecret: config.dial.webhookSecret ?? undefined,
+    maxCallDurationSeconds: config.dial.maxCallDurationSeconds,
+  }});
   const result = await voice.startCall({
     attemptId: storedAttempt.id,
     caseId: authorizedCase.id,
@@ -133,16 +152,18 @@ T2 persists/locks one attempt per authorization before this invocation. Return
 the old attempt for repeated authorizationId/requestId. The adapter does not
 persist or verify customer authorization itself; never pass raw client facts.
 Capture accepted.providerCallId durably. On rejected, the documented request
-was refused before dispatch. On dispatch_unknown, preserve the attempt and
-block new dispatch/authorization. Do not turn uncertainty into a retry-safe503.
+was refused before dispatch. Integrated config-code rejections return 503 and
+release the unused attempt; a provider refusal keeps its failed attempt under
+the one-attempt V1 rule. On dispatch_unknown, preserve the attempt and
+block new dispatch/authorization. Do not turn uncertainty into a retry-safe 503.
 
 The exact API is POST https://api.getdial.ai/api/v1/calls with Bearer auth,
 Idempotency-Key: attemptId, and {to,fromNumber,outboundInstruction,language,
 maxCallDurationSeconds}. Exactly one POST is sent per invocation. Current
 OpenAPI/SDK support the key, although older voice-call prose says otherwise.
-Successful 2xx requires a valid call.id. 409 idempotency_conflict, ambiguous409,
+Successful 2xx requires a valid call.id. 409 idempotency_conflict, ambiguous 409,
 5xx, transport/timeout errors, malformed success and unusable IDs remain unknown.
-Known HTTP400/401/402/403/404/429 and 409 calling_disabled are sanitized refusals.
+Known HTTP 400/401/402/403/404/429 and 409 calling_disabled are sanitized refusals.
 No fabricated correlation lookup. A provider ID is never guessed after loss.
 
 GET /api/v1/calls/{id} returns {call}. Queued/Ringing -> queued;
@@ -152,33 +173,33 @@ Unknown states throw INVALID_PROVIDER_RESPONSE. Cancellation flags alone do
 not imply cancelled: an answered call can end completed after a manual stop.
 Transcript/duration null remains null; transcriptTurns is a speaker-labelled
 fallback. No snapshot infers a refund decision or confirmed payment.
-Reads default to one retry on transport/5xx failures (max2 configurable);
-each request including JSON body has a 10s deadline (max60s configurable).
+Reads default to one retry on transport/5xx failures (max 2 configurable);
+each request including JSON body has a 10 s deadline (max 60 s configurable).
 
 WEBHOOK ROUTE (T2 OWNS)
-Use Node runtime and obtain bytes BEFORE JSON parsing:
-  const raw = new Uint8Array(await request.arrayBuffer());
-  const event = await voice.verifyWebhook(raw, request.headers);
-Limit incoming HTTP body size to 1MiB before buffering; adapter also checks size.
-INVALID_WEBHOOK ->401; MISSING_CONFIG is server misconfiguration, not a forged
-request. Authenticated irrelevant event ->null, safe204. Relevant event returns
+src/app/api/webhooks/dial/route.ts uses Node runtime and collects exact bytes
+BEFORE JSON parsing. Its bounded stream reader cancels requests over 1 MiB,
+including absent/false Content-Length, before verification and full buffering.
+Oversized requests return 413; the adapter independently checks raw byte size.
+INVALID_WEBHOOK -> 401; MISSING_CONFIG is server misconfiguration, not a forged
+request. Authenticated irrelevant event -> null, safe 204. Relevant event returns
 {eventId,providerCallId,type:"call.ended"} only after signature/envelope/data checks.
-Durably accept/deduplicate before204; keep unknown call IDs queued so an event
+Durably accept/deduplicate before 204; keep unknown call IDs queued so an event
 arriving before dispatch's response can reconcile. Bind the matched provider ID
 to an owned attempt; never trust a webhook's phone number as case ownership.
 Do not reject legitimate duplicates in memory: they pass verification each time.
 
 Authentication: X-Dial-Signature t=<unix-seconds>,v1=<64hex>, HMAC-SHA256 of
 UTF8(timestamp + ".") followed by the EXACT raw bytes, keyed by the entire
-subscription secret. Absolute skew >=300s is rejected. X-Dial-Event-ID and
+subscription secret. Absolute skew >=300 s is rejected. X-Dial-Event-ID and
 X-Dial-Event-Type must match signed id/type. Expected object:event/version:1,
 createdAt timestamp, matching call relatedObject and all documented ended data
 fields. Unknown fields are tolerated. Malformed authenticated payloads reject.
 Configure a public HTTPS subscription for call.ended only after T2 provides
 the running authenticated route. Nothing has been deployed or subscribed here.
 
-The following valid TypeScript route factory is ready to copy into a T2-owned
-server module. Supply T2's durable acceptance callback; its Promise must resolve
+The following route factory is a reference example, not the integrated route's
+actual export. Supply T2's durable acceptance callback; its Promise must resolve
 only AFTER a transaction commits the event/job or recognizes a stored duplicate.
 It must persist unmatched provider IDs for reconciliation, never silently drop
 them. Route body reading is bounded even if Content-Length is absent or false.
@@ -226,24 +247,41 @@ them. Route body reading is bounded even if Content-Length is absent or false.
     };
   }
 
-T2's app/api/webhooks/dial/route.ts exports runtime="nodejs" and
-POST=makeDialWebhookPOST(acceptDialEventDurably), importing its own committed
-database callback. That callback needs a unique eventId and durable job key;
+The integrated route exports runtime="nodejs" and calls the case service's
+handleWebhook after its bounded read. A future implementation using the factory
+above would supply POST=makeDialWebhookPOST(acceptDialEventDurably). That callback
+needs a unique eventId and durable reconciliation state;
 use a transaction/upsert to make concurrent duplicate delivery safe. Configure
 request-header/body timeouts at the HTTP host. Do not background work in an
-unawaited Promise after returning204; serverless hosts may stop execution.
+unawaited Promise after returning 204; serverless hosts may stop execution.
 
 CRITICAL: LATE TRANSCRIPT RECONCILIATION
 call.ended has NO transcript and transcriptAvailable can be false. Dial emits
 call.transcribed later. V1 only normalizes call.ended, so call.transcribed returns
-null. T2 MUST persist a reconciliation job: fetch getCall after ended, retry
-bounded reads until transcript arrives, then atomically publish terminal CallV1
-plus evaluated outcome/timeline. Proposed job delays 0/2/5/10/20 seconds; if still
-missing, publish an explicit unknown outcome and a manual-review next step.
-Do not publish terminal state early and depend on UI polling to get the transcript.
+null. The integrated backend persists reconciliation timestamps and drives reads
+through GET /api/cases/:id; there is no background worker. During the default 45 s
+TRANSCRIPT_WAIT_MS, a completed provider call without text remains nonterminal
+in the case. Text arrival publishes terminal state/outcome/timeline atomically.
+Expiry publishes completed with an explicit unknown outcome and next action.
+Later case GETs can retrieve a missing transcript without redialing: default
+LATE_TRANSCRIPT_INTERVAL_MS=30000, within LATE_TRANSCRIPT_WINDOW_MS=86400000
+(24 h measured from attempt creation). If no GET occurs, no work advances. Past
+that window, manual provider review is required. Reopening a case is a read,
+not authorization for another call.
+Late text belongs to its original call. After awaiting the provider, the backend
+rechecks authorization ID and case revision inside the publication transaction.
+It can attach old text to its original call, but only the current matching
+authorization/revision may change the case outcome. Material edits reset the
+previous outcome; completed calls from older authorizations cannot determine the
+new revision's status. Null, empty and whitespace-only transcripts are consistently
+treated as missing. Repeated GETs do not publish the same outcome twice, and the
+completed call state never regresses. Six new regressions verify these rules.
 T2 may deliberately coordinate V2 call.transcribed support later; not changed here.
 
-Worker example: each job is leased from T2's durable queue. The callbacks below
+PROPOSED WORKER ALTERNATIVE — NOT IMPLEMENTED IN THIS INTEGRATION
+The following earlier example remains a design option if GET-driven operation
+is replaced. It is not evidence of a background queue. Each proposed job is
+leased from a durable queue. The callbacks below
 must compare the lease/attempt/version in a transaction, so stale workers cannot
 overwrite a newer outcome. The retry number is stored durably, not a JS timer.
 Each callback commits job state before resolving; a thrown error leaves the job
@@ -261,7 +299,7 @@ startCall. Separate queue delivery retry from the bounded provider-read budget.
   export async function reconcileEndedCall(
     job: Job, jobs: Jobs, voice: VoiceAdapter, now: () => number = Date.now,
   ): Promise<void> {
-    // First read immediately; subsequent durable delays are2,5,10,20 seconds.
+    // First read immediately; subsequent durable delays are 2, 5, 10, 20 seconds.
     const delays = [2_000, 5_000, 10_000, 20_000] as const;
     let snapshot: VoiceSnapshot | null = null;
     try { snapshot = await voice.getCall(job.providerCallId); }
@@ -316,9 +354,9 @@ Only after the user explicitly authorizes a specific consenting test recipient:
 3. Set DIAL_SMOKE_ATTEMPT_FILE to a new absolute file path outside the repository.
 4. Run:
    node --env-file="$HOME/.config/speedhacks/dial.env" src/integrations/dial/live-smoke.mts --live
-The script validates consent/configuration first, caps at60s, uses a synthetic
+The script validates consent/configuration first, caps at 60 s, uses a synthetic
 test brief, rejects repository-contained paths (including symlinked parents),
-reserves a0600 attempt file and syncs it and its directory before dispatch.
+reserves a 0600 attempt file and syncs it and its directory before dispatch.
 It refuses an existing path. It prints only sanitized result and saves it
 atomically, syncing the result and directory. A pending/unknown outcome requires manual dashboard
 reconciliation. Do not choose a new file just to bypass that guard.
@@ -348,134 +386,100 @@ mode. The earlier implementation audit did not message teammates or edit
 colleague records; subsequent coordination is recorded separately.
 
 DIAL/BACKEND BOUNDARY COORDINATION — 2026-10-11
-The user authorized a scoped Alike handoff to teammate2, without full integration.
-Task: "Speedhacks prompt 2 backend collaboration with Claude"
+The user first authorized a scoped Alike boundary handoff, then explicitly
+expanded the task to integrate T2 and T3 on codex/voice. Main and T1 remain out
+of scope. Coordination task:
   urn:alike:task:f29a81e564bcbd98e8b52bb1d7581a86ed8a666641fa0fdf8acb90d88b86ba61
-Current task-linked sessions: Claude implementation fe22b3b41e3baa624cea09c28771c205;
-Codex verification dc49c607d8512c47da66e814df762a82. The newer colleague split
-decision assigns Claude implementation and Codex tests/integration + tests/sparta;
-it supersedes the older proposed split mentioned in the scaffold handoff.
-Published backend snapshot is now pinned 23bd75a, with service, persistence and
-routes. Its live composition root is src/server/cases/composition.ts, importing
-the adapter and re-exporting canonical V1 types in src/integrations/dial/types.ts.
-T2 independently incorporated adapter 3ef5066 into its branch; this is not a merge
-into codex/voice or main and does not establish live verification. Our historical
-V1 equality/bundler checks against db5f311 remain recorded under VERIFICATION.
+T2's published 43d099d addresses the findings from our pinned 23bd75a review.
+The source changes and current synthetic results supersede the earlier pending
+status; an old question's seen marker was never treated as agreement.
 
-Alike question0ecf15fd-be61-412c-93bd-cf2584880d4f sent to Jonathan's colleague
-inbox: exported interface, codex/voice3ef5066,183-test/typecheck evidence, exact
-env gap and late-transcript requirement. Requested the current composition-root
-and env-loading paths; durable attempt/event/job ownership; pending-secret
-behavior; and any newer WIP commit or V1 deviation. No secrets/customer data sent.
-Alike marks that question seen at 2026-10-11T19:44:58Z; no reply had arrived at
-the latest check. Seen is not agreement. The newer published wiring allows a
-concrete boundary review. The requirements
-below await T2's fixes or explicit agreement; no shared contract change is made.
+FOUR ORIGINAL BOUNDARY FINDINGS — CORRECTED IN 43d099d
+- Mode isolation: authorize and call dispatch reject 409 MODE_MISMATCH when the
+  stored case mode differs from runtime mode. The check runs in the transaction
+  before provider dispatch; call reads also stay within their original mode.
+- Webhook body bound: the route cancels streamed bytes beyond 1 MiB and returns
+  413 PAYLOAD_TOO_LARGE before verification, including no/false Content-Length.
+- Configuration source: composition passes validated config.dial explicitly to
+  createDialAdapter. Ambient process.env cannot replace those transport values.
+  API key/fromNumber are required; webhookSecret is optional until verification.
+- Duration/config rejection: T2 defaults blank/absent duration to 300, validates
+  60..3600, and comments the optional template value. Invalid configuration is 503
+  before dispatch; adapter config-code rejection releases the unused attempt.
+The four original independent synthetic probes now pass. Thirteen requested
+backend tests also passed. All used synthetic inputs/transports; no live call
+or deployed webhook was involved. Full post-fix results belong below.
 
-PENDING T2 BOUNDARY FINDINGS — 2026-10-11, PINNED 23bd75a
-- Before dispatch, stored case/authorization mode must match the runtime's live
-  mode. A case authorized in simulated mode must not become a real call merely
-  because the server restarts with REFUND_MODE=live. Keep this check in T2's
-  authorization/attempt transaction before the provider side effect.
-- src/app/api/webhooks/dial/route.ts checks Content-Length, then buffers via
-  arrayBuffer before enforcing actual size. Bound streamed bytes before full
-  buffering, including absent/false Content-Length; the route factory above is
-  an example. Provider authentication does not replace an HTTP body-size limit.
-- The composition root validates config.dial, but constructs createDialAdapter
-  with only {mode:"live"}; the adapter then reads process.env independently.
-  Pass T2's validated values through the adapter's existing public optional
-  dependencies argument. This needs no shared V1 contract change:
-    createDialAdapter({mode: "live"}, {config: {
-      apiKey: config.dial.apiKey!,
-      fromNumber: config.dial.fromNumber!,
-      webhookSecret: config.dial.webhookSecret!,
-      maxCallDurationSeconds: validatedDuration,
-    }});
-  This expression belongs AFTER T2 checks all three required values and validates
-  the integer duration 60..3600, defaulting an absent duration to 300. The non-null
-  assertions do not perform runtime validation. Explicit config replaces the
-  adapter's environment config in full. Do not validate one set of credentials
-  while dispatching with another.
-- Set DIAL_MAX_CALL_DURATION_SECONDS=300 or comment it out in T2's template;
-  the present blank value becomes 0 and fails adapter validation.
-- T2 currently provides a bounded 45s transcript wait driven by case GETs.
-  Expiry publishes an unknown outcome; there is no background worker and no
-  in-app transcript refresh after terminal publication. A later transcript needs
-  explicit manual provider review under this implementation. T2 must document
-  and agree that operational handoff, or add a durable read-only reconciliation
-  path before claiming the worker example above is implemented. Never redial
-  to recover a missing transcript. If case GET polling stops, no background job
-  currently advances that wait.
+LATE-TRANSCRIPT FOLLOW-UP — FIXED AND VERIFIED
+The integration review reproduced an old call A's late text changing a newer
+revision/authorization's case outcome. Five independent regressions failed before
+the fixes. The completed changes now:
+- Recheck current authorization ID and revision atomically after the provider
+  await, so concurrent edits or new authorization cannot be overwritten.
+- Attach an old transcript to its original call while preserving newer outcomes.
+- Treat null, empty and whitespace-only transcripts consistently as missing.
+- Reset the previous outcome on a material edit, retaining historical calls and
+  timeline, and derive terminal case status from the current authorization only.
+- Publish a current authorization's late outcome once across repeated GETs.
+All six tests in tests/backend/late-transcript-boundary.test.ts passed after the
+fixes. The final independent reviewer found no remaining material findings.
 
-TARGETED BOUNDARY VERIFICATION — SYNTHETIC ONLY
-An independent reviewer ran five existing targeted backend tests successfully,
-then four new probes exposed the following failures against pinned 23bd75a:
-- Reusing a simulated authorization after switching runtime to live triggered
-  one fake live dispatch. No actual provider was contacted.
-- The blank optional duration produced INVALID_CONFIG with zero transport calls.
-- Validated config.dial values were ignored by the environment-reading factory,
-  producing MISSING_CONFIG and a persisted failed attempt with zero transport
-  calls.
-- An oversized request without Content-Length was fully drained (2,097,152
-  bytes) before its 400 response; the stream was never cancelled at the 1 MiB cap.
-The published snapshot's standalone Dial suite also passed 183/183 tests. Exact
-equality of six local adapter types against T2's canonical types and local factory
-assignability passed strict TypeScript with noUncheckedIndexedAccess.
-All probes used synthetic values, a scrubbed environment and intercepted fetch.
-The duration failure concerns the backend template, not a request to make Dial
-accept an explicitly invalid duration. These probes are boundary verification,
-not live calling,
-deployed-webhook verification or a full application acceptance result.
+OWNERSHIP AND PUBLICATION
+T2 owns frozen authorization/case access, durable dispatch dedup before sending,
+unknown-dispatch locking, raw webhook acceptance/durable event dedup, unmatched
+retention, reconciliation and atomic outcome publication. Dial owns transport,
+normalization, authentication and explicit simulation. Canonical V1 fields and
+states remain unchanged. This integration does not add T1 UI, insurer knowledge,
+real support contact, deployment or a main-branch merge.
 
-Confirmed boundary from shared V1: T2 owns frozen authorization/case access,
-durable dispatch dedup before sending, unknown-dispatch locking, raw webhook
-acceptance and durable event dedup, unmatched-event retention, late-transcript
-jobs and atomic terminal outcome publication. Dial owns transport/normalization,
-authentication and explicit simulation. Do not move those T2 responsibilities
-into the adapter or modify the shared contract without agreement.
-Next handoff point: T2 fixes or explicitly resolves these findings in a new
-reviewable commit and confirms env loading, mode isolation and transcript expiry
-behavior. Review that boundary without merging; deploy and register the webhook
-only in a separately authorized later phase.
+INTEGRATION COMPLETION RECORD — VERIFIED 2026-10-11
+Integrated source: T2's 43d099d plus T3 adapter/demo work and the regression fixes
+above, on codex/voice. The containing commit is the integration snapshot:
+  git log -1 --format=%H -- src/server/cases src/integrations/dial docs/handoffs/dial.txt
+Main, T1's frontend and the teammate branch were not changed. T1 remains unmounted.
+No live call, provider/model request, deployment, purchase or real claim occurred
+in the combined verification. Earlier authenticated account/number reads remain
+separate live evidence; a real call and deployed webhook remain unverified.
 
-VERIFICATION
-Run:
-  node --test src/integrations/dial/__tests__/*.node-test.mts
-Synthetic injected fetch only: normalization, dispatch refusal/uncertainty,
-no POST retry, input capture, abort/body deadlines, bounded GET retry, strict
-mode separation, exact-byte HMAC, stale/future/forged/malformed signatures,
-required event fields, enum type confusion, raw byte mutation, duplicate delivery,
-irrelevant events and malformed provider records. Baseline:122/122 passed at
-056e54c. Final coordinated audit:183/183 passed, independently rerun by the lead.
-The added script suite launches scrubbed child environments with an unconditional
-synthetic fetch replacement before production imports. It verifies real local
-file reservation, private permissions, atomic result status, rerun refusal,
-recipient/config guards and account-error sanitization without contacting Dial.
-Strict TypeScript5.9.3 noEmit checking with @types/node22 passes with targetES2022,
-module/moduleResolution NodeNext, libES2022,DOM, allowImportingTsExtensions,
-and noUncheckedIndexedAccess. All owned sources, scripts and tests were included.
-Compiler invocation (using an isolated temporary installation):
+CHECKS ACTUALLY RUN
+All final integration checks ran on Node 25.2.1. The repository's .nvmrc recommends
+Node 24; this run did not independently verify Node 24 or its native SQLite build.
+- npm test: 45/45 backend tests passed in 7 files, comprising 39 tests in the
+  published backend snapshot plus 6 new regressions. The older teammate handoff's
+  109-test claim was not reproduced; do not report it as this run's result.
+- node --test src/integrations/dial/__tests__/*.node-test.mts: 189/189 passed,
+  including subtests. These standalone adapter/script tests are separate from
+  Vitest and are not included in the 45 backend count.
+- npm run typecheck: passed. Separate strict noEmit/noUncheckedIndexedAccess
+  checking of every Dial source, script and standalone test also passed.
+- npm run build: passed. One non-blocking dynamic DATA_DIR output-tracing warning
+  remains; the successful build is not deployment or proof of an ephemeral-host
+  persistence setup. This backend uses a local SQLite database and upload files.
+- Built-server HTTP smoke: passed with synthetic values and no external
+  credentials. Created a case, authorized it, dispatched the backend's simulated
+  call, observed approved with paymentStatus=unverified and retrieved its packet.
+  The same request/authorization returned the same call ID after process restart.
+  Missing session access returned 404, incomplete authorization returned
+  422, an unsigned webhook returned 401 and an oversized request returned 413.
+- Four original independent boundary probes passed; final independent review
+  found no material findings. git diff --check passed.
+The HTTP smoke used a temporary local harness and actual localhost HTTP/SQLite
+persistence. It did not upload every scenario file, test a T1 UI, send a document
+through a live model, make a Dial call or receive a live provider webhook.
+
+STANDALONE TYPECHECK COMMAND
   tsc --noEmit --strict --noUncheckedIndexedAccess --target ES2022 \
-    --module NodeNext --moduleResolution NodeNext --lib ES2022,DOM \
+    --module ESNext --moduleResolution Bundler --lib ES2022,DOM \
     --allowImportingTsExtensions --types node \
     src/integrations/dial/index.ts src/integrations/dial/types.ts \
     src/integrations/dial/*.mts src/integrations/dial/__tests__/*.node-test.mts
-The temporary invocation additionally pointed typeRoots at its installed
-@types/node directory; on T2's installed scaffold normal type resolution applies.
-Separate compile-time equality assertions against db5f311's actual canonical
-Mode/input/result/snapshot/event/adapter types and factory assignment passed with
-strict/noUncheckedIndexedAccess/isolatedModules and bundler resolution, without
-allowImportingTsExtensions. Extracted route/worker examples also typechecked.
-Final independent read-only code review found no remaining material findings;
-git diff --check passed. The183-test audit used no provider/account requests.
-Subsequent authenticated read-only account/number verification is described
-under LIVE ACCOUNT STATUS. Live webhook delivery, a real phone call, a deployed
-route and a full application build remain unverified.
-Compiler was installed only in a temporary directory outside the repo.
-The standalone tests use .node-test.mts to avoid T2's Vitest discovery. Production
-scripts use .mts and need this lane's explicit separate typecheck; T2's current
-**/*.ts include does not include them. Runtime adapter index.ts remains in T2's
-application typecheck. No running T2 route or deployed application is claimed.
+Historical isolated checks additionally pointed typeRoots at a temporary
+@types/node installation; the installed combined scaffold resolves its own types.
+The standalone files use .node-test.mts to avoid Vitest discovery. Scripts use
+.mts and need their explicit typecheck because the application's **/*.ts include
+does not include them. The production adapter remains in the application check.
+Earlier exact V1 type comparisons and the reference route/worker snippets also
+passed typechecking; the route/worker examples are not a second implementation.
 
 OFFICIAL SOURCES CHECKED 2026-10-11
 https://getdial.ai/hackathon/speedhacks/quickstart
@@ -487,6 +491,6 @@ https://docs.getdial.ai/api-reference/events/call-transcribed
 https://docs.getdial.ai/documentation/platform/webhooks
 https://docs.getdial.ai/documentation/reference/usage-and-limits
 https://docs.getdial.ai/documentation/platform/context-mcp
-Official @getdial/sdk0.41.1 source corroborates /api/v1 paths, request fields,
+Official @getdial/sdk 0.41.1 source corroborates /api/v1 paths, request fields,
 Idempotency-Key and {call} response unwrapping. Some guide examples omit /api;
 use the verified SDK/OpenAPI route here. Transcript-late behavior is documented.

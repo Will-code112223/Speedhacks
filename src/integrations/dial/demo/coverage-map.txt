@@ -7,6 +7,23 @@ Final kit verification: 189/189 tests passed (six added tests including subtests
 Strict TypeScript/noUncheckedIndexedAccess passed across all owned source,
 scripts and tests. The walkthrough's forbidden-network simulation also passed.
 
+Combined integration verification (separate from the 189 standalone tests):
+45 backend Vitest tests passed in 7 files: 39 published tests plus 6 new late-text
+regressions. Five regressions failed before the fix. The passing suite checks
+atomic authorization/revision rechecks after provider awaits, old-call isolation,
+material-edit outcome reset, current-authorization status, empty/whitespace text
+recovery and no duplicate publication across repeated GETs. Four earlier mode,
+stream-limit and configuration probes also passed. Final review found no material
+findings. Full typechecking and production build passed on Node 25.2.1; Node 24
+was not independently tested. The build had one non-blocking DATA_DIR warning.
+
+Localhost HTTP/SQLite verification passed: synthetic create -> authorize -> call
+-> approved/payment unverified -> packet; identical call ID after restart;
+missing session 404, missing-facts authorization 422, unsigned webhook 401 and
+oversized webhook 413. No credentials or external requests were used. This is
+backend evidence, not T1 UI QA or a real provider interaction. The older backend
+handoff's 109-test claim was not reproduced by this run.
+
 Unavailable facts
   Existing: null transcript/duration preservation; invalid approved briefs;
   frozen input snapshot despite caller mutation.
@@ -38,8 +55,11 @@ Uncertain outcomes — reuse existing tests; do not duplicate them
   "late transcripts can be retrieved after a completed call without starting another call"
   Plus bounded GET retry, unknown provider state/ID mismatch, webhook redelivery,
   and the guarded smoke script's persisted-attempt/rerun-refusal tests.
-  Still T2: durable dispatch_unknown lock across restarts, duplicate HTTP requests,
-  early webhook queues and atomic transcript/outcome publication.
+  T2 responsibility: durable dispatch_unknown locks, duplicate HTTP requests,
+  early webhook queues and atomic transcript/outcome publication. The integrated
+  backend suite covers these boundaries; the local HTTP smoke additionally
+  verified duplicate-call persistence across restart. Scenario-specific outcome
+  classification and real voice behavior remain separate acceptance work.
 
 Do not confuse test levels: a fake fetch using mode:"live" exercises parsing and
 transport behavior only. The expected dialogue in the scenario files is a

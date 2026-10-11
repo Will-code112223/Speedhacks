@@ -1,0 +1,21 @@
+# dependencies
+node_modules/
+
+# next.js
+.next/
+out/
+next-env.d.ts
+*.tsbuildinfo
+
+# runtime data (hackathon local persistence: SQLite db + private uploads)
+data/
+
+# secrets
+.env
+.env.*
+!.env.example
+
+# misc
+.DS_Store
+npm-debug.log*
+coverage/

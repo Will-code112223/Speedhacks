@@ -6,8 +6,10 @@ run from the repository root. Open README.txt, coverage-map.txt and the three
 scenario.txt files below.
 No server or credentials are needed. Do not load dial.env, invoke live-smoke.mts,
 call fixture numbers or send documents to a model/provider for this rehearsal.
-This kit demonstrates source fixtures and adapter boundaries. If T2/T1 later
-provide a tested application, use acceptance-checklist.txt before showing its UI.
+This kit demonstrates source fixtures and adapter boundaries. T2's 43d099d backend
+is integrated with T3 and verified through tests, build and synthetic localhost
+HTTP flows; T1's UI was not merged/mounted. See acceptance-checklist.txt for the
+scope of that evidence before showing a later UI.
 Do not present a narrated upload/approval flow as a running application.
 
 00:00–00:35 — STATE WHAT IS RUNNING
@@ -19,13 +21,13 @@ No actual conversation, transfer, claim, payment or deployed webhook is verified
 
 00:35–01:30 — DUPLICATE-CHARGE REVIEW
 Open scenarios/duplicate-charge/scenario.txt and its receipt.txt, statement.txt
-and customer-note.txt. Show one USD74.90 order and two posted USD74.90 entries.
-The proposed request is one USD74.90 duplicate: amountMinor=7490, not14980.
+and customer-note.txt. Show one USD 74.90 order and two posted USD 74.90 entries.
+The proposed request is one USD 74.90 duplicate: amountMinor=7490, not 14980.
 Point out evidence, confirmed contact, the proposed brief and the one-attempt
 authorization boundary. These are expected T2/T1 behaviors, not code in this kit.
 Read one proposed support line: "Please provide the receipt before I decide."
 Explain needs_information, an available reference and paymentStatus=unverified.
-Alternative: "I offer USD30 as a final settlement if you accept now." The agent
+Alternative: "I offer USD 30.00 as a final settlement if you accept now." The agent
 cannot accept; it must return the offer for customer review without changing
 the requested amount or inventing a partial_approval status.
 
@@ -56,7 +58,7 @@ above, evaluate an outcome, confirm a refund or create a persisted case.
 02:15–03:00 — FICTIONAL INSURANCE EXTENSION
 Open scenarios/fictional-insurance/scenario.txt and policy.txt. These terms were
 invented for this fixture; they are not retrieved insurer knowledge or advice.
-Show USD180 repair less an invented USD50 deductible = USD130 requested review
+Show USD 180.00 repair less an invented USD 50.00 deductible = USD 130.00 requested review
 (amountMinor=13000). The arithmetic is not a coverage or payment decision.
 Read the proposed request for the repair receipt and incident statement. Show
 how existing reason/brief/evidence can carry this context without new V1 fields.
@@ -65,9 +67,9 @@ it does not run an insurance workflow or build T2's knowledge base.
 
 03:00–03:45 — BLOCK MISSING AND CONTRADICTORY FACTS
 Open scenarios/needs-clarification/scenario.txt and its three fragments. Compare
-USD49.90 pending at one merchant with USD69.90 posted at another. The target
+USD 49.90 pending at one merchant with USD 69.90 posted at another. The target
 merchant, support phone and amount remain null until the customer resolves them.
-Explain missingFields, needs_information and the expected422 authorization
+Explain missingFields, needs_information and the expected 422 authorization
 refusal. Do not invoke startCall for this scenario, even to produce a simulated
 transcript. Missing data is a useful result; no reference or outcome is fabricated.
 
@@ -86,8 +88,18 @@ Report the actual observed result/count; consult coverage-map.txt for limits.
 04:30–05:00 — HAND OFF THE REMAINING ACCEPTANCE WORK
 Open acceptance-checklist.txt. T2 owns immutable authorization, persistent one-
 attempt/event dedup, unknown-dispatch locking and atomic transcript/outcome
-publication; T1 owns the UI. The four pinned23bd75a backend findings need fresh
-fix verification. The checklist is not evidence that those fixes already landed.
+publication; T1 owns the UI. The four original 23bd75a findings were corrected,
+and late-transcript integration defects were fixed with six passing regressions.
+Final results: 45 backend tests, 189 separate Dial tests, typechecking, production
+build and a synthetic built-server HTTP flow passed. See docs/handoffs/dial.txt.
+Explain the actual transcript path: case GETs drive the initial 45 s wait and later
+read-only refresh at most every 30 s for 24 h from attempt creation. No background
+worker runs. Late text for an old authorization cannot replace newer outcomes;
+the backend rechecks authorization/revision atomically after the provider read.
+dev:live/start:live load credentials but do not set REFUND_MODE; this rehearsal
+uses neither those scripts nor any live credential file. A missing webhook
+secret blocks authenticated webhook processing, not otherwise-authorized calls
+or reads through a configured live adapter. None of that authorizes a demo call.
 State that spoken approval needs an attributable quote, referenceNumber stays
 null if absent and payment stays unverified without separate payment evidence.
 Hold/join controls, counterpart routing, mid-call approval and automated transfer

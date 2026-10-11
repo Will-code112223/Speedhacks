@@ -1,8 +1,10 @@
 TEAMMATE 3 — SYNTHETIC DEMO AND QA KIT
 
-Start with walkthrough.txt. Use acceptance-checklist.txt when teammate 2 has a
-reviewable integration ready. These are proposed V1 handoff examples, not an
-implemented case engine or an insurer knowledge base.
+Start with walkthrough.txt. This folder contains proposed V1 rehearsal fixtures,
+not an insurer knowledge base. The repository now includes T2's backend integrated
+with T3 on codex/voice. Backend tests, a production build and synthetic localhost
+HTTP flows passed; T1's UI was not merged or mounted. Main remains unchanged.
+See acceptance-checklist.txt and docs/handoffs/dial.txt for actual verification.
 
 The three scenario folders contain small text/plain upload documents and a
 scenario.txt describing the intended facts, brief, authorized actions, scripted
@@ -28,7 +30,11 @@ Verification levels — keep these separate in the demo:
 3. Mocked live-mode transport tests: the real adapter normalizes injected fake
    provider responses. A returned mode:"live" describes the selected code path,
    not evidence that the provider was contacted. No voice-agent behavior is proven.
-4. Verified live behavior: earlier authenticated read-only account/number checks
+4. Integrated synthetic HTTP behavior: the built backend created, authorized and
+   completed a simulated case, returned a packet and preserved the same call ID
+   across restart. This uses T2's simulated backend adapter, not the fixed T3
+   transcript above. It does not prove that every scenario document was extracted.
+5. Verified live behavior: earlier authenticated read-only account/number checks
    succeeded. No real call, recorded conversation, transfer, claim submission or
    deployed webhook delivery has been verified in this workstream.
 
@@ -37,6 +43,10 @@ Safe QA command from the repository root (Node >=22.18):
 The tests inject synthetic transport/configuration. Do not load dial.env or run
 live-smoke.mts for this kit. No credentials, application server or dependency on
 teammates' branches is needed to run the standalone adapter tests.
+Final checks: 189 standalone Dial tests and 45 backend Vitest tests passed
+separately. Full typechecking, strict Dial checking and production build passed
+on Node 25.2.1. Node 24 is recommended by .nvmrc but was not tested in this run.
+The build retains one non-blocking dynamic DATA_DIR tracing warning.
 
 Contract boundaries:
 - Shared V1 types remain owned by teammate 2. Amounts are integer minor units;
@@ -49,9 +59,9 @@ Contract boundaries:
 - Unresolved required facts prevent authorization. The adapter receives only
   a server-prepared approved brief; it cannot validate documents or resolve
   contradictions itself.
-- T2 owns extraction, case state, authorization, persistent attempt/event dedup,
-  outcome analysis and transcript reconciliation. T1 owns the UI. This kit adds
-  neither implementation and does not modify their knowledge-base work.
+- T2 owns the integrated extraction, case state, authorization, persistent
+  attempt/event dedup, outcome analysis and transcript reconciliation. T1 owns
+  the UI. These fixtures do not duplicate implementation or knowledge-base work.
 
 Use acceptance-checklist.txt to record PASS / FAIL / NOT RUN with a commit and
 evidence. Proposed expected dialogue is never evidence of a passing live test.

@@ -1,0 +1,142 @@
+BACKEND HANDOFF — teammate 2 (case engine, scaffold, contracts, integration)
+Branch: codex/case-engine   Updated: 2026-10-11
+Agents: Claude Code (implementation, this file) + Codex (tests/integration/**, tests/sparta/**; see tests/integration/README.md)
+
+COMMITS (base your branch on the latest)
+- db5f311  scaffold + canonical contracts (Next.js 16, TypeScript, Node 24, better-sqlite3, vitest)
+- 9cb849c  routes, SQLite persistence, case service, simulated voice, webhook dedup, tests/backend
+- 23bd75a  T3 Dial adapter merged from codex/voice (3ef5066) and wired at the composition root
+- cbb03ed  T3 docs update 48541aa merged; env fixes; webhook-secret-pending behaviour; answers below
+- (this)   T3 findings 12be4ab merged and resolved: mode isolation, streamed webhook bound, validated adapter
+           config, config-code rejections, read-only late-transcript refresh (see FINDINGS FROM T3)
+
+FINDINGS FROM T3 (docs/handoffs/dial.txt 12be4ab, Alike ask 8d31fd06) — RESOLVED
+1. Mode isolation: authorize and POST …/calls answer 409 MODE_MISMATCH when case.mode !== REFUND_MODE. The check runs
+   inside the attempt transaction before any provider side effect; reconciliation and webhook processing never look a
+   call up through the other mode's provider. tests/backend/boundary.test.ts.
+2. Webhook body bound: POST /api/webhooks/dial streams the body and cancels the stream at 1 MiB, with or without
+   Content-Length, answering 413 PAYLOAD_TOO_LARGE before verification. tests/backend/routes.test.ts.
+3. Validated config reaches the adapter: the composition root calls
+   createDialAdapter({mode:"live"}, {config:{apiKey, fromNumber, webhookSecret?, maxCallDurationSeconds}}) with the
+   values from loadConfig(); the adapter never reads process.env on its own. DIAL_MAX_CALL_DURATION_SECONDS is
+   validated 60..3600 (absent/blank → 300; invalid → 503 naming the variable, nothing persisted). Adapter rejections
+   with MISSING_CONFIG / INVALID_CONFIG / SERVER_ONLY / INVALID_MODE are 503 LIVE_CONFIGURATION_MISSING and release
+   the attempt (a server misconfiguration must not consume the user's authorization). Verified with a fake transport
+   in a scrubbed environment: Bearer header, Idempotency-Key = attempt id, to, fromNumber, maxCallDurationSeconds=300.
+   tests/backend/boundary.test.ts.
+4. .env.example duration line commented out (cbb03ed).
+5. Late transcript, agreed operational handoff: after the wait window publishes an unknown outcome, each
+   GET /api/cases/:id re-reads the provider read-only (at most every LATE_TRANSCRIPT_INTERVAL_MS, default 30 s, for
+   LATE_TRANSCRIPT_WINDOW_MS, default 24 h). A transcript that arrives is attached, the outcome is evaluated once,
+   and the call stays completed (no regression). There is still no background worker: if nobody opens the case,
+   nothing advances until the next GET. Nothing ever redials. tests/backend/transcript-wait.test.ts.
+Also: E.164 validation now matches the adapter's rule (+ then 8–15 digits), so a dispatch never fails on format.
+
+ANSWERS TO T3 (Alike ask 0ecf15fd, 2026-10-11) — reviewable paths
+- Composition root: src/server/cases/composition.ts (buildVoiceResolver → createDialAdapter({mode:"live"}) in live
+  mode; T2's src/server/cases/simulated-voice.ts in simulated mode). Env is read by src/server/config.ts loadConfig()
+  from process.env at request time; the adapter captures process.env when the factory runs (lazily, first use).
+- Env loading: `npm run dev:live` / `npm run start:live` wrap Next with
+  node --env-file="$HOME/.config/speedhacks/dial.env" so the external 0600 file is loaded before the factory runs.
+  Exported shell variables still take precedence. .env.example now lists DIAL_FROM_NUMBER and keeps
+  DIAL_MAX_CALL_DURATION_SECONDS commented out (a blank value would be rejected).
+- Ownership confirmed (all T2, implemented): frozen authorization + session ownership; one persisted attempt per
+  authorization before startCall (UNIQUE authorization_id/request_id); dispatch_unknown blocks edits/authorize and
+  is never redialed; raw-body webhook → verifyWebhook → durable provider_events (PK event_id) → 204; unmatched
+  events retained and reconciled when the attempt learns its provider id; terminal never regresses; late transcript
+  handled by a bounded wait (TRANSCRIPT_WAIT_MS, poll-driven) and one atomic terminal publish. Adapter stays
+  transport/normalization/auth only; no T2 responsibility was moved into it; V1 types unchanged.
+- Pending webhook secret: dispatch and getCall need only DIAL_API_KEY + DIAL_FROM_NUMBER; while DIAL_WEBHOOK_SECRET
+  is unset, POST /api/webhooks/dial answers 503 LIVE_CONFIGURATION_MISSING (fields ["DIAL_WEBHOOK_SECRET"]) and
+  stores nothing; call results still arrive through bounded polling of GET /api/cases/:id. Adapter MISSING_CONFIG /
+  INVALID_CONFIG at construction or verification also surface as 503, never as 401.
+- V1 deviations: none. One literal reading to note: a definitive pre-dispatch refusal keeps its attempt as failed
+  and consumes the authorization (see KNOWN LIMITS). Your V1 mirror src/integrations/dial/types.ts was replaced
+  with canonical re-exports as your handoff instructs; nothing else in src/integrations/dial was changed.
+- Not done, by design: no deployment, no subscription, no live call. Deploying the receiver and registering the
+  webhook is a separately authorized phase.
+
+STATUS
+- [x] Scaffold, contracts, placeholder page (src/app/page.tsx mounts T1's RefundApp after handoff)
+- [x] All shared HTTP routes under src/app/api/** (Node runtime, force-dynamic)
+- [x] SQLite persistence: cases, evidence, private provenance, authorizations (UNIQUE case+revision),
+      call_attempts (UNIQUE authorization_id, UNIQUE request_id, UNIQUE provider_call_id),
+      provider_events (PK event_id), call_reconciliation
+- [x] Revision checks; material edits bump revision, clear authorization, rebuild draft; no-op edits do nothing
+- [x] Authorization: 422 with missing fields; idempotent per revision; frozen snapshot + immutable call brief
+- [x] Dispatch: attempt persisted before the provider call; duplicates by requestId/authorizationId return the
+      stored attempt; thrown/timeout -> dispatch_unknown (never redialed); rejected -> 503, attempt kept as failed
+- [x] Webhook: raw bytes + headers -> verifyWebhook; 401 INVALID_WEBHOOK; 204 only after durable insert;
+      duplicates 204; early (unmatched) events queued and reconciled when the attempt learns its provider id;
+      terminal states never regress; 1 MiB body cap; adapter MISSING_CONFIG -> 503
+- [x] Bounded reconciliation on GET /api/cases/:id for queued/in_progress calls (missed webhook) and a bounded
+      transcript wait (Dial's call.ended precedes call.transcribed) before publishing terminal state + outcome atomically
+- [x] Outcome analysis from the transcript: explicit support-side statements only; negation, questions, conditionals,
+      quoted claims and under-review wording never approve; later corrections win; paymentStatus always "unverified"
+- [x] Evidence: MIME allowlist + magic bytes, 5 files x 10 MB, private DATA_DIR/uploads/<caseId>/<uuid>.<ext>
+- [x] Extraction: heuristic (simulated) and OpenAI Responses API (live; LLM_MODEL + OPENAI_API_KEY required; a claim
+      is kept only when its cited source exists and contains the quoted excerpt); provenance stored privately
+- [x] Packet: GET /api/cases/:id/packet text/plain with facts, draft, evidence index (sha256), outcome, calls, timeline
+- [x] Session cookie ownership (refund_session, httpOnly); foreign/absent session -> 404
+- [x] T3 createDialAdapter wired (src/server/cases/composition.ts); its V1 mirror replaced by canonical re-exports
+- [ ] Mount T1 RefundApp (waiting for docs/handoffs/frontend.txt)
+- [ ] Sparta merchant-side scenario (Codex, tests/sparta/**) — distinct from our consumer-side call integration
+- [ ] Live Dial smoke test: only with an explicitly consenting test recipient; never run in tests
+
+EXPORTED INTERFACES
+- @/contracts/case: Mode, CaseStatus, CallState, CallV1, CaseV1, CaseChanges, ApiError (+ CaseResponse, CallResponse,
+  PatchCaseRequest, AuthorizeCaseRequest, StartCallRequest, ApiErrorCode, ACTIVE_CALL_STATES, TERMINAL_CALL_STATES)
+- @/contracts/voice: AuthorizedCallInput, StartCallResult, VoiceSnapshot, VerifiedVoiceEvent, VoiceAdapter
+  (+ INVALID_WEBHOOK, VoiceWebhookError, isInvalidWebhookError — any thrown error with code === "INVALID_WEBHOOK" is a 401)
+- @/server/cases/composition: getCaseService() (process-wide), buildCaseService(config) (tests)
+- @/server/cases/simulated-voice: createSimulatedVoiceAdapter, buildSimulatedWebhook (signed synthetic events)
+
+ERROR CODES (ApiError.error.code)
+400 BAD_REQUEST · 404 NOT_FOUND · 409 REVISION_CONFLICT | AUTHORIZATION_CONFLICT | CALL_IN_PROGRESS ·
+422 MISSING_REQUIRED_FACTS (fields) · 503 LIVE_CONFIGURATION_MISSING (fields = env names) | PROVIDER_UNAVAILABLE ·
+401 INVALID_WEBHOOK (webhook route only) · 500 INTERNAL
+
+MODES AND ENVIRONMENT (.env.example)
+- REFUND_MODE=simulated (default): no credentials; case.mode === "simulated"; heuristic extraction; T2's simulated
+  voice adapter. Scenario by destination suffix: …0001 rejected before dispatch, …0002 dispatch_unknown,
+  …0003 completed/denied, …0004 completed/needs information, …0005 failed, …0006 cancelled, else completed/approved
+  with a reference number. Timings: SIMULATED_QUEUED_MS (2000), SIMULATED_IN_PROGRESS_MS (6000).
+- REFUND_MODE=live: requires LLM_MODEL + OPENAI_API_KEY (POST /api/cases is 503 otherwise) and DIAL_API_KEY,
+  DIAL_FROM_NUMBER, DIAL_WEBHOOK_SECRET (POST …/calls and the webhook are 503 otherwise). No silent fallback.
+  Live extraction failure creates the case with no extracted facts and an extraction_failed timeline entry.
+- Reconciliation: RECONCILE_MIN_INTERVAL_MS (2000), TRANSCRIPT_WAIT_MS (45000).
+- DATA_DIR (./data): refund.sqlite + uploads/. Local disk only; not for ephemeral/serverless hosts.
+
+VERIFICATION (actual, Node 24)
+  npm run typecheck   -> clean
+  npm test            -> 14 files, 109 tests passing (tests/backend/** by Claude; tests/integration/** by Codex)
+  npm run build       -> all routes compiled (ƒ dynamic)
+  tests/backend covers: stale revision; no-op edit; material edit clears authorization (snapshot preserved);
+  422 missing facts; stale authorization; case isolation; concurrent duplicate dispatch (one row);
+  edits/authorize rejected while active; dispatch_unknown with no redial; thrown provider error; pre-dispatch
+  rejection; live config 503; completion ≠ approval ≠ payment; denial; failed call; packet; invalid/stale/
+  tampered signature; ping; duplicate event; late event; early event; transcript wait; route handlers with
+  multipart + cookies; T3 simulated adapter end to end.
+  No real calls, no model requests, no customer data in tests.
+
+INTEGRATION INSTRUCTIONS
+T1: git fetch origin && git checkout -b <branch> origin/codex/case-engine. Create src/features/refund-ui/RefundApp.tsx
+    ("use client", default export). Poll GET /api/cases/:id every 2–3 s while status is "calling" or a call is
+    queued/in_progress; stop on terminal. Reuse requestId on retries. The server sets the session cookie on
+    POST /api/cases; send credentials on every request. Tell T2 when ready; T2 mounts it in src/app/page.tsx.
+T3: merged (3ef5066). verifyWebhook errors with code INVALID_WEBHOOK -> 401, MISSING_CONFIG -> 503.
+    T2 webhook route reads request.arrayBuffer() with a 1 MiB cap before verification.
+
+DEPENDENCY / ENV REQUESTS FROM TEAMMATES
+- T3 (dial.txt): DIAL_API_KEY, DIAL_FROM_NUMBER, DIAL_WEBHOOK_SECRET, DIAL_MAX_CALL_DURATION_SECONDS -> added to .env.example.
+  No new npm dependencies requested. T3's node-test files need Node >=22.18; they are not part of `npm test`.
+
+KNOWN LIMITS / PROPOSED CONTRACT NOTES (not applied; coordinate before changing V1)
+- One attempt per authorization is enforced literally: a definitive pre-dispatch refusal (e.g. provider rate limit)
+  consumes the authorization; the user must edit a fact and re-authorize. Proposed V1.1: allow a new attempt when
+  the previous one is a pre-dispatch refusal with no provider id. (Alike decision recorded.)
+- dispatch_unknown with no provider id has no automatic correlation; manual verification in the provider dashboard
+  is required before any new attempt (nextAction says so). No automatic redial exists anywhere.
+- Transcript reconciliation is driven by GET polling (bounded), not a worker; if nobody polls, it resumes on the next GET.
+- Simulated mode is explicit in data (mode) and must be labeled in the UI.
+- npm 11 install-script gating: package.json allowScripts approves better-sqlite3 and esbuild.
