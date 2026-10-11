@@ -1,0 +1,34 @@
+{
+  "parts": 120,
+  "verdicts": {
+    "PASS": 97,
+    "REVIEW": 0,
+    "FAIL": 23
+  },
+  "part_level": {
+    "defective": 24,
+    "caught": 23,
+    "missed": 1,
+    "good": 96,
+    "good_failed": 0,
+    "good_reviewed": 0
+  },
+  "time_saved_hours": 11.91,
+  "time_saved_pct": 88.2,
+  "drift_alert_cycle": 33,
+  "bearing_alert_cycle": 79,
+  "skipped_drill_cycle": 42,
+  "skipped_drill_verdict": "FAIL",
+  "burrs_after_drift_alert": "18/19",
+  "synthetic_holdout": {
+    "region_accuracy": 1.0,
+    "defect_detection_rate": 1.0,
+    "false_reject_rate": 0.0
+  },
+  "calibration": {
+    "n_parts": 20,
+    "threshold_before": 3.236622823164006,
+    "threshold_after": 2.6928143909750704,
+    "review_rate_before": 0.0
+  }
+}
