@@ -128,12 +128,12 @@ test("live dispatch sends one authorized call with a stable idempotency key", as
   const result = await live(fetchImpl).startCall(INPUT);
   assert.deepEqual(result, { state: "accepted", mode: "live", providerCallId: PROVIDER_ID });
   assert.equal(calls.length, 1);
-  assert.equal(calls[0].url, "https://api.getdial.ai/api/v1/calls");
-  assert.equal(calls[0].init?.method, "POST");
-  const headers = new Headers(calls[0].init?.headers);
+  assert.equal(calls[0]!.url, "https://api.getdial.ai/api/v1/calls");
+  assert.equal(calls[0]!.init?.method, "POST");
+  const headers = new Headers(calls[0]!.init?.headers);
   assert.equal(headers.get("Idempotency-Key"), INPUT.attemptId);
   assert.equal(headers.get("Authorization"), `Bearer ${CONFIG.apiKey}`);
-  const body = JSON.parse(String(calls[0].init?.body));
+  const body = JSON.parse(String(calls[0]!.init?.body));
   assert.equal(body.fromNumber, CONFIG.fromNumber);
   assert.equal(body.to, INPUT.to);
   assert.equal(body.maxCallDurationSeconds, 300);
@@ -230,7 +230,7 @@ test("call status normalization preserves lifecycle without inventing a refund d
       assert.ok(!("decision" in snapshot));
       assert.ok(!("paymentStatus" in snapshot));
       assert.equal(calls.length, 1);
-      assert.equal(calls[0].url, `https://api.getdial.ai/api/v1/calls/${PROVIDER_ID}`);
+      assert.equal(calls[0]!.url, `https://api.getdial.ai/api/v1/calls/${PROVIDER_ID}`);
     });
   }
 });
@@ -322,7 +322,7 @@ test("missing, malformed and forged webhook signatures reject with the same safe
 });
 
 test("authenticated webhook headers must agree with signed body identity and type", async (t) => {
-  for (const [header, value] of [["X-Dial-Event-ID", "different_event"], ["X-Dial-Event-Type", "other.event"]]) {
+  for (const [header, value] of [["X-Dial-Event-ID", "different_event"], ["X-Dial-Event-Type", "other.event"]] as const) {
     await t.test(header, async () => {
       const { rawBody, headers } = signedWebhook();
       headers.set(header, value);
@@ -430,7 +430,7 @@ test("default call duration is 300 seconds when the explicit config omits it", a
     fetch: fetchImpl,
   });
   assert.equal((await adapter.startCall(INPUT)).state, "accepted");
-  assert.equal(JSON.parse(String(calls[0].init?.body)).maxCallDurationSeconds, 300);
+  assert.equal(JSON.parse(String(calls[0]!.init?.body)).maxCallDurationSeconds, 300);
 });
 
 test("invalid UUIDs and unusable approved briefs are rejected before dispatch", async (t) => {
@@ -554,20 +554,20 @@ test("changing caller-owned facts after invocation cannot alter the dispatched s
   assert.ok(finish);
   finish(jsonResponse({ call: { id: PROVIDER_ID } }, 201));
   assert.equal((await result).state, "accepted");
-  const sent = JSON.parse(String(calls[0].init?.body));
+  const sent = JSON.parse(String(calls[0]!.init?.body));
   assert.equal(sent.to, INPUT.to);
   assert.ok(sent.outboundInstruction.includes(INPUT.brief));
   assert.ok(!sent.outboundInstruction.includes(mutableInput.brief));
-  assert.equal(new Headers(calls[0].init?.headers).get("Idempotency-Key"), INPUT.attemptId);
+  assert.equal(new Headers(calls[0]!.init?.headers).get("Idempotency-Key"), INPUT.attemptId);
 });
 
 test("structured transcript turns preserve speakers when plain transcript is unavailable", async () => {
   const { fetchImpl } = recordingFetch(() => jsonResponse(providerCall({
     transcript: null,
     transcriptTurns: [
-      { speaker: "agent", text: "I am an authorized AI assistant." },
-      { speaker: "user", text: "Your request needs review." },
-      { speaker: "transfer_target", text: "The customer must complete verification." },
+      { speaker: "agent", text: "I am an authorized AI assistant.", startMs: 0, endMs: 1000 },
+      { speaker: "user", text: "Your request needs review.", startMs: 1000, endMs: 2000 },
+      { speaker: "transfer_target", text: "The customer must complete verification.", startMs: 2000, endMs: 3000 },
     ],
   })));
   const snapshot = await live(fetchImpl).getCall(PROVIDER_ID);
@@ -577,7 +577,116 @@ test("structured transcript turns preserve speakers when plain transcript is una
 test("structured transcript turns reject nonstring speakers instead of coercing them", async () => {
   const { fetchImpl } = recordingFetch(() => jsonResponse(providerCall({
     transcript: null,
-    transcriptTurns: [{ speaker: ["agent"], text: "Synthetic text" }],
+    transcriptTurns: [{ speaker: ["agent"], text: "Synthetic text", startMs: 0, endMs: 1000 }],
   })));
   await assert.rejects(live(fetchImpl).getCall(PROVIDER_ID), codeIs("INVALID_PROVIDER_RESPONSE"));
+});
+
+test("definitive HTTP refusals remain refusals when their response body is not JSON", async (t) => {
+  for (const status of [400, 401, 402, 403, 404, 429]) {
+    await t.test(`HTTP ${status}`, async () => {
+      const { fetchImpl, calls } = recordingFetch(() => new Response("synthetic HTML error page", { status }));
+      const result = await live(fetchImpl).startCall(INPUT);
+      assert.equal(result.state, "rejected");
+      assert.equal(calls.length, 1);
+      assert.ok(!JSON.stringify(result).includes("synthetic HTML"));
+    });
+  }
+  await t.test("unparseable 409 remains ambiguous", async () => {
+    const { fetchImpl, calls } = recordingFetch(() => new Response("Conflict", { status: 409 }));
+    assert.equal((await live(fetchImpl).startCall(INPUT)).state, "dispatch_unknown");
+    assert.equal(calls.length, 1);
+  });
+});
+
+test("malformed credentials are known local rejections and never reach fetch", async (t) => {
+  for (const apiKey of ["synthetic key", " key", "key ", "key\n", "synthetic-\u00e9", "synthetic-\u2603"]) {
+    await t.test(JSON.stringify(apiKey), async () => {
+      let fetched = false;
+      const { fetchImpl } = recordingFetch(() => {
+        fetched = true;
+        return jsonResponse({ call: { id: PROVIDER_ID } }, 201);
+      });
+      const result = await live(fetchImpl, { apiKey }).startCall(INPUT);
+      assert.equal(result.state, "rejected");
+      assert.equal(fetched, false);
+      assert.ok(!JSON.stringify(result).includes(apiKey));
+    });
+  }
+});
+
+test("provider durations must be nonnegative safe integer seconds or null", async (t) => {
+  for (const duration of [-1, 0.5, Number.MAX_SAFE_INTEGER + 1, "23"]) {
+    await t.test(JSON.stringify(duration), async () => {
+      const { fetchImpl } = recordingFetch(() => jsonResponse(providerCall({ duration })));
+      await assert.rejects(live(fetchImpl).getCall(PROVIDER_ID), codeIs("INVALID_PROVIDER_RESPONSE"));
+    });
+  }
+  const { fetchImpl } = recordingFetch(() => jsonResponse(providerCall({ duration: 0 })));
+  assert.equal((await live(fetchImpl).getCall(PROVIDER_ID)).durationSeconds, 0);
+});
+
+test("transcript fallback rejects unusable timing", async (t) => {
+  const turn = { speaker: "agent", text: "Synthetic transcript", startMs: 0, endMs: 1000 };
+  const invalidTurns = [
+    [{ speaker: "agent", text: "Missing timing" }],
+    [{ ...turn, startMs: -1 }],
+    [{ ...turn, startMs: "0" }],
+    [{ ...turn, endMs: 0.5 }],
+    [{ ...turn, endMs: Number.MAX_SAFE_INTEGER + 1 }],
+    [{ ...turn, startMs: 1001 }],
+  ];
+  for (const [index, transcriptTurns] of invalidTurns.entries()) {
+    await t.test(`bad timing ${index + 1}`, async () => {
+      const { fetchImpl } = recordingFetch(() => jsonResponse(providerCall({ transcript: null, transcriptTurns })));
+      await assert.rejects(live(fetchImpl).getCall(PROVIDER_ID), codeIs("INVALID_PROVIDER_RESPONSE"));
+    });
+  }
+  await t.test("plain transcript wins over an unusable optional fallback", async () => {
+    const { fetchImpl } = recordingFetch(() => jsonResponse(providerCall({ transcriptTurns: invalidTurns[0] })));
+    assert.equal((await live(fetchImpl).getCall(PROVIDER_ID)).transcript, providerCall().call.transcript);
+  });
+});
+
+test("opaque provider IDs cannot escape the call path or cause untyped URI failures", async (t) => {
+  for (const providerCallId of [".", "..", "\ud800", "\udfff"]) {
+    await t.test(JSON.stringify(providerCallId), async () => {
+      await assert.rejects(live(forbiddenFetch).getCall(providerCallId), codeIs("INVALID_CALL_ID"));
+      const { fetchImpl, calls } = recordingFetch(() => jsonResponse({ call: { id: providerCallId } }, 201));
+      assert.equal((await live(fetchImpl).startCall(INPUT)).state, "dispatch_unknown");
+      assert.equal(calls.length, 1);
+    });
+  }
+});
+
+test("late transcripts can be retrieved after a completed call without starting another call", async () => {
+  let read = 0;
+  const { fetchImpl, calls } = recordingFetch(() => jsonResponse(providerCall({
+    transcript: read++ === 0 ? null : "Support: Synthetic reference LATE-001. Request pending review.",
+    transcriptTurns: null,
+  })));
+  const adapter = live(fetchImpl);
+  const ended = await adapter.getCall(PROVIDER_ID);
+  assert.equal(ended.state, "completed");
+  assert.equal(ended.transcript, null);
+  const later = await adapter.getCall(PROVIDER_ID);
+  assert.equal(later.state, "completed");
+  assert.match(later.transcript ?? "", /LATE-001/);
+  assert.ok(calls.every(({ init }) => init?.method === "GET"));
+  assert.equal(calls.length, 2);
+});
+
+test("redelivery freshness is checked against the delivery signature rather than event creation", async () => {
+  const sixMinutesLater = NOW + 360_000;
+  const adapter = createDialAdapter({ mode: "live" }, {
+    config: CONFIG, fetch: forbiddenFetch, now: () => sixMinutesLater,
+  });
+  const { rawBody, headers } = signedWebhook(eventEnvelope(), sixMinutesLater / 1000);
+  assert.equal((await adapter.verifyWebhook(rawBody, headers))?.eventId, EVENT_ID);
+  assert.equal((await adapter.verifyWebhook(rawBody, headers))?.eventId, EVENT_ID);
+});
+
+test("V1 deliberately ignores authenticated call.transcribed without fabricating an ended event", async () => {
+  const { rawBody, headers } = signedWebhook(eventEnvelope({ type: "call.transcribed" }));
+  assert.equal(await live(forbiddenFetch).verifyWebhook(rawBody, headers), null);
 });

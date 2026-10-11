@@ -15,19 +15,26 @@ is never returned. Live failure never falls back to simulation.
 Runtime: Node server with native fetch, Headers, TextDecoder and node:crypto.
 No additional runtime dependency. Do not import from a client component or Edge route.
 Tests require Node >=22.18 with built-in TypeScript stripping (verified on 25.2.1),
-or T2 may use its chosen TypeScript runner. Type-only imports use .ts, as do test
-and script imports: set compilerOptions.allowImportingTsExtensions=true for
-noEmit checking. TypeScript >=5.0 and @types/node are development dependencies
+or T2 may use its chosen TypeScript runner. Production imports/re-exports of
+./types.ts are type-only and erased, compatible with T2's current compiler.
+Test and script value imports use .ts: set compilerOptions.allowImportingTsExtensions=true for their
+separate noEmit check. TypeScript >=5.0 and @types/node are development dependencies
 owned by T2, not added to the repository by this workstream.
 
 TEMPORARY CONTRACT BRIDGE
-Canonical src/contracts/* did not exist on origin/main when this was implemented.
+Canonical src/contracts/* does not exist on origin/main. Teammate 2 has now
+published matching V1 types on origin/codex/case-engine at db5f311; that inspected
+scaffold still has no case service or webhook route. No T2 branch was merged here.
 types.ts is the exact, isolated shared V1 mirror permitted by the prompts.
-When T2's scaffold lands, replace its definitions with:
+On the combined integration branch, replace its definitions with:
   export type {Mode} from "../../contracts/case";
   export type {AuthorizedCallInput, StartCallResult, VoiceSnapshot,
     VerifiedVoiceEvent, VoiceAdapter} from "../../contracts/voice";
 No routes, root manifests, lockfiles, database, or shared contracts were edited.
+The lead checked a temporary combined projection against db5f311: production
+files pass T2's strict compiler flags (including noUncheckedIndexedAccess and
+without allowImportingTsExtensions), and both canonical type directions match.
+This establishes source compatibility, not a running application integration.
 
 SERVER CONFIGURATION (T2 adds to .env.example; never NEXT_PUBLIC_)
 DIAL_API_KEY                  Existing account API key.
@@ -37,6 +44,7 @@ DIAL_MAX_CALL_DURATION_SECONDS Optional integer 60..3600; default 300.
 Set the duration within the account's verified free guardrails; credit alone
 does not establish that free limits are lifted. Missing API key/from number
 rejects before dispatch; webhook verification only requires the webhook secret.
+The API key must be a nonempty visible-ASCII bearer token without whitespace.
 An explicit injected config replaces environment config in full.
 
 LIVE ACCOUNT STATUS
@@ -53,6 +61,9 @@ Read-only preflight after configuring a secure external environment file:
   node --env-file=/secure/path/dial.env src/integrations/dial/check-account.mts
 It GETs /api/v1/account and prints only validated duration/concurrency limits.
 Missing limits is an error; explicit limits:null means free guardrails lifted.
+The command also validates DIAL_MAX_CALL_DURATION_SECONDS, compares that request
+cap and the fixed60s smoke cap against free limits, and exits1 if the configured
+request cap exceeds them. A failed check is not permission to buy an upgrade.
 Per-call duration overrides configured number/account duration, then free limits
 apply. This account endpoint alone cannot prove number readiness or its limits.
 
@@ -114,6 +125,62 @@ fields. Unknown fields are tolerated. Malformed authenticated payloads reject.
 Configure a public HTTPS subscription for call.ended only after T2 provides
 the running authenticated route. Nothing has been deployed or subscribed here.
 
+The following valid TypeScript route factory is ready to copy into a T2-owned
+server module. Supply T2's durable acceptance callback; its Promise must resolve
+only AFTER a transaction commits the event/job or recognizes a stored duplicate.
+It must persist unmatched provider IDs for reconciliation, never silently drop
+them. Route body reading is bounded even if Content-Length is absent or false.
+
+  import {createDialAdapter, DialAdapterError} from "@/integrations/dial";
+  import type {VerifiedVoiceEvent} from "@/contracts/voice";
+
+  export function makeDialWebhookPOST(
+    acceptDurably: (event: VerifiedVoiceEvent) => Promise<void>,
+  ) {
+    const voice = createDialAdapter({mode: "live"});
+    return async function POST(request: Request): Promise<Response> {
+      const reader = request.body?.getReader();
+      if (!reader) return new Response(null, {status: 400});
+      const chunks: Uint8Array[] = [];
+      let length = 0;
+      try {
+        while (true) {
+          const {done, value} = await reader.read();
+          if (done) break;
+          length += value.byteLength;
+          if (length > 1_048_576) {
+            await reader.cancel();
+            return new Response(null, {status: 413});
+          }
+          chunks.push(value);
+        }
+      } catch {
+        return new Response(null, {status: 400});
+      } finally {
+        reader.releaseLock();
+      }
+      const raw = new Uint8Array(length);
+      let offset = 0;
+      for (const chunk of chunks) { raw.set(chunk, offset); offset += chunk.length; }
+      try {
+        const event = await voice.verifyWebhook(raw, request.headers);
+        if (event) await acceptDurably(event);
+        return new Response(null, {status: 204});
+      } catch (error) {
+        return new Response(null, {status:
+          error instanceof DialAdapterError && error.code === "INVALID_WEBHOOK"
+            ? 401 : 503});
+      }
+    };
+  }
+
+T2's app/api/webhooks/dial/route.ts exports runtime="nodejs" and
+POST=makeDialWebhookPOST(acceptDialEventDurably), importing its own committed
+database callback. That callback needs a unique eventId and durable job key;
+use a transaction/upsert to make concurrent duplicate delivery safe. Configure
+request-header/body timeouts at the HTTP host. Do not background work in an
+unawaited Promise after returning204; serverless hosts may stop execution.
+
 CRITICAL: LATE TRANSCRIPT RECONCILIATION
 call.ended has NO transcript and transcriptAvailable can be false. Dial emits
 call.transcribed later. V1 only normalizes call.ended, so call.transcribed returns
@@ -123,6 +190,52 @@ plus evaluated outcome/timeline. Proposed job delays 0/2/5/10/20 seconds; if sti
 missing, publish an explicit unknown outcome and a manual-review next step.
 Do not publish terminal state early and depend on UI polling to get the transcript.
 T2 may deliberately coordinate V2 call.transcribed support later; not changed here.
+
+Worker example: each job is leased from T2's durable queue. The callbacks below
+must compare the lease/attempt/version in a transaction, so stale workers cannot
+overwrite a newer outcome. The retry number is stored durably, not a JS timer.
+Each callback commits job state before resolving; a thrown error leaves the job
+retryable by the queue. This code schedules read-only retries and never calls
+startCall. Separate queue delivery retry from the bounded provider-read budget.
+
+  import type {VoiceAdapter, VoiceSnapshot} from "@/contracts/voice";
+
+  type Job = {id: string; providerCallId: string; readIndex: number; lease: string};
+  interface Jobs {
+    reschedule(job: Job, nextReadIndex: number, dueAt: number): Promise<void>;
+    publishWithOutcome(job: Job, snapshot: VoiceSnapshot): Promise<void>;
+    manualReview(job: Job, snapshot: VoiceSnapshot | null): Promise<void>;
+  }
+  export async function reconcileEndedCall(
+    job: Job, jobs: Jobs, voice: VoiceAdapter, now: () => number = Date.now,
+  ): Promise<void> {
+    // First read immediately; subsequent durable delays are2,5,10,20 seconds.
+    const delays = [2_000, 5_000, 10_000, 20_000] as const;
+    let snapshot: VoiceSnapshot | null = null;
+    try { snapshot = await voice.getCall(job.providerCallId); }
+    catch { /* Preserve unknown state; retry only the read. */ }
+    const terminal = snapshot && ["completed", "failed", "cancelled"].includes(snapshot.state);
+    if (terminal && snapshot?.transcript?.trim()) {
+      await jobs.publishWithOutcome(job, snapshot);
+      return;
+    }
+    const delay = delays[job.readIndex];
+    if (delay !== undefined) {
+      await jobs.reschedule(job, job.readIndex + 1, now() + delay);
+      return;
+    }
+    await jobs.manualReview(job, snapshot);
+  }
+
+publishWithOutcome stores terminal CallV1, evaluated outcome and timeline in the
+SAME transaction that completes the job. manualReview publishes an explicit
+unknown case outcome/next action and retains an honest provider state; it does
+not invent completed status when all reads failed or remained nonterminal.
+If no terminal provider state was verified, keep the attempt blocked and expose
+manual reconciliation. A late transcript after the bounded window requires an
+explicit read-only reconciliation path; never redial to obtain a transcript.
+The evaluator treats transcript text as evidence, not instructions. A spoken
+approval still leaves paymentStatus="unverified" absent separate payment proof.
 
 SIMULATED MODE
   const voice = createDialAdapter({mode:"simulated"});
@@ -150,10 +263,18 @@ Only after the user explicitly authorizes a specific consenting test recipient:
 3. Set DIAL_SMOKE_ATTEMPT_FILE to a new absolute file path outside the repository.
 4. Run:
    node --env-file=/secure/path/dial.env src/integrations/dial/live-smoke.mts --live
-The script caps at60s, uses a synthetic test brief, reserves a0600 attempt file
-before dispatch and refuses an existing path. It prints only sanitized result
-and saves it atomically. A pending/unknown outcome requires manual dashboard
+The script validates consent/configuration first, caps at60s, uses a synthetic
+test brief, rejects repository-contained paths (including symlinked parents),
+reserves a0600 attempt file and syncs it and its directory before dispatch.
+It refuses an existing path. It prints only sanitized result and saves it
+atomically, syncing the result and directory. A pending/unknown outcome requires manual dashboard
 reconciliation. Do not choose a new file just to bypass that guard.
+Its attemptId becomes the provider Idempotency-Key. A CLI flag or environment
+variable is a technical guard, not evidence of human consent; retain the actual
+recipient authorization in your operational record before running the command.
+Only local filesystems with exclusive-create, atomic-rename and directory-sync
+support are suitable for the attempt file. A filesystem failure stops the script;
+inspect the original/residual result file before considering any further action.
 Retrieve the accepted provider ID using getCall after the call; no automatic
 redial. No real calls, support contact, refunds or claims occurred in development.
 
@@ -162,19 +283,52 @@ context-mcp-design.txt records the narrow proposed tool scope. No MCP server was
 implemented: account-wide identity and phone headers cannot securely select an
 authorized case. T2 must agree/verify a per-attempt capability binding first.
 
+ALIKE COORDINATION CHECK
+Read the relevant colleague records and their available related records. "Work
+on codex/case-engine" contains no conflicting contract decision. "Speedhacks
+refund-agent frontend and conversation-mode design" records a requirement for
+distinct AI-agent and human-support conversations. Their detailed sources are
+owner-only/unavailable. That counterpart distinction must not overload V1's
+mode:"live"|"simulated", which describes execution. V1's approved brief can state
+known counterpart context without changing authorization or introducing a new
+mode. No teammate was messaged and no colleague record was edited.
+
 VERIFICATION
 Run:
-  node --test src/integrations/dial/__tests__/adapter.test.ts
+  node --test src/integrations/dial/__tests__/*.node-test.mts
 Synthetic injected fetch only: normalization, dispatch refusal/uncertainty,
 no POST retry, input capture, abort/body deadlines, bounded GET retry, strict
 mode separation, exact-byte HMAC, stale/future/forged/malformed signatures,
 required event fields, enum type confusion, raw byte mutation, duplicate delivery,
-irrelevant events and malformed provider records. Result: 122/122 tests passed.
+irrelevant events and malformed provider records. Baseline:122/122 passed at
+056e54c. Final coordinated audit:183/183 passed, independently rerun by the lead.
+The added script suite launches scrubbed child environments with an unconditional
+synthetic fetch replacement before production imports. It verifies real local
+file reservation, private permissions, atomic result status, rerun refusal,
+recipient/config guards and account-error sanitization without contacting Dial.
 Strict TypeScript5.9.3 noEmit checking with @types/node22 passes with targetES2022,
-module/moduleResolution NodeNext, libES2022,DOM, allowImportingTsExtensions.
+module/moduleResolution NodeNext, libES2022,DOM, allowImportingTsExtensions,
+and noUncheckedIndexedAccess. All owned sources, scripts and tests were included.
+Compiler invocation (using an isolated temporary installation):
+  tsc --noEmit --strict --noUncheckedIndexedAccess --target ES2022 \
+    --module NodeNext --moduleResolution NodeNext --lib ES2022,DOM \
+    --allowImportingTsExtensions --types node \
+    src/integrations/dial/index.ts src/integrations/dial/types.ts \
+    src/integrations/dial/*.mts src/integrations/dial/__tests__/*.node-test.mts
+The temporary invocation additionally pointed typeRoots at its installed
+@types/node directory; on T2's installed scaffold normal type resolution applies.
+Separate compile-time equality assertions against db5f311's actual canonical
+Mode/input/result/snapshot/event/adapter types and factory assignment passed with
+strict/noUncheckedIndexedAccess/isolatedModules and bundler resolution, without
+allowImportingTsExtensions. Extracted route/worker examples also typechecked.
+Final independent read-only code review found no remaining material findings;
+git diff --check passed. No provider/account request, live webhook delivery,
+real phone call, deployed route, or full application build was verified.
 Compiler was installed only in a temporary directory outside the repo.
-Smoke/account commands were checked for fail-closed missing configuration only.
-No application build or T2 route integration is claimed: the scaffold is absent.
+The standalone tests use .node-test.mts to avoid T2's Vitest discovery. Production
+scripts use .mts and need this lane's explicit separate typecheck; T2's current
+**/*.ts include does not include them. Runtime adapter index.ts remains in T2's
+application typecheck. No running T2 route or deployed application is claimed.
 
 OFFICIAL SOURCES CHECKED 2026-10-11
 https://getdial.ai/hackathon/speedhacks/quickstart

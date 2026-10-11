@@ -56,10 +56,17 @@ function record(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function textId(value: unknown): value is string {
-  return typeof value === "string" && value.length > 0 && value.length <= 256 && !/[\s\x00-\x1f\x7f]/.test(value);
+  return typeof value === "string" && value.length > 0 && value.length <= 256
+    && value !== "." && value !== ".." && !/[\s\x00-\x1f\x7f]/.test(value)
+    // Dot path segments survive encodeURIComponent; unpaired surrogates throw.
+    // Both must be rejected before forming a provider URL.
+    && !/[\uD800-\uDFFF]/u.test(value);
 }
 function cleanConfigText(value: unknown, max: number): value is string {
   return typeof value === "string" && value.trim().length > 0 && value.length <= max && !/[\x00-\x1f\x7f]/.test(value);
+}
+function nonnegativeInteger(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
 }
 function invalidResponse(): never {
   throw new DialAdapterError("INVALID_PROVIDER_RESPONSE", "Dial returned an unsupported or malformed call record.");
@@ -90,14 +97,15 @@ function normalizeCall(value: unknown, requestedId: string): VoiceSnapshot {
       break;
     default: invalidResponse();
   }
-  if (value.duration !== null && (typeof value.duration !== "number" || !Number.isFinite(value.duration) || value.duration < 0)) invalidResponse();
+  if (value.duration !== null && !nonnegativeInteger(value.duration)) invalidResponse();
   if (value.transcript !== null && typeof value.transcript !== "string") invalidResponse();
   let transcript = value.transcript as string | null;
   if (transcript === null && value.transcriptTurns !== null && value.transcriptTurns !== undefined) {
     if (!Array.isArray(value.transcriptTurns)) invalidResponse();
     const lines = value.transcriptTurns.map(turn => {
       if (!record(turn) || typeof turn.speaker !== "string" || !["agent", "user", "transfer_target"].includes(turn.speaker)
-        || typeof turn.text !== "string") invalidResponse();
+        || typeof turn.text !== "string" || !nonnegativeInteger(turn.startMs) || !nonnegativeInteger(turn.endMs)
+        || turn.endMs < turn.startMs) invalidResponse();
       return `${turn.speaker}: ${turn.text}`;
     });
     if (lines.length) transcript = lines.join("\n");
@@ -125,6 +133,9 @@ export function createDialAdapter({ mode }: { mode: Mode }, dependencies: DialDe
 
   function requireApiKey(): void {
     if (!cleanConfigText(config.apiKey, 4096)) throw new DialAdapterError("MISSING_CONFIG", "Configure DIAL_API_KEY on the server.");
+    // A bearer key is a single visible ASCII token. Validate before fetch so a
+    // locally invalid Authorization header cannot look like an unknown dispatch.
+    if (!/^[\x21-\x7e]+$/.test(config.apiKey)) throw new DialAdapterError("INVALID_CONFIG", "DIAL_API_KEY must be a valid server-side bearer token.");
   }
   function requireDispatchConfig(): number {
     requireApiKey();
@@ -145,7 +156,14 @@ export function createDialAdapter({ mode }: { mode: Mode }, dependencies: DialDe
       return await Promise.race([
         (async () => {
           const response = await transport(API + path, { ...init, signal: controller.signal, redirect: "error" });
-          const body: unknown = await response.json();
+          let body: unknown;
+          try { body = await response.json(); }
+          catch (error) {
+            // Completed non-JSON responses still carry an authoritative status.
+            // Preserve only parse failures; interrupted/failed body reads remain
+            // uncertain, as does any successful response without a valid call ID.
+            if (!(error instanceof SyntaxError)) throw error;
+          }
           return { status: response.status, ok: response.ok, body };
         })(),
         new Promise<never>((_, reject) => {
@@ -231,11 +249,13 @@ export function createDialAdapter({ mode }: { mode: Mode }, dependencies: DialDe
       const signature = headers.get("X-Dial-Signature");
       const parts = signature?.match(/^t=(\d{1,16}),v1=([a-fA-F0-9]{64})$/);
       if (!parts) invalidWebhook();
-      const timestamp = Number(parts[1]);
+      const [, timestampText, signatureText] = parts;
+      if (timestampText === undefined || signatureText === undefined) invalidWebhook();
+      const timestamp = Number(timestampText);
       const current = now();
       if (!Number.isSafeInteger(timestamp) || !Number.isFinite(current) || Math.abs(current / 1000 - timestamp) >= 300) invalidWebhook();
-      const digest = createHmac("sha256", config.webhookSecret).update(parts[1] + ".").update(rawBody).digest();
-      const supplied = Buffer.from(parts[2], "hex");
+      const digest = createHmac("sha256", config.webhookSecret).update(timestampText + ".").update(rawBody).digest();
+      const supplied = Buffer.from(signatureText, "hex");
       if (supplied.length !== digest.length || !timingSafeEqual(supplied, digest)) invalidWebhook();
       let event: unknown;
       try { event = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(rawBody)); }
@@ -250,7 +270,7 @@ export function createDialAdapter({ mode }: { mode: Mode }, dependencies: DialDe
       if (typeof data.from !== "string" || !E164.test(data.from)
         || typeof data.to !== "string" || !E164.test(data.to)
         || typeof data.direction !== "string" || !["inbound", "outbound"].includes(data.direction)
-        || (data.durationSeconds !== null && (typeof data.durationSeconds !== "number" || !Number.isInteger(data.durationSeconds) || data.durationSeconds < 0))
+        || (data.durationSeconds !== null && !nonnegativeInteger(data.durationSeconds))
         || typeof data.status !== "string" || !["completed", "busy", "no-answer", "failed", "canceled"].includes(data.status)
         || typeof data.canceled !== "boolean" || typeof data.transcriptAvailable !== "boolean"
         || (data.failureReason !== undefined && data.failureReason !== null && typeof data.failureReason !== "string")) invalidWebhook();
