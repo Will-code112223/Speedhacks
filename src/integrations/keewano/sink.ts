@@ -17,8 +17,10 @@ type Logger = { warn(message: string): void };
 
 /**
  * In-memory queue per entity, shipped as one batch per entity after a short debounce.
- * Nothing here can throw into the case flow: failures are counted and logged (sparsely).
- * Registration of the custom event list happens once per process before the first batch.
+ * A failed batch is put back in front of its entity's queue and retried after a backoff,
+ * up to maxAttempts, then dropped. Nothing here can throw into the case flow: failures
+ * are counted and logged (sparsely). Registration of the custom event list happens once
+ * per process before the first batch.
  */
 export class KeewanoSink implements EventSink {
   readonly stats: SinkStats = { sent: 0, accepted: 0, dropped: 0, failures: 0 };
@@ -27,14 +29,22 @@ export class KeewanoSink implements EventSink {
   private timer: ReturnType<typeof setTimeout> | null = null;
   private registered = false;
   private chain: Promise<void> = Promise.resolve();
+  private readonly attempts = new Map<string, number>();
   private readonly client: KeewanoIngestClient;
   private readonly debounceMs: number;
+  private readonly retryDelayMs: number;
+  private readonly maxAttempts: number;
   private readonly maxQueued: number;
   private readonly logger: Logger;
 
-  constructor(client: KeewanoIngestClient, opts: { debounceMs?: number; maxQueued?: number; logger?: Logger } = {}) {
+  constructor(
+    client: KeewanoIngestClient,
+    opts: { debounceMs?: number; retryDelayMs?: number; maxAttempts?: number; maxQueued?: number; logger?: Logger } = {},
+  ) {
     this.client = client;
     this.debounceMs = opts.debounceMs ?? 250;
+    this.retryDelayMs = opts.retryDelayMs ?? 2000;
+    this.maxAttempts = Math.max(1, opts.maxAttempts ?? 3);
     this.maxQueued = opts.maxQueued ?? 5000;
     this.logger = opts.logger ?? console;
   }
@@ -66,12 +76,12 @@ export class KeewanoSink implements EventSink {
     return this.chain;
   }
 
-  private schedule(): void {
+  private schedule(delayMs = this.debounceMs): void {
     if (this.timer) return;
     this.timer = setTimeout(() => {
       this.timer = null;
       void this.flush();
-    }, this.debounceMs);
+    }, delayMs);
     this.timer.unref?.();
   }
 
@@ -95,9 +105,11 @@ export class KeewanoSink implements EventSink {
       const batches = [...this.queue.entries()];
       this.queue.clear();
       this.queued = 0;
+      let retryLater = false;
       for (const [entityId, events] of batches) {
         try {
           const result = await this.client.sendBatch(entityId, events);
+          this.attempts.delete(entityId);
           this.stats.sent += events.length;
           this.stats.accepted += result.accepted;
           if (result.accepted < events.length) {
@@ -105,10 +117,27 @@ export class KeewanoSink implements EventSink {
             this.warn(`accepted ${result.accepted}/${events.length} events for ${entityId}`);
           }
         } catch (err) {
+          const message = String((err as Error).message ?? err);
+          const attempt = (this.attempts.get(entityId) ?? 0) + 1;
           this.stats.failures += 1;
-          this.stats.dropped += events.length;
-          this.warn(`batch of ${events.length} dropped for ${entityId}: ${String((err as Error).message ?? err)}`);
+          if (attempt < this.maxAttempts) {
+            // Back in front of anything queued for this entity since; retried after a pause.
+            this.attempts.set(entityId, attempt);
+            const later = this.queue.get(entityId) ?? [];
+            this.queue.set(entityId, [...events, ...later]);
+            this.queued += events.length;
+            retryLater = true;
+            this.warn(`batch of ${events.length} for ${entityId} failed (attempt ${attempt}/${this.maxAttempts}), retrying: ${message}`);
+          } else {
+            this.attempts.delete(entityId);
+            this.stats.dropped += events.length;
+            this.warn(`batch of ${events.length} dropped for ${entityId} after ${attempt} attempts: ${message}`);
+          }
         }
+      }
+      if (retryLater) {
+        this.schedule(this.retryDelayMs);
+        return;
       }
     }
   }

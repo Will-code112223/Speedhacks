@@ -231,7 +231,7 @@ describe("keewano sink", () => {
     });
     const sink = new KeewanoSink(
       new KeewanoIngestClient({ apiKey: "k", baseUrl: "https://ingest.test", eventTypes: EVENT_TYPES, eventsHash: EVENTS_HASH, fetch: f.fetch }),
-      { logger: silent, debounceMs: 1 },
+      { logger: silent, debounceMs: 1, maxAttempts: 1 },
     );
     const bad = "00000000-0000-4000-8000-000000000001";
     const good = randomUUID();
@@ -243,6 +243,38 @@ describe("keewano sink", () => {
     registerOk = true;
     await sink.flush();
     expect(sink.stats).toMatchObject({ sent: 1, accepted: 1, dropped: 1, failures: 2 });
+  });
+});
+
+describe("keewano sink retries", () => {
+  it("re-queues a failed batch in order, retries after the backoff, then drops after maxAttempts", async () => {
+    let failures = 0;
+    const f = fakeFetch((call) => (call.url.endsWith("/in") && failures++ < 1 ? { status: 503, body: {} } : {}));
+    const sink = new KeewanoSink(
+      new KeewanoIngestClient({ apiKey: "k", baseUrl: "https://ingest.test", eventTypes: EVENT_TYPES, eventsHash: EVENTS_HASH, fetch: f.fetch }),
+      { logger: { warn() {} }, debounceMs: 1, retryDelayMs: 1, maxAttempts: 3 },
+    );
+    const entity = randomUUID();
+    sink.emit(entity, [event("RefundCaseEvent", "first", "2026-10-11T20:00:00Z")]);
+    await sink.flush(); // fails once, re-queued
+    expect(sink.stats).toMatchObject({ sent: 0, dropped: 0, failures: 1 });
+    sink.emit(entity, [event("RefundCaseEvent", "second", "2026-10-11T20:00:01Z")]);
+    await new Promise((r) => setTimeout(r, 10)); // the backoff timer flushes on its own
+    await sink.flush();
+    expect(sink.stats).toMatchObject({ sent: 2, accepted: 2, dropped: 0, failures: 1 });
+    const sent = f.calls.filter((c) => c.url.endsWith("/in")).map((c) => (c.body.events as KeewanoIngestEvent[]).map((e) => e.data));
+    expect(sent.at(-1)).toEqual(["first", "second"]); // original order preserved ahead of newer events
+
+    const always = fakeFetch((call) => (call.url.endsWith("/in") ? { status: 500, body: {} } : {}));
+    const doomed = new KeewanoSink(
+      new KeewanoIngestClient({ apiKey: "k", baseUrl: "https://ingest.test", eventTypes: EVENT_TYPES, eventsHash: EVENTS_HASH, fetch: always.fetch }),
+      { logger: { warn() {} }, debounceMs: 1, retryDelayMs: 1, maxAttempts: 2 },
+    );
+    doomed.emit(entity, [event("RefundCaseEvent", "x", "2026-10-11T20:00:00Z")]);
+    await doomed.flush();
+    expect(doomed.stats).toMatchObject({ dropped: 0, failures: 1 });
+    await doomed.flush();
+    expect(doomed.stats).toMatchObject({ dropped: 1, failures: 2 });
   });
 });
 

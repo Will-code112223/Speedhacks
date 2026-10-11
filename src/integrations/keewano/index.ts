@@ -38,7 +38,7 @@ export interface KeewanoWiring {
 export function createKeewano(config: Pick<AppConfig, "mode" | "keewano">, logger: { warn(message: string): void } = console): KeewanoWiring {
   const k = config.keewano;
   const sink = k.apiKey
-    ? new KeewanoSink(new KeewanoIngestClient({ apiKey: k.apiKey, baseUrl: k.ingestUrl, eventTypes: EVENT_TYPES, eventsHash: EVENTS_HASH, timeoutMs: k.timeoutMs }), { logger })
+    ? new KeewanoSink(new KeewanoIngestClient({ apiKey: k.apiKey, baseUrl: k.ingestUrl, eventTypes: EVENT_TYPES, eventsHash: EVENTS_HASH, timeoutMs: k.ingestTimeoutMs }), { logger })
     : null;
   let history: TransactionHistory | null = null;
   if (k.accessToken) {
