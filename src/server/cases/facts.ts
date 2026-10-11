@@ -129,15 +129,40 @@ export function applyChanges(facts: Facts, changes: CaseChanges): { next: Facts;
   return { next, changed };
 }
 
-/** Refund request draft; null until every required fact is present. */
+/**
+ * Email draft. With an amount it is the V1 refund request (unchanged); without one it is a
+ * neutral information request, so an insurance or general question is never framed as a
+ * refund claim. null until the facts that purpose needs are present.
+ */
 export function buildDraft(facts: Facts, evidence: CaseV1["evidence"]): CaseV1["draft"] {
-  if (missingFields(facts).length > 0) return null;
-  const amount = formatAmount(facts.amountMinor, facts.currency);
-  const subject = `Refund request: duplicate charge of ${amount} at ${facts.merchant.name}`;
   const evidenceLines =
     evidence.length > 0
       ? evidence.map((e, i) => `  ${i + 1}. ${e.name} (${e.mimeType})`).join("\n")
       : "  (none attached)";
+  if (missingFields(facts).length > 0) {
+    if (missingFields(facts, "gather_information").length > 0) return null;
+    return {
+      subject: `Information request about a charge at ${facts.merchant.name}`,
+      body: [
+        `Hello ${facts.merchant.name} support,`,
+        "",
+        `My name is ${facts.customer.name}${facts.customer.email ? ` (${facts.customer.email})` : ""}.`,
+        "I have a question about a charge on my account and am not requesting a refund at this time.",
+        "",
+        `Details: ${facts.reason}`,
+        "",
+        "Documents attached:",
+        evidenceLines,
+        "",
+        "Please tell me what you need from me to resolve this, and any reference number for this inquiry.",
+        "",
+        "Thank you,",
+        facts.customer.name ?? "",
+      ].join("\n"),
+    };
+  }
+  const amount = formatAmount(facts.amountMinor, facts.currency);
+  const subject = `Refund request: duplicate charge of ${amount} at ${facts.merchant.name}`;
   const body = [
     `Hello ${facts.merchant.name} support,`,
     "",

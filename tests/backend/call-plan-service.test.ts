@@ -84,6 +84,14 @@ describe("V1.1 call plan at authorization", () => {
     expect(input.brief).not.toContain("[amount missing]");
   });
 
+  it("a case without an amount gets a neutral information-request draft, never a refund request", async () => {
+    h = makeHarness();
+    const c = await createCaseWithoutAmount(h);
+    expect(c.draft?.subject).toMatch(/^Information request about a charge at /);
+    expect(c.draft?.body).toContain("am not requesting a refund");
+    expect(c.draft?.body).not.toMatch(/requesting a refund of/);
+  });
+
   it("the same revision cannot be re-authorized for a different purpose", async () => {
     h = makeHarness();
     const c = await createReadyCase(h);
