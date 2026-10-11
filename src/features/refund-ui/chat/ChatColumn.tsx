@@ -39,6 +39,11 @@ export interface ChatColumnProps {
 }
 
 const ASSISTANT_KINDS: ReadonlySet<ThreadItem["kind"]> = new Set(["assistant", "understood", "approval", "result"]);
+const SAMPLE_PROMPTS = [
+  "Help me get a refund for Amazon shoes.",
+  "Help me dispute a duplicate subscription charge.",
+  "Help me prepare a car insurance claim.",
+] as const;
 
 export default function ChatColumn({ controller, fixture, phoneHint, callBar, metrics }: ChatColumnProps) {
   const session = controller.active;
@@ -115,6 +120,9 @@ export default function ChatColumn({ controller, fixture, phoneHint, callBar, me
                 <li><span className={styles.stepNumber} aria-hidden="true">02</span><span>Attach supporting documents</span></li>
                 <li><span className={styles.stepNumber} aria-hidden="true">03</span><span>Review details and approve the action</span></li>
               </ol>
+              <div className={styles.prompts} role="group" aria-label="Sample requests">
+                {SAMPLE_PROMPTS.map((prompt) => <button className={styles.prompt} type="button" key={prompt} onClick={() => { setDraft(prompt); textareaRef.current?.focus(); }}>{prompt}</button>)}
+              </div>
             </div>
           ) : null}
           <ActivityGraph

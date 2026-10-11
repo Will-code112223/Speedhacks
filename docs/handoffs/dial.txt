@@ -559,7 +559,7 @@ picker with all 33 official-site marks, actual KB excerpt/source links, uploaded
 policy previews, and a blank Recourse preparation worksheet. The worksheet is
 not an insurer form. Provider selection does not authorize a call or establish
 coverage. New case has two purpose sentences and three steps. The graph is
-smaller and ends after Graph help. Global simulation chrome is removed; actual
+smaller and ends at its canvas; the help block is removed. Global simulation chrome is removed; actual
 call/result provenance remains accurate. No backend KB duplication was added.
 
 HTTP case recovery now stores only case IDs and selection in sessionStorage,

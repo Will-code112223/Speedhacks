@@ -3,7 +3,7 @@ import { activityNodes, type ActivityNode, type ActivityNodeId } from "./model";
 
 export interface GraphNode extends Omit<ActivityNode, "id"> {
   id: ActivityNodeId | "agent";
-  /** Node centers in a 960 × 590 world. */
+  /** Node centers in a 960 × 440 world. */
   x: number;
   y: number;
 }
@@ -18,12 +18,12 @@ export interface GraphEdge {
 }
 
 const POSITIONS: Record<ActivityNodeId, { x: number; y: number }> = {
-  request: { x: 125, y: 145 },
-  evidence: { x: 125, y: 430 },
-  brief: { x: 585, y: 120 },
-  approval: { x: 815, y: 145 },
-  dial: { x: 815, y: 415 },
-  outcome: { x: 540, y: 475 },
+  request: { x: 125, y: 110 },
+  evidence: { x: 125, y: 300 },
+  brief: { x: 585, y: 70 },
+  approval: { x: 815, y: 110 },
+  dial: { x: 815, y: 290 },
+  outcome: { x: 540, y: 335 },
 };
 
 /**
@@ -69,7 +69,7 @@ export function activityGraph(caseData: CaseV1 | null, call: CallV1 | null, fixt
     if (associatedCall.state === "completed") dialNode.tone = "idle";
   }
   nodes.push({
-    id: "agent", title: "Recourse", x: 390, y: 285,
+    id: "agent", title: "Recourse", x: 390, y: 195,
     status: caseData ? "Case workspace" : "Ready for a request",
     tone: caseData ? "recorded" : "idle",
     description: "Saved case details and actions.",

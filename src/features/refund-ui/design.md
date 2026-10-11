@@ -7,15 +7,15 @@ It follows the Refero skill in `.agents/skills/refero-design` with its bundled c
 
 ### Compact workspace revision
 
-The latest user revision removes the global mode badge and extra graph panels.
-Keep source provenance with actual call results and inside Graph help. The graph
-is capped at 290px on desktop, 240px on mobile, with pan, zoom, movable nodes and
+The latest user revision removes the global mode badge, Graph help and extra graph panels.
+Keep source provenance with actual call results. The graph
+uses a wider 960 × 440 layout, capped at 350px on desktop and 260px on mobile, with pan, zoom, movable nodes and
 keyboard selection. Remove the inspector, connection list and timeline below
-Graph help; this supersedes the earlier inspector decision below.
+the canvas, including Graph help; this supersedes the earlier inspector decision below.
 
 New case keeps a two-sentence description of Recourse's insurance and refund
 purpose, then three short steps: describe the issue, attach documents, review and
-approve. Provider logos and real document excerpt tiles supply visual interest.
+approve. Three sample requests populate the composer without submitting. Provider logos and real document excerpt tiles supply visual interest.
 The source is the user's explicit request for less text and useful previews.
 
 ### Provider library extension

@@ -24,7 +24,7 @@ describe("activity graph topology and provenance", () => {
     const ids = new Set(graph.nodes.map((node) => node.id));
     expect(ids.size).toBe(7);
     expect(new Set(graph.edges.map((edge) => edge.id)).size).toBe(graph.edges.length);
-    expect(graph.nodes.every((node) => node.x > 0 && node.x < 960 && node.y > 0 && node.y < 590)).toBe(true);
+    expect(graph.nodes.every((node) => node.x > 0 && node.x < 960 && node.y > 0 && node.y < 440)).toBe(true);
     expect(graph.edges.every((edge) => ids.has(edge.source) && ids.has(edge.target))).toBe(true);
     expect(graph.edges.every((edge) => edge.state === "pending")).toBe(true);
     expect(graph.edges.filter((edge) => edge.target === "agent")).toHaveLength(2);

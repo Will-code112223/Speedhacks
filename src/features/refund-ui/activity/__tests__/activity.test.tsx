@@ -89,7 +89,7 @@ describe("activity graph snapshot projection", () => {
     expect(outcome.facts).toContain("Partial offer: review the $25 credit");
   });
 
-  it("exposes keyboard-operable node controls and labels workflow limitations", () => {
+  it("exposes keyboard-operable node controls", () => {
     const html = renderToStaticMarkup(<ActivityGraph caseData={null} call={null} fixture={false} />);
     expect(html.match(/aria-pressed=/g)).toHaveLength(7);
     expect(html).toContain("Interactive case relationship graph");
@@ -98,22 +98,20 @@ describe("activity graph snapshot projection", () => {
     expect(html).toContain("Reset view");
     expect(html).toContain("Agent activity map");
     expect(html).toContain('aria-expanded="true"');
-    expect(html).toContain("not a live event trace");
-    expect(html).toContain("No provider browser activity is recorded");
   });
 
   it("keeps the compact graph free of the removed inspector and event list", () => {
     const html = renderToStaticMarkup(<ActivityGraph caseData={makeCase()} call={null} fixture defaultExpanded />);
-    expect(html).toContain("Graph help");
+    expect(html).not.toContain("Graph help");
+    expect(html).not.toContain("Data source:");
     expect(html).not.toContain("Inspect node");
     expect(html).not.toContain("Selected node connections");
     expect(html).not.toContain("Recorded case events");
   });
 
-  it("keeps the source details consistent when a supplied live call belongs to another case", () => {
+  it("does not show an unrelated supplied live call as started", () => {
     const html = renderToStaticMarkup(<ActivityGraph caseData={makeCase()} call={makeCall()} fixture={false} />);
     expect(html).not.toContain("Live call record");
-    expect(html).toContain("Simulated");
     expect(html).toContain("Dial call: Not started");
     expect(html).not.toContain("Inspect node");
   });

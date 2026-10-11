@@ -3,7 +3,6 @@
 import { useId, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 import type { CallV1, CaseV1 } from "../../../contracts/case";
 import { CheckIcon, ChevronRightIcon, FileIcon, PhoneIcon, SendIcon } from "../ui/icons";
-import { activityMode } from "./model";
 import { activityGraph, type GraphNode } from "./graph";
 import styles from "./ActivityGraph.module.css";
 
@@ -17,7 +16,7 @@ export interface ActivityGraphProps {
 type Point = { x: number; y: number };
 type View = Point & { zoom: number };
 const initialView: View = { x: 0, y: 0, zoom: 1 };
-const center = { x: 480, y: 295 };
+const center = { x: 480, y: 220 };
 const movement: Record<string, Point> = {
   ArrowLeft: { x: -20, y: 0 }, ArrowRight: { x: 20, y: 0 },
   ArrowUp: { x: 0, y: -20 }, ArrowDown: { x: 0, y: 20 },
@@ -103,7 +102,7 @@ export default function ActivityGraph({ caseData, call, fixture, defaultExpanded
     // Keep a keyboard-focused node visible even after panning away from it.
     const x = node.x * view.zoom + view.x;
     const y = node.y * view.zoom + view.y;
-    if (x < 100 || x > 860 || y < 70 || y > 480) {
+    if (x < 100 || x > 860 || y < 55 || y > 350) {
       setView((current) => ({ ...current, x: center.x - node.x * current.zoom, y: center.y - node.y * current.zoom }));
     }
   }
@@ -126,12 +125,12 @@ export default function ActivityGraph({ caseData, call, fixture, defaultExpanded
             </div>
           </div>
           <div className={styles.canvas}>
-            <svg ref={svgRef} className={styles.network} viewBox="0 0 960 590" role="group" aria-label="Interactive case relationship graph" aria-describedby={`${id}-help`} tabIndex={0} onKeyDown={canvasKey} onPointerDown={(event) => startDrag(event)} onPointerMove={moveDrag} onPointerUp={endDrag} onPointerCancel={endDrag} onLostPointerCapture={() => { drag.current = null; }}>
+            <svg ref={svgRef} className={styles.network} viewBox="0 0 960 440" role="group" aria-label="Interactive case relationship graph" tabIndex={0} onKeyDown={canvasKey} onPointerDown={(event) => startDrag(event)} onPointerMove={moveDrag} onPointerUp={endDrag} onPointerCancel={endDrag} onLostPointerCapture={() => { drag.current = null; }}>
               <defs>
                 <pattern id={`${id}-dots`} width="24" height="24" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r="0.8" className={styles.gridDot} /></pattern>
                 <marker id={`${id}-arrow`} markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto" markerUnits="userSpaceOnUse"><path d="M0 0L7 3.5L0 7" fill="none" stroke="context-stroke" strokeWidth="1.3" /></marker>
               </defs>
-              <rect width="960" height="590" fill={`url(#${id}-dots)`} aria-hidden="true" />
+              <rect width="960" height="440" fill={`url(#${id}-dots)`} aria-hidden="true" />
               <g transform={`translate(${view.x} ${view.y}) scale(${view.zoom})`}>
                 <g aria-hidden="true" className={styles.edges}>
                   {graph.edges.map((edge) => {
@@ -158,15 +157,6 @@ export default function ActivityGraph({ caseData, call, fixture, defaultExpanded
               </g>
             </svg>
           </div>
-          <div className={styles.content}>
-            <details className={styles.help}>
-              <summary>Graph help</summary>
-              <p className={styles.footnote}>Data source: {activityMode(caseData, graph.call, fixture)}.</p>
-              <p id={`${id}-help`} className={styles.hint}>Drag to pan or move nodes. Use Tab and Enter to select nodes, arrows to move, + / − to zoom, and Home to reset.</p>
-              <p className={styles.footnote}>Connections describe case records, not a live event trace. No provider browser activity is recorded here.</p>
-            </details>
-
-          </div>
         </div>
       )}
     </section>
@@ -174,7 +164,7 @@ export default function ActivityGraph({ caseData, call, fixture, defaultExpanded
 }
 
 function boundedNode(position: Point): Point {
-  return { x: Math.max(95, Math.min(865, position.x)), y: Math.max(65, Math.min(490, position.y)) };
+  return { x: Math.max(95, Math.min(865, position.x)), y: Math.max(55, Math.min(350, position.y)) };
 }
 function shortStatus(status: string) { return status.length > 29 ? `${status.slice(0, 27)}…` : status; }
 function connection(from: GraphNode, to: GraphNode) {
