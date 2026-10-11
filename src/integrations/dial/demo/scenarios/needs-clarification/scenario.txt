@@ -1,0 +1,57 @@
+SYNTHETIC/FICTIONAL — CLARIFICATION REHEARSAL; NO AUTHORIZATION OR CALL
+Fixture numbers +14155550113/+14155550114: NEVER DIAL. Neither is a known destination.
+
+UPLOADS AND PROVENANCE
+Upload receipt-fragment.txt, statement-fragment.txt and customer-note.txt as text/plain.
+All are authored QA fixtures. The receipt shows amountMinor=4990
+(USD 49.90) at Pebble Signal Supply; the statement shows that amount pending at
+Pebble Signal and amountMinor=6990 (USD 69.90) posted at Cloud Parcel.
+The customer explicitly does not know the target charge, merchant relationship
+or verified support contact. Preserve source disagreements; do not resolve them
+by choosing the first/last parsed amount, merchant or phone number.
+
+PROPOSED V1 PROJECTION (not a complete CaseV1 response)
+mode:simulated; status:needs_information
+customer:{name:"Morgan Example",email:"morgan@example.com"}
+merchant:{name:null,supportPhone:null}; amountMinor:null; currency:USD
+reason: Unresolved possible duplicate; conflicting merchants/amounts and only one
+posted entry. Clarify the actual disputed charge and verified support contact.
+missingFields:["merchant.name","merchant.supportPhone","amountMinor"]
+draft:null; authorization:null; calls:[]
+evidence: the three uploads above with server-generated UUIDs and text/plain.
+outcome: decision=needs_information; paymentStatus=unverified;
+referenceNumber=null; supportingQuote=null;
+nextAction:Ask the customer for the finalized charges, target merchant and contact.
+The known source amounts remain in evidence; amountMinor itself stays null.
+
+EXPECTED BRIEF AND AUTHORIZATION
+There is no approved call brief and no authority to startCall, even in simulation.
+Do not call authorize/startCall until disputed and missing critical facts have
+been resolved and the customer has reviewed the resulting revision. An attempted
+authorization should fail 422 with the missing fields; it must not invent values.
+This is a proposed QA acceptance target, not a claim that T2 extraction already
+detects every contradiction. If extraction populates disputed fields, flag that
+gap for T2; do not proceed to authorization to keep the demo moving.
+
+EXPECTED CONVERSATION IS WITH THE CUSTOMER, NOT SUPPORT
+AI: Which posted charge are you disputing, and is there a second finalized charge
+for the same order? USD 49.90 is pending; the USD 69.90 entry names another merchant.
+AI: Please confirm the target merchant and provide its verified support contact.
+Customer: I am not sure yet.
+AI: I will keep the case awaiting information. No call has been authorized or made.
+
+ACCEPTABLE V1 OUTCOMES AND HYPOTHETICAL FOLLOW-UP
+Remain needs_information with null disputed values, no authorization, no calls,
+no provider reference/transcript and no approval/payment claim.
+Only a hypothetical later correction may resolve the facts: customer supplies
+finalized evidence and confirms the merchant, positive amount and contact. T2
+then increments revision, rebuilds the draft and requires fresh explicit review
+and authorization. Do not supply made-up replacement values in this fixture.
+A partial offer cannot exist without a support interaction; if later observed,
+map to needs_information/manual customer approval, never automatic acceptance.
+
+CURRENT IMPLEMENTATION LIMIT
+Do not invoke the adapter merely to show a transcript: its simulated mode would
+produce the same generic fixed conversation as every other input. That would
+misrepresent this case's blocked state. These fixtures are proposed upload and
+clarification rehearsals, not an integrated extraction run or provider dialogue.

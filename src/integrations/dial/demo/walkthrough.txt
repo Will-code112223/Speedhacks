@@ -1,0 +1,95 @@
+FIVE-MINUTE SYNTHETIC DEMO — REFUND FIRST, INSURANCE EXTENSION
+
+Preparation: use this branch, a terminal at the repository root and Node >=22.18.
+Document paths below are relative to src/integrations/dial/demo; shell commands
+run from the repository root. Open README.txt, coverage-map.txt and the three
+scenario.txt files below.
+No server or credentials are needed. Do not load dial.env, invoke live-smoke.mts,
+call fixture numbers or send documents to a model/provider for this rehearsal.
+This kit demonstrates source fixtures and adapter boundaries. If T2/T1 later
+provide a tested application, use acceptance-checklist.txt before showing its UI.
+Do not present a narrated upload/approval flow as a running application.
+
+00:00–00:35 — STATE WHAT IS RUNNING
+Say: "These documents and conversations are fictional. We can execute the Dial
+adapter's explicit simulation and test provider-shaped responses with fake
+transport. Neither is a phone call or proof that a voice model follows a script."
+Earlier live evidence covers authenticated read-only account/number checks only.
+No actual conversation, transfer, claim, payment or deployed webhook is verified.
+
+00:35–01:30 — DUPLICATE-CHARGE REVIEW
+Open scenarios/duplicate-charge/scenario.txt and its receipt.txt, statement.txt
+and customer-note.txt. Show one USD74.90 order and two posted USD74.90 entries.
+The proposed request is one USD74.90 duplicate: amountMinor=7490, not14980.
+Point out evidence, confirmed contact, the proposed brief and the one-attempt
+authorization boundary. These are expected T2/T1 behaviors, not code in this kit.
+Read one proposed support line: "Please provide the receipt before I decide."
+Explain needs_information, an available reference and paymentStatus=unverified.
+Alternative: "I offer USD30 as a final settlement if you accept now." The agent
+cannot accept; it must return the offer for customer review without changing
+the requested amount or inventing a partial_approval status.
+
+01:30–02:15 — RUN THE REAL EXPLICIT ADAPTER SIMULATION
+Run this self-contained command. It uses synthetic values, explicit empty config
+and a forbidden transport. It does not exercise document extraction or T2 routes.
+
+node --input-type=module <<'JS'
+globalThis.fetch = async () => { throw new Error("Demo network is disabled"); };
+const {createDialAdapter} = await import("./src/integrations/dial/index.ts");
+const voice = createDialAdapter({mode: "simulated"}, {config: {}, fetch: globalThis.fetch});
+const call = await voice.startCall({
+  attemptId: "11111111-1111-4111-8111-111111111111",
+  caseId: "22222222-2222-4222-8222-222222222222",
+  authorizationId: "33333333-3333-4333-8333-333333333333",
+  to: "+14155550111",
+  brief: "Synthetic duplicate-charge review only; no real customer or refund."
+});
+if (call.state !== "accepted") throw new Error("Simulation was not accepted");
+console.log(JSON.stringify(await voice.getCall(call.providerCallId), null, 2));
+JS
+
+Show mode="simulated", sim_dial_ ID, completed phone lifecycle and the explicitly
+synthetic transcript. It always returns the same generic needs-information
+conversation with DEMO-REFUND-001. It did not perform the duplicate-charge script
+above, evaluate an outcome, confirm a refund or create a persisted case.
+
+02:15–03:00 — FICTIONAL INSURANCE EXTENSION
+Open scenarios/fictional-insurance/scenario.txt and policy.txt. These terms were
+invented for this fixture; they are not retrieved insurer knowledge or advice.
+Show USD180 repair less an invented USD50 deductible = USD130 requested review
+(amountMinor=13000). The arithmetic is not a coverage or payment decision.
+Read the proposed request for the repair receipt and incident statement. Show
+how existing reason/brief/evidence can carry this context without new V1 fields.
+Explain that the current simulation still returns its generic refund transcript;
+it does not run an insurance workflow or build T2's knowledge base.
+
+03:00–03:45 — BLOCK MISSING AND CONTRADICTORY FACTS
+Open scenarios/needs-clarification/scenario.txt and its three fragments. Compare
+USD49.90 pending at one merchant with USD69.90 posted at another. The target
+merchant, support phone and amount remain null until the customer resolves them.
+Explain missingFields, needs_information and the expected422 authorization
+refusal. Do not invoke startCall for this scenario, even to produce a simulated
+transcript. Missing data is a useful result; no reference or outcome is fabricated.
+
+03:45–04:30 — EXECUTE MOCKED PROVIDER-BOUNDARY QA
+Run the added focused suite:
+  node --test src/integrations/dial/__tests__/scenario-boundary.node-test.mts
+It exercises preserved unknown/conflicting facts, partial offers, denial, an
+uncertain outcome and transferred speaker turns using injected fake responses.
+The selected live code path returns mode="live", but transport is synthetic.
+These checks prove normalization/data preservation and no extra dispatch, not
+model behavior, support agreement, T2 outcome classification or a real transfer.
+For the broader independent adapter/script checks, run:
+  node --test src/integrations/dial/__tests__/*.node-test.mts
+Report the actual observed result/count; consult coverage-map.txt for limits.
+
+04:30–05:00 — HAND OFF THE REMAINING ACCEPTANCE WORK
+Open acceptance-checklist.txt. T2 owns immutable authorization, persistent one-
+attempt/event dedup, unknown-dispatch locking and atomic transcript/outcome
+publication; T1 owns the UI. The four pinned23bd75a backend findings need fresh
+fix verification. The checklist is not evidence that those fixes already landed.
+State that spoken approval needs an attributable quote, referenceNumber stays
+null if absent and payment stays unverified without separate payment evidence.
+Hold/join controls, counterpart routing, mid-call approval and automated transfer
+controls are V2 proposals, not features delivered by this V1 adapter. No new
+shared status, second call, deployment or main merge is part of this demo.

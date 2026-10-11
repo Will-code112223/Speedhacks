@@ -1,0 +1,124 @@
+SYNTHETIC REFUND DEMO — INTEGRATION ACCEPTANCE CHECKLIST
+
+Owners: T1 = frontend; T2 = case engine/routes/persistence; T3 = Dial adapter.
+This is an acceptance plan, not a claim that every item passed. Record the exact
+commit, command, result and evidence when checking a box. T2 owns implementation
+of its items; this kit does not add a backend, knowledge base, UI or shared types.
+See README.txt for verification levels, walkthrough.txt for the rehearsal and
+coverage-map.txt for the distinction between adapter tests and manual/T2 checks.
+All scenario identities, documents, amounts and phone numbers are fictional.
+Use injected transports only. A fictional number is not an authorized recipient.
+
+EVIDENCE LABELS
+[ ] [T1/T2/T3] Clearly label each demonstration as one of: proposed conversation;
+    explicit adapter simulation; mocked provider response; verified live result.
+    A mocked adapter invocation with mode="live" is not a real call. The existing
+    explicit simulation always returns its generic needs-information transcript;
+    it does not dynamically enact the scenario's scripted conversation.
+[ ] [T1/T2] Preserve mode="simulated"|"live" in V1 data and UI. AI-agent versus
+    human-support counterpart is separate context, never a new execution mode.
+[ ] [T3/lead] Report earlier authenticated account/number reads separately from
+    calls and webhooks. No live call or deployed-webhook result is established
+    by this kit. Its commands do not load credential files or run live-smoke.mts.
+
+FACTS, REVIEW AND AUTHORIZATION
+[ ] [T1/T2] The duplicate-charge scenario displays evidence and a draft for review.
+    Customer name, merchant name, E.164 support number, positive integer
+    amountMinor, currency and nonempty reason are required for authorization.
+[ ] [T2] Unknown facts remain null and missingFields names the missing facts.
+    Conflicting amounts or references are presented for human correction; the
+    incomplete/contradictory scenario cannot authorize a fabricated resolution.
+[ ] [T1/T2] Money is integer minor units in data and correctly formatted in UI.
+    The fictional insurance scenario is an extension exercise, not a claim that
+    V1 implements policy adjudication or an insurance submission workflow.
+[ ] [T2] Authorization freezes the revision, destination, facts, evidence and
+    permitted actions. Subsequent client replacement fields cannot alter a call.
+    Material edits clear authorization; unchanged authorization reuses its ID.
+[ ] [T2] Mode is bound to the stored case/authorization. Changing server mode
+    cannot turn a simulated authorization into a real dispatch. Existing calls
+    use the correct mode for polling and webhook verification after restart.
+
+ONE ATTEMPT AND HONEST UNCERTAINTY
+[ ] [T2] Persist one attempt per authorization before awaiting the provider.
+    Concurrent/repeated requestId or authorizationId returns the existing attempt;
+    a conflicting reused requestId cannot dispatch. Verify this across restart.
+[ ] [T3] Send at most one provider POST per invocation with the stable attempt ID.
+    Known local/refused requests reject; lost response, timeout, malformed success
+    and uncertain conflict return dispatch_unknown. No automatic POST retry.
+[ ] [T2] Persist dispatch_unknown and reject edits/new authorization/new dispatch
+    until manually reconciled with provider evidence. Never render it as a
+    retry-safe failure or manufacture a provider ID. No blind redial after a
+    transfer, queue change, dropped line, missing transcript or partial response.
+[ ] [T2/T3] Missing/invalid configuration is visible; no live-to-simulated fallback.
+    Validate the configuration actually passed to Dial before reserving an attempt.
+
+WEBHOOKS, LATE TRANSCRIPTS AND PUBLICATION
+[ ] [T2] Read exact raw bytes and bound streamed data at 1 MiB before full buffering,
+    including missing/false Content-Length. Route runs in the Node runtime.
+[ ] [T3] Verify exact-byte HMAC, timestamp freshness and signed/header identity.
+    Tampered, stale and malformed events fail with INVALID_WEBHOOK. Missing server
+    configuration is not mislabeled as a forged provider event.
+[ ] [T2] Durably insert/deduplicate authenticated eventId before acknowledging204.
+    Concurrent duplicates cause one business update; an event arriving before
+    dispatch's response stays queued until its provider ID matches an owned attempt.
+    Phone numbers alone do not establish case ownership.
+[ ] [T2/T3] call.ended may precede its transcript. Retrieve the existing call with
+    bounded reads; retain null while absent. V1 ignores call.transcribed after
+    authentication rather than inventing a new event contract.
+[ ] [T2] Publish terminal CallV1 state, evaluated outcome and timeline atomically.
+    A stale poll/event cannot regress terminal state or overwrite a newer result.
+    At the documented wait limit, publish unknown with a concrete manual next step.
+    Explain whether reconciliation requires GET polling or a durable worker;
+    demonstrate the implementation actually present, not the proposed worker.
+[ ] [T2] Document how an operator reviews a transcript arriving after that window.
+    Current pinned behavior required manual provider review, not automatic reopen.
+    A manual read must never trigger another call.
+
+CONVERSATION AND OUTCOME BOUNDARIES
+[ ] [T3] The assistant identifies itself as AI acting with authorization, uses only
+    approved facts and asks for status, requirements, a reference and a next step.
+    It does not impersonate the customer, invent evidence or supply credentials.
+[ ] [T1/T2/T3] Partial offers, waivers and changed terms are reported to the user;
+    the agent does not accept them. A scripted partial offer is not full approval
+    and creates no new V1 status. Preserve the quote and unresolved next action.
+[ ] [T2] A completed phone call is not a refund approval. A support-side statement
+    needs a supporting quote; referenceNumber remains null if none was provided.
+    paymentStatus stays "unverified" unless independent payment evidence exists.
+    Agent repetitions and quoted claims cannot establish approval. Conflicting
+    statements remain visible.
+[ ] [T1/T2/T3, manual] Rehearse "The earlier approval note was wrong; this request
+    is denied." Preserve the correction/quote; do not report approved or paid.
+[ ] [T1/T2/T3, manual] Rehearse "What was the transaction date?" when the source
+    does not supply it. Say it is unavailable and request the customer's help;
+    invent no date, evidence, verification answer or reference.
+[ ] [T1/T2/T3, manual] Rehearse transfer to a new support desk that lacks context.
+    Reidentify as AI, repeat only approved facts and hand off customer-only
+    verification. Keep the existing call identity; do not create another call.
+[ ] [T1/T2] Case ownership is enforced for read/edit/authorize/call/packet endpoints.
+    Real keys, claim documents and transcripts are not included in demo fixtures.
+
+PINNED BACKEND OBSERVATIONS — REQUIRE FRESH T2 FIX VERIFICATION
+These were observed at23bd75a, not asserted to remain unfixed on a newer branch.
+All four require a current commit and regression result before marking resolved.
+[ ] [T2] Mode mismatch: composition.ts:31–47 and service.ts:345–369 selected the
+    global mode without checking the persisted case. Probe both directions of
+    server-mode change with the same database; no unintended call or stalled
+    verification of the original mode may result.
+[ ] [T2] Body cap: src/app/api/webhooks/dial/route.ts:17–20 fully drained a synthetic
+    2 MiB request without Content-Length before rejecting it. Verify early stream
+    cancellation at the cap, before signature checking and complete buffering.
+[ ] [T2] Configuration mismatch: src/server/cases/composition.ts:47 validated
+    config.dial but constructed the adapter from ambient process.env. Supply
+    different synthetic values to each source and prove the validated values win.
+[ ] [T2] Blank duration: .env.example:20 supplied an empty optional value, which
+    became0 and consumed an attempt on rejection. Use300 or omit the variable;
+    invalid configuration must be caught before the attempt/provider side effect.
+
+V1 SCOPE AND COMPLETION RECORD
+[ ] [T1/T2/T3] No invented shared statuses or endpoints. V2 hold controls, joining
+    a live call, counterpart routing, live approval controls and automatic transfer
+    controls are not delivered by this V1 adapter. Do not demonstrate them as built.
+[ ] [Lead] Record commit(s), exact synthetic commands/counts, manual observations,
+    remaining T2 findings and whether a full application was actually exercised.
+    Record live verification separately. No purchase, deployment, real support
+    contact, live call or main-branch merge is authorized by this checklist.

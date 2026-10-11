@@ -1,0 +1,9 @@
+SYNTHETIC/FICTIONAL — CONTRADICTORY QA UPLOAD; NO REAL BANK DATA
+Author: Speedhacks demo fixture. Fixture date: 2026-09-19.
+
+Fictional customer: Morgan Example
+Currency:USD; amounts are integer minor units.
+2026-09-18 | PEBBLE SIGNAL DEMO | amountMinor=4990 (USD 49.90) | pending
+2026-09-19 | CLOUD PARCEL DEMO | amountMinor=6990 (USD 69.90) | posted
+No order references or relationship between the two merchants are documented.
+A pending entry is not a second posted charge. No duplicate is established.

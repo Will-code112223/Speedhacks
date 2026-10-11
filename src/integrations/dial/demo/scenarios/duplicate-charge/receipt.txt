@@ -1,0 +1,11 @@
+SYNTHETIC/FICTIONAL — QA UPLOAD; NO REAL PURCHASE OR CUSTOMER
+Author: Speedhacks demo fixture. Fixture date: 2026-09-20.
+
+Fictional merchant: Paper Comet Supply
+Fictional customer: Edda Example; edda@example.com
+Order: DEMO-PC-1001
+Item: One desk lamp
+Order total: amountMinor=7490 (USD 74.90); currency=USD
+Quantity/order count: one item in one order
+Fictional support fixture: +14155550111 — NEVER DIAL; simulation only.
+This authored receipt is evidence only within this synthetic scenario.

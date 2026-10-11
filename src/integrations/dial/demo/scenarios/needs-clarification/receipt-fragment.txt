@@ -1,0 +1,9 @@
+SYNTHETIC/FICTIONAL — INCOMPLETE QA UPLOAD; NO REAL TRANSACTION
+Author: Speedhacks demo fixture. Fixture date: 2026-09-18.
+
+Fictional customer: Morgan Example; morgan@example.com
+Receipt merchant: Pebble Signal Supply
+Order: DEMO-PS-UNCLEAR
+Receipt total: amountMinor=4990 (USD 49.90); currency=USD
+Support contact: not provided
+Only this receipt fragment is available; it does not prove duplicate payment.

@@ -5,6 +5,27 @@ Implementation date: 2026-10-11
 Commit: use git log -1 --format=%H -- src/integrations/dial docs/handoffs/dial.txt
 The exact final commit is also saved in the Alike implementation handoff.
 
+SYNTHETIC DEMO AND QA KIT
+Start at src/integrations/dial/demo/README.txt and walkthrough.txt.
+Three scenario folders include text/plain evidence, proposed V1 fact projections,
+briefs, authorization limits, conversation rehearsals and acceptable outcomes:
+- duplicate-charge: complete fictional receipt and duplicate posted charges;
+- fictional-insurance: reimbursement review under an explicitly invented policy;
+- needs-clarification: conflicting evidence and unknown required facts; no call.
+acceptance-checklist.txt assigns future checks to T1/T2/T3 and keeps the four
+pinned backend findings visible pending fresh verification. coverage-map.txt
+identifies existing coverage and the narrow adapter tests added for this kit.
+These files do not implement a case engine or duplicate T2 insurer knowledge.
+The adapter's explicit simulated mode still returns one fixed generic transcript;
+it does not enact the scripted scenarios. Mocked live-mode tests verify transport
+and normalization only, not model behavior, real conversations or claim outcomes.
+The kit authorizes no real calls, deployment or branch integration.
+Kit verification on 2026-10-11: 189/189 standalone tests passed (six added tests,
+including subtests); strict TypeScript/noUncheckedIndexedAccess passed across
+all owned sources, scripts and tests. The exact forbidden-network simulation
+command in walkthrough.txt ran successfully. Independent review checked V1
+field/outcome names, fictional-policy arithmetic and withheld authorization.
+
 DELIVERED
 src/integrations/dial/index.ts exports createDialAdapter({mode}):VoiceAdapter.
 The optional second argument injects config/fetch/clock/timeouts for isolated tests.
