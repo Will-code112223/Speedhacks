@@ -1,12 +1,18 @@
 import { getCaseService } from "@/server/cases/composition";
 import { CURRENCY, E164, isIsoDate, isValidAmountMinor } from "@/server/cases/facts";
 import type { UploadInput } from "@/server/documents/storage";
-import { badRequest } from "@/server/http/errors";
+import { CALL_PLAN_LIMITS } from "@/contracts/voice";
+import { ApiHttpError, badRequest } from "@/server/http/errors";
 import { handle, json } from "@/server/http/respond";
-import { ensureSession } from "@/server/http/session";
+import { ensureSession, requireAccess } from "@/server/http/session";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+/** The call plan carries the summary as `reason`; a longer one could never be approved. */
+const SUMMARY_MAX_CHARS = CALL_PLAN_LIMITS.reasonChars;
+/** 5 files x 10 MB plus 1 MB for the summary, fields and multipart framing. */
+const MAX_UPLOAD_BODY_BYTES = 5 * 10 * 1024 * 1024 + 1024 * 1024;
 
 function optionalText(form: FormData, key: string, max = 200): string | null {
   const v = form.get(key);
@@ -19,6 +25,12 @@ function optionalText(form: FormData, key: string, max = 200): string | null {
 /** POST /api/cases — multipart/form-data: summary + repeated "files" + optional fact fields. */
 export async function POST(request: Request): Promise<Response> {
   return handle(async () => {
+    requireAccess(request);
+    // Reject an oversized body before buffering it: 5 files x 10 MB plus 1 MB for the form.
+    const declared = Number.parseInt(request.headers.get("content-length") ?? "", 10);
+    if (Number.isFinite(declared) && declared > MAX_UPLOAD_BODY_BYTES) {
+      throw new ApiHttpError(413, "PAYLOAD_TOO_LARGE", `Upload exceeds ${MAX_UPLOAD_BODY_BYTES} bytes`, ["files"]);
+    }
     let form: FormData;
     try {
       form = await request.formData();
@@ -27,7 +39,10 @@ export async function POST(request: Request): Promise<Response> {
     }
     const summaryRaw = form.get("summary");
     if (summaryRaw !== null && typeof summaryRaw !== "string") throw badRequest("summary must be text", ["summary"]);
-    const summary = (summaryRaw ?? "").slice(0, 5000);
+    const summary = summaryRaw ?? "";
+    if (summary.trim().length > SUMMARY_MAX_CHARS) {
+      throw new ApiHttpError(422, "SUMMARY_TOO_LONG", `summary must be at most ${SUMMARY_MAX_CHARS} characters`, ["summary"]);
+    }
 
     const files: UploadInput[] = [];
     for (const entry of form.getAll("files")) {

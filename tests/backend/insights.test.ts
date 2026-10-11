@@ -351,7 +351,7 @@ describe("additive HTTP routes", () => {
     const res = await routes.capabilities.GET();
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toBe("application/json; charset=utf-8");
-    expect(await res.json()).toEqual({ liveCall: false, stepIn: false, decisions: false });
+    expect(await res.json()).toEqual({ liveCall: false, stepIn: false, decisions: false, accessRequired: false });
   });
 
   it("GET /api/cases/:id/history is session-bound and returns the stored check", async () => {

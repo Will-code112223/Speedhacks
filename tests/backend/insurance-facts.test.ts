@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import type { MerchantSourceV1 } from "@/contracts/case";
 import { CALL_PURPOSES, type CallPurpose } from "@/contracts/voice";
 import { buildBrief, isIsoDate, missingFields, validateChanges, type Facts } from "@/server/cases/facts";
 import { findInsurerInText } from "@/server/cases/service";
@@ -168,7 +169,7 @@ describe("insurer registry destination (V1.2)", () => {
       purpose: "claims",
       confidence: "verified_official",
     });
-    expect(c.merchant.source?.sourceUrl).toMatch(/^https:\/\//);
+    expect((c.merchant.source as MerchantSourceV1 | null)?.sourceUrl).toMatch(/^https:\/\//);
     expect(c.timeline.some((t) => t.type === "insurer_registry" && t.message.includes("Confirm it before approving"))).toBe(true);
     const prov = h.repo.listProvenance(c.id).find((p) => p.field === "supportPhone");
     expect(prov).toMatchObject({ sourceKind: "insurer_registry", sourceRef: "lemonade", value: lemonade.claimsPhone });
@@ -179,14 +180,14 @@ describe("insurer registry destination (V1.2)", () => {
     expect(allianz.claimsPhoneConfidence).toBe("reported");
     const c = await h.service.createCase(SESSION_A, { summary: "Trip question.", files: [], fields: { merchantName: "Allianz Global Assistance" } });
     expect(c.merchant.supportPhone).toBe(allianz.supportPhone);
-    expect(c.merchant.source?.purpose).toBe("customer_service");
+    expect((c.merchant.source as MerchantSourceV1 | null)?.purpose).toBe("customer_service");
   });
 
   it("finds an insurer named only in the user's text", async () => {
     const c = await h.service.createCase(SESSION_A, { summary: "My Farmers home policy should cover the burst pipe last week.", files: [], fields: {} });
     expect(c.merchant.name).toBe(registry("Farmers").name);
     expect(c.merchant.supportPhone).toBe(registry("Farmers").claimsPhone);
-    expect(c.merchant.source?.insurerId).toBe("farmers");
+    expect((c.merchant.source as MerchantSourceV1 | null)?.insurerId).toBe("farmers");
     expect(h.repo.listProvenance(c.id).find((p) => p.field === "merchantName")?.sourceKind).toBe("summary");
   });
 
@@ -231,7 +232,7 @@ describe("insurer registry destination (V1.2)", () => {
   it("never fills when the number came from the user or the insurer is unknown", async () => {
     const own = await h.service.createCase(SESSION_A, { summary: "x", files: [], fields: { merchantName: "Lemonade", supportPhone: "+14155550100" } });
     expect(own.merchant.supportPhone).toBe("+14155550100");
-    expect(own.merchant.source).toBeNull();
+    expect(own.merchant.source).toEqual({ kind: "user" });
     const unknown = await h.service.createCase(SESSION_A, { summary: "File a claim against Northwind Mutual.", files: [], fields: {} });
     expect(unknown.merchant.name).toBe("Northwind Mutual");
     expect(unknown.merchant.supportPhone).toBeNull();
@@ -245,16 +246,16 @@ describe("insurer registry destination (V1.2)", () => {
     expect(findInsurerInText("I am with Lemonade.", all)?.id).toBe("lemonade");
   });
 
-  it("stays editable: a manual number clears the source, an unchanged resend keeps it, a new insurer re-resolves", async () => {
+  it("stays editable: a manual number becomes a user source, an unchanged resend keeps it, a new insurer re-resolves", async () => {
     const c = await h.service.createCase(SESSION_A, { summary: "x", files: [], fields: { ...CLAIM_FIELDS, merchantName: "Lemonade" } });
     const kept = h.service.patchCase(SESSION_A, c.id, c.revision, { merchant: { name: c.merchant.name, supportPhone: c.merchant.supportPhone }, claimType: "theft" });
-    expect(kept.merchant.source?.insurerId).toBe("lemonade");
+    expect((kept.merchant.source as MerchantSourceV1 | null)?.insurerId).toBe("lemonade");
     const edited = h.service.patchCase(SESSION_A, c.id, kept.revision, { merchant: { name: "Lemonade", supportPhone: "+14155550199" } });
     expect(edited.merchant.supportPhone).toBe("+14155550199");
-    expect(edited.merchant.source).toBeNull();
+    expect(edited.merchant.source).toEqual({ kind: "user" });
     const renamed = h.service.patchCase(SESSION_A, c.id, edited.revision, { merchant: { name: "Farmers", supportPhone: null } });
     expect(renamed.merchant.supportPhone).toBe(registry("Farmers").claimsPhone);
-    expect(renamed.merchant.source?.insurerId).toBe("farmers");
+    expect((renamed.merchant.source as MerchantSourceV1 | null)?.insurerId).toBe("farmers");
   });
 });
 
@@ -305,7 +306,7 @@ describe("authorization purpose (V1.2)", () => {
     expect(a.authorization?.purpose).toBe("file_claim");
     const snap = h.repo.findAuthorization(c.id, c.revision)!.snapshot;
     expect(snap).toMatchObject({ policyNumber: "NWM-HO-0441772", incidentDate: "2026-10-03", claimType: "water damage" });
-    expect(snap.merchant.source?.insurerId).toBe("lemonade");
+    expect((snap.merchant.source as MerchantSourceV1 | null)?.insurerId).toBe("lemonade");
     expect(snap.brief).toContain("Purpose: file a new insurance claim");
     expect(snap.brief).toContain("- Policy number: NWM-HO-0441772");
   });

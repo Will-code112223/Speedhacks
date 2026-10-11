@@ -1,3 +1,4 @@
+import { requireAccess } from "@/server/http/session";
 import { handle, json } from "@/server/http/respond";
 import { ApiHttpError } from "@/server/http/errors";
 import { listInsurers, lookupInsurer } from "@/server/insurers";
@@ -12,6 +13,7 @@ export const runtime = "nodejs";
  */
 export async function GET(request: Request): Promise<Response> {
   return handle(() => {
+    requireAccess(request);
     const name = new URL(request.url).searchParams.get("name")?.trim() ?? "";
     if (!name) return json({ insurers: listInsurers() });
     if (name.length > 200) throw new ApiHttpError(400, "BAD_REQUEST", "name is too long");

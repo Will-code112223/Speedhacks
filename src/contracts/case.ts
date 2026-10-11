@@ -54,7 +54,7 @@ export interface CaseV1 {
   status: CaseStatus;
   customer: { name: string | null; email: string | null };
   /** V1.2 adds optional `source`: where supportPhone came from when the server filled it (null = documents or the user). */
-  merchant: { name: string | null; supportPhone: string | null; source?: MerchantSourceV1 | null };
+  merchant: { name: string | null; supportPhone: string | null; source?: MerchantSourceV1 | MerchantInputSourceV1 | null };
   amountMinor: number | null;
   currency: string;
   reason: string;
@@ -146,6 +146,15 @@ export interface MerchantSourceV1 {
   retrievedAt: string | null;
 }
 
+/**
+ * Additive: provenance of a support number that did not come from the registry.
+ * "user" = typed by the person (form field or edit); "document" = extracted from the
+ * uploaded documents or summary. Absent on older rows (treat as unknown).
+ */
+export interface MerchantInputSourceV1 {
+  kind: "user" | "document";
+}
+
 export interface ApiError {
   error: { code: string; message: string; fields?: string[] };
 }
@@ -207,4 +216,66 @@ export type ApiErrorCode =
   | "MISSING_REQUIRED_FACTS" // 422 fields lists what is missing
   | "LIVE_CONFIGURATION_MISSING" // 503 live mode requested without configuration
   | "PROVIDER_UNAVAILABLE" // 503 provider rejected before dispatch
-  | "INVALID_WEBHOOK"; // 401 webhook authentication failed
+  | "INVALID_WEBHOOK" // 401 webhook authentication failed
+  | "ACCESS_REQUIRED" // 401 APP_ACCESS_CODE is set and the request has no valid access cookie
+  | "UNSUPPORTED_DESTINATION" // 422 live mode: supportPhone is not an allowed North American number
+  | "SUMMARY_TOO_LONG" // 422 summary exceeds the 2000-character plan limit
+  | "RATE_LIMITED"; // 429 live mode: too many call dispatches in the last hour
+
+// ---------------------------------------------------------------------------
+// V1.3 (additive): the resolution plan the user reads before approving a call.
+// Served by GET /api/cases/:id/plan. Read-only: building it never freezes or
+// authorizes anything. Every string is plain words for the policyholder.
+// ---------------------------------------------------------------------------
+
+/** One thing to do or expect, in plain words. `status` is set only on "before" items. */
+export interface ResolutionStepV1 {
+  title: string;
+  detail: string;
+  /** "done" when the case facts already have it, "missing" when the user still needs to add it. */
+  status?: "done" | "missing";
+  /** Where the statement comes from, when it is the insurer's own rule. */
+  source?: { label: string; url: string };
+}
+
+/** One insurer rule from the registry, with how sure we are and where it was read. */
+export interface ResolutionTermV1 {
+  /** Registry term key, e.g. "claim_decision_timeline". */
+  key: string;
+  /** Plain-words name, e.g. "Claim decision". */
+  label: string;
+  value: string;
+  /** Registry confidence: verified_official | reported | regulatory_default | unknown. */
+  confidence: string;
+  /** Plain-words confidence, e.g. "From the insurer's website". */
+  confidenceLabel: string;
+  sourceUrl: string | null;
+}
+
+export interface ResolutionPlanV1 {
+  version: 1;
+  purpose: CallPurpose;
+  /** True when every fact the call needs is present (or the plan is the frozen one). */
+  ready: boolean;
+  /** True when `call` is the plan frozen with the current authorization: exactly what the agent got. */
+  frozen: boolean;
+  /** Server field keys still missing for this purpose (same keys as missingFieldsByPurpose). */
+  missingFields: string[];
+  /** The insurer or company as the registry names it, or the case's name when it is not in the registry. */
+  insurerName: string | null;
+  before: ResolutionStepV1[];
+  call: {
+    goal: string;
+    steps: string[];
+    questions: string[];
+    readBack: string;
+    /** The plan's forbidden actions in plain words. */
+    willNotDo: string[];
+  };
+  after: ResolutionStepV1[];
+  insurerTerms: ResolutionTermV1[];
+}
+
+export interface ResolutionPlanResponse {
+  plan: ResolutionPlanV1;
+}

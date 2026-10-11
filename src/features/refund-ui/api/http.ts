@@ -33,6 +33,53 @@ type RequestBody = { json: unknown } | { form: FormData } | null;
 
 const NO_CAPABILITIES: CaseApiCapabilities = { liveCall: false, stepIn: false, decisions: false };
 
+/** Error code the server uses when APP_ACCESS_CODE is set and the access cookie is missing or wrong. */
+export const ACCESS_REQUIRED = "ACCESS_REQUIRED";
+
+/** A 401 ACCESS_REQUIRED answer: the person has to enter the server's access code first. */
+export class AccessRequiredError extends ApiRequestError {
+  constructor(message: string) {
+    super(401, ACCESS_REQUIRED, message);
+    this.name = "AccessRequiredError";
+  }
+}
+
+/**
+ * Registered by the app shell: resolves once the person has entered a valid access
+ * code (POST /api/access set the cookie). While one is registered, a request that
+ * answers 401 ACCESS_REQUIRED waits for it and is sent again once. The server
+ * rejects before doing any work, so the retry never repeats a side effect.
+ */
+type AccessPrompt = () => Promise<void>;
+let accessPrompt: AccessPrompt | null = null;
+export function setAccessPrompt(prompt: AccessPrompt | null): void {
+  accessPrompt = prompt;
+}
+
+/** POST /api/access. "ok" once the cookie is set, "wrong" for a code the server refused. */
+export async function submitAccessCode(code: string, baseUrl = ""): Promise<"ok" | "wrong"> {
+  const res = await globalThis.fetch(`${baseUrl.replace(/\/+$/, "")}/api/access`, {
+    method: "POST",
+    headers: { "content-type": "application/json", accept: "application/json" },
+    body: JSON.stringify({ code }),
+    credentials: "same-origin",
+    cache: "no-store",
+  });
+  if (res.ok) return "ok";
+  if (res.status === 401 || res.status === 400) return "wrong";
+  throw await failure(res);
+}
+
+async function isAccessRequired(res: Response): Promise<boolean> {
+  if (res.status !== 401) return false;
+  try {
+    const parsed = readApiError(await res.clone().json());
+    return parsed?.code === ACCESS_REQUIRED;
+  } catch {
+    return false;
+  }
+}
+
 export function createHttpCaseApi(options: HttpCaseApiOptions = {}): CaseApi {
   const base = (options.baseUrl ?? "").replace(/\/+$/, "");
   const fetchImpl: typeof fetch = options.fetch ?? ((input, init) => globalThis.fetch(input, init));
@@ -46,8 +93,8 @@ export function createHttpCaseApi(options: HttpCaseApiOptions = {}): CaseApi {
     } else if (body !== null) {
       payload = body.form; // fetch writes the multipart boundary itself
     }
-    try {
-      return await fetchImpl(`${base}${path}`, {
+    const attempt = () =>
+      fetchImpl(`${base}${path}`, {
         method,
         headers,
         body: payload,
@@ -55,9 +102,22 @@ export function createHttpCaseApi(options: HttpCaseApiOptions = {}): CaseApi {
         cache: "no-store",
         ...(signal ? { signal } : {}),
       });
+    let res: Response;
+    try {
+      res = await attempt();
     } catch (cause) {
       throw unreachable("The server could not be reached.", cause);
     }
+    const prompt = accessPrompt;
+    if (prompt && (await isAccessRequired(res))) {
+      await prompt();
+      try {
+        res = await attempt();
+      } catch (cause) {
+        throw unreachable("The server could not be reached.", cause);
+      }
+    }
+    return res;
   }
 
   // Capabilities are probed once. A definitive answer (a 404 from a V1-only
@@ -213,6 +273,7 @@ async function failure(res: Response, notFoundMessage?: string): Promise<Error> 
   if (parsed === null) {
     return new ApiRequestError(res.status, "CONTRACT_VIOLATION", `The server answered HTTP ${res.status} without an error body.`);
   }
+  if (res.status === 401 && parsed.code === ACCESS_REQUIRED) return new AccessRequiredError(parsed.message);
   const message = res.status === 404 && notFoundMessage !== undefined ? notFoundMessage : parsed.message;
   return new ApiRequestError(res.status, parsed.code, message, parsed.fields);
 }

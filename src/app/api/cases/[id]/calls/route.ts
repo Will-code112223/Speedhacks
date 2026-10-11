@@ -1,7 +1,7 @@
 import { getCaseService } from "@/server/cases/composition";
 import { badRequest, notFound } from "@/server/http/errors";
 import { handle, json, readJson } from "@/server/http/respond";
-import { readSession } from "@/server/http/session";
+import { readSession, requireAccess } from "@/server/http/session";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -9,6 +9,7 @@ export const dynamic = "force-dynamic";
 /** POST /api/cases/:id/calls — {authorizationId, requestId}; 202 with the stored attempt. */
 export async function POST(request: Request, ctx: { params: Promise<{ id: string }> }): Promise<Response> {
   return handle(async () => {
+    requireAccess(request);
     const session = readSession(request);
     if (!session) throw notFound();
     const { id } = await ctx.params;

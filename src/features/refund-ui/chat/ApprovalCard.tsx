@@ -9,7 +9,7 @@
  */
 
 import { useId, useState } from "react";
-import type { CallV1, CaseV1, MerchantSourceV1 } from "../../../contracts/case";
+import type { CallV1, CaseV1 } from "../../../contracts/case";
 import { UI_CALL_PURPOSES, type UiCallPurpose } from "../api/types";
 import { Banner, Button, KeyValueList, Mono, Pill } from "../ui/primitives";
 import { formatClock, formatMoney, formatPhone } from "../ui/format";
@@ -86,7 +86,8 @@ function hostOf(url: string | null): string | null {
 }
 
 /** Where the number about to be dialed came from, in one sentence. */
-function provenance(source: MerchantSourceV1 | null | undefined): string {
+function provenance(source: CaseV1["merchant"]["source"]): string {
+  if (source?.kind === "user") return "Entered by you.";
   if (!source || source.kind !== "insurer_registry") return "From your documents.";
   const line = source.purpose === "claims" ? "Claims line" : "Customer service line";
   const confidence = source.confidence.replace(/_/g, " ");

@@ -105,7 +105,7 @@ describe("insurance routes (V1.2)", () => {
     expect(((await ok.json()) as { case: CaseV1 }).case.authorization?.purpose).toBe("file_claim");
   });
 
-  it("PATCH edits insurance facts and a manual number clears the registry source", async () => {
+  it("PATCH edits insurance facts and a manual number replaces the registry source with a user source", async () => {
     const { c, session } = await createClaimCase();
     const res = await routes.byId.PATCH(
       new Request(`${BASE}/${c.id}`, {
@@ -118,7 +118,7 @@ describe("insurance routes (V1.2)", () => {
     expect(res.status).toBe(200);
     const next = ((await res.json()) as { case: CaseV1 }).case;
     expect(next.merchant.supportPhone).toBe("+14155550123");
-    expect(next.merchant.source).toBeNull();
+    expect(next.merchant.source).toEqual({ kind: "user" });
     expect(next.incidentDate).toBe("2026-10-04");
   });
 });

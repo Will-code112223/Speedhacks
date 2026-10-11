@@ -25,7 +25,9 @@ export function buildPacket(
   lines.push(`Merchant:       ${c.merchant.name ?? "[missing]"}`);
   lines.push(`Support phone:  ${c.merchant.supportPhone ?? "[missing]"}`);
   const src = c.merchant.source;
-  if (src) {
+  if (src && src.kind !== "insurer_registry") {
+    lines.push(`Phone source:   ${src.kind === "user" ? "entered by the customer" : "from the customer's documents"}`);
+  } else if (src) {
     lines.push(`Phone source:   ${src.insurerName} ${src.purpose === "claims" ? "claims" : "customer service"} line, insurer registry (${src.confidence}${src.sourceUrl ? `, ${src.sourceUrl}` : ""})`);
   }
   lines.push(`Amount:         ${amount}`);

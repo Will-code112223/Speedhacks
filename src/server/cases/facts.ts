@@ -7,6 +7,35 @@ import type { CaseDoc } from "@/server/persistence/repository";
 /** E.164 with at least 8 digits, matching the Dial adapter's own validation so dispatch never fails on format. */
 export const E164 = /^\+[1-9]\d{7,14}$/;
 export const CURRENCY = /^[A-Z]{3}$/;
+
+/**
+ * NANP area codes outside the US and Canada. They look domestic (+1) but bill as
+ * international calls and are the classic one-ring and callback-fraud destinations.
+ */
+const INTERNATIONAL_NANP_AREAS = new Set([
+  "242", "246", "264", "268", "284", "345", "441", "473", "649", "658", "664", "721",
+  "758", "767", "784", "809", "829", "849", "868", "869", "876",
+]);
+
+/**
+ * Live-mode destination rule: a real call may only go to a North American (+1) number
+ * with a valid NANP area code and exchange. Rejects premium 900 and 976, N11 and 0/1-leading
+ * codes, unassigned N9X area codes, Caribbean and Atlantic NANP areas billed as
+ * international, and the account's own caller ID. Returns why the number is refused, or null.
+ */
+export function liveDestinationProblem(phone: string, fromNumber: string | null): string | null {
+  const m = /^\+1([2-9]\d{2})([2-9]\d{2})(\d{4})$/.exec(phone);
+  if (!m) return "Live calls can only go to North American numbers: +1 followed by a valid 10-digit number";
+  const [, area, exchange] = m as unknown as [string, string, string, string];
+  if (area[1] === "1" && area[2] === "1") return `Area code ${area} is not a valid North American area code`;
+  if (area[1] === "9") return `Area code ${area} is not an assigned North American area code`;
+  if (area === "900") return "Premium-rate 900 numbers cannot be called";
+  if (INTERNATIONAL_NANP_AREAS.has(area)) return `Area code ${area} is outside the US and Canada and bills as an international call`;
+  if (exchange[1] === "1" && exchange[2] === "1") return `Exchange ${exchange} is not a valid North American exchange`;
+  if (exchange === "976") return "Premium-rate 976 numbers cannot be called";
+  if (fromNumber && phone === fromNumber.trim()) return "The support number cannot be this service's own caller ID";
+  return null;
+}
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export const REQUIRED_FIELDS = [
@@ -116,7 +145,7 @@ export function validateChanges(input: unknown): { changes: CaseChanges; invalid
   }
   if ("reason" in c) {
     const v = c.reason;
-    if (typeof v === "string" && v.trim().length > 0 && v.length <= 2000) changes.reason = v.trim();
+    if (typeof v === "string" && v.trim().length > 0 && v.trim().length <= 2000) changes.reason = v.trim();
     else invalid.push("reason");
   }
   // V1.2 insurance facts: null (or blank) clears; unknown stays null.
@@ -180,9 +209,23 @@ export function applyChanges(facts: Facts, changes: CaseChanges): { next: Facts;
   const next: Facts = pickFacts(facts);
   if (changes.customer) next.customer = { ...changes.customer };
   if (changes.merchant) {
-    // Registry provenance survives only an unchanged resend; a manual name or number edit clears it.
-    const same = changes.merchant.name === prev.merchant.name && changes.merchant.supportPhone === prev.merchant.supportPhone;
-    next.merchant = { name: changes.merchant.name, supportPhone: changes.merchant.supportPhone, source: same ? (prev.merchant.source ?? null) : null };
+    // Provenance follows the number. A registry number never survives a change of insurer
+    // name: it is cleared so the caller can re-resolve it for the new name (or leave it
+    // empty), and is never kept under a different insurer. A newly typed number is "user".
+    const prevSource = prev.merchant.source ?? null;
+    const nameChanged = changes.merchant.name !== prev.merchant.name;
+    const phoneChanged = changes.merchant.supportPhone !== prev.merchant.supportPhone;
+    let supportPhone = changes.merchant.supportPhone;
+    let source: Facts["merchant"]["source"] = null;
+    if (!phoneChanged && prevSource?.kind === "insurer_registry") {
+      if (nameChanged) supportPhone = null;
+      else source = prevSource;
+    } else if (!phoneChanged) {
+      source = supportPhone ? prevSource : null;
+    } else if (supportPhone) {
+      source = { kind: "user" };
+    }
+    next.merchant = { name: changes.merchant.name, supportPhone, source };
   }
   if ("amountMinor" in changes && changes.amountMinor !== undefined) next.amountMinor = changes.amountMinor;
   if (changes.currency !== undefined) next.currency = changes.currency;
@@ -380,7 +423,9 @@ export function buildCallPlan(input: {
   const insurer = fileClaim || Object.values(insurance).some((v) => v !== null);
   const duplicate = input.history?.status === "duplicate_found" ? input.history : null;
   // A claim call never states an amount: the insurer's adjuster sets it, and the agent may not agree to one.
-  const disclosures = PLAN_DISCLOSURES.filter((k) => !(fileClaim && (k === "amountMinor" || k === "currency")));
+  // Nor does it read the raw summary ("reason"): free text the person typed can hold an SSN, an
+  // amount or anything else. The claim is described by lossDescription and claimType only.
+  const disclosures = PLAN_DISCLOSURES.filter((k) => !(fileClaim && (k === "amountMinor" || k === "currency" || k === "reason")));
   if (insurer) {
     for (const key of ["policyNumber", "incidentDate", "lossDescription", "claimType"] as const) {
       if (insurance[key] !== null) disclosures.push(key);

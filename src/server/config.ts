@@ -19,6 +19,13 @@ export interface AppConfig {
   };
   simulated: { webhookSecret: string; queuedMs: number; inProgressMs: number };
   upload: { maxFiles: number; maxBytes: number };
+  /**
+   * Optional shared access code (APP_ACCESS_CODE). When set, every /api route except
+   * GET /api/capabilities and the provider webhook requires the recourse_access cookie.
+   */
+  accessCode: string | null;
+  /** Live-mode call dispatch limits over a rolling hour. */
+  dispatchLimits: { perSessionPerHour: number; perProcessPerHour: number; windowMs: number };
   reconcile: {
     minIntervalMs: number;
     transcriptWaitMs: number;
@@ -93,6 +100,8 @@ export function loadConfig(env: EnvSource = process.env): AppConfig {
       inProgressMs: int(env.SIMULATED_IN_PROGRESS_MS, 6000),
     },
     upload: { maxFiles: 5, maxBytes: 10 * 1024 * 1024 },
+    accessCode: str(env.APP_ACCESS_CODE),
+    dispatchLimits: { perSessionPerHour: 3, perProcessPerHour: 10, windowMs: 60 * 60 * 1000 },
     reconcile: {
       minIntervalMs: int(env.RECONCILE_MIN_INTERVAL_MS, 2000),
       // Dial's call.ended arrives before the transcript; keep reading for this long before publishing without one.

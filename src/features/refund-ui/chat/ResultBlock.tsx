@@ -10,6 +10,7 @@
 
 import { useId } from "react";
 import type { CallV1, CaseV1 } from "../../../contracts/case";
+import type { CallPurpose } from "../../../contracts/voice";
 import { Banner, Button, Disclosure, KeyValueList, Mono, MonoBlock, Pill, SourcePill, type Tone } from "../ui/primitives";
 import { DownloadIcon } from "../ui/icons";
 import { formatDateTime, formatMoney, statusWord } from "../ui/format";
@@ -48,7 +49,32 @@ function decisionTone(decision: Decision): Tone {
   }
 }
 
-function decisionNote(decision: Decision): string {
+/** The purpose the outcome was read under; absent on older rows = request_refund. */
+function outcomePurpose(caseData: CaseV1): CallPurpose {
+  return caseData.authorization?.purpose ?? "request_refund";
+}
+
+function decisionNote(decision: Decision, purpose: CallPurpose): string {
+  if (purpose === "file_claim") {
+    switch (decision) {
+      case "approved":
+        return "The insurer opened a claim on the call.";
+      case "denied":
+        return "The insurer said it will not open a claim.";
+      case "needs_information":
+        return "No claim was filed. They need more information first.";
+      case "requested":
+      case "unknown":
+        return "No claim was filed on this call.";
+      default: {
+        const unreachable: never = decision;
+        return unreachable;
+      }
+    }
+  }
+  if (purpose === "gather_information") {
+    return decision === "unknown" ? "The call did not reach anyone who could answer." : "See the next step for what they said.";
+  }
   switch (decision) {
     case "approved":
       return "Support approved the request on the call.";
@@ -80,12 +106,34 @@ function paymentNote(status: PaymentStatus): string {
   }
 }
 
+/** Why no claim exists yet, in a few words for the headline. */
+function noClaimReason(decision: Decision): string {
+  switch (decision) {
+    case "denied":
+      return "the insurer declined to open one";
+    case "needs_information":
+      return "they need more information";
+    default:
+      return "no claim number was given on the call";
+  }
+}
+
 /**
- * The outcome in one line: the contract status word, then the money when
- * support approved it, else the reference they gave, else the merchant.
+ * The outcome in one line. A refund call shows the status word, then the money
+ * when support approved it, else the reference they gave, else the merchant.
+ * A claim or information call never mentions a refund or an amount.
  */
 function OutcomeHeadline({ caseData }: { caseData: CaseV1 }) {
   const { decision, referenceNumber } = caseData.outcome;
+  const purpose = outcomePurpose(caseData);
+  if (purpose === "file_claim") {
+    if (decision === "approved") return <>{referenceNumber ? `Claim opened - claim ${referenceNumber}` : "Claim opened"}</>;
+    return <>{`No claim filed yet - ${noClaimReason(decision)}`}</>;
+  }
+  if (purpose === "gather_information") {
+    const who = caseData.merchant.name ? ` - ${caseData.merchant.name}` : "";
+    return <>{referenceNumber ? `Information call - reference ${referenceNumber}` : `Information call${who}`}</>;
+  }
   const word = statusWord(decision);
   const amount = decision === "approved" ? formatMoney(caseData.amountMinor, caseData.currency) : null;
   if (amount) {
@@ -217,7 +265,7 @@ export default function ResultBlock({ caseData, call, latest, fixture, packet, o
           <dt>Support decision</dt>
           <dd>
             <Pill tone={decisionTone(outcome.decision)}>{statusWord(outcome.decision)}</Pill>
-            <span className={styles.ledgerNote}>{decisionNote(outcome.decision)}</span>
+            <span className={styles.ledgerNote}>{decisionNote(outcome.decision, outcomePurpose(caseData))}</span>
           </dd>
         </div>
         <div className={styles.ledgerRow} data-testid="outcome-payment">

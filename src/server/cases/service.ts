@@ -14,6 +14,7 @@ import {
   missingFields,
   suggestedPurpose,
   type Facts,
+  liveDestinationProblem,
 } from "@/server/cases/facts";
 import { evaluateHistory, unavailableHistory, type HistoryCheck, type TransactionHistory } from "@/server/cases/history";
 import { merchantRecordSummary, type FrozenMerchantRecord, type MerchantInsights, type MerchantInsightsResult } from "@/server/cases/insights";
@@ -118,6 +119,12 @@ function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
   });
 }
 
+/**
+ * How long after an attempt an idempotent replay is still safe. Dial deduplicates a POST by
+ * Idempotency-Key; past this window a replay could place a second call, so none is sent.
+ */
+const RECONCILE_REPLAY_WINDOW_MS = 60 * 60 * 1000;
+
 /** Adapter rejection codes that mean "this server is misconfigured", not "the provider refused". */
 const CONFIG_REJECTION_CODES = new Set(["MISSING_CONFIG", "INVALID_CONFIG", "SERVER_ONLY", "INVALID_MODE"]);
 
@@ -149,6 +156,43 @@ export class CaseService {
     }
   }
 
+  /**
+   * Live mode only: a real call may go only to an allowed North American number
+   * (see liveDestinationProblem). A 422 naming "supportPhone" otherwise.
+   */
+  private assertDialableDestination(phone: string | null | undefined): void {
+    const { config } = this.deps;
+    if (config.mode !== "live" || !phone) return;
+    const problem = liveDestinationProblem(phone, config.dial.fromNumber);
+    if (problem) throw new ApiHttpError(422, "UNSUPPORTED_DESTINATION", problem, ["supportPhone"]);
+  }
+
+  /** Live dispatch timestamps (ms) per session and for the whole process, rolling window. */
+  private readonly dispatchLog = { bySession: new Map<string, number[]>(), all: [] as number[] };
+
+  /** Live mode only: at most N dispatches per session and M per process per rolling hour (429). */
+  private assertDispatchAllowed(ownerSession: string, nowMs: number): void {
+    const { config } = this.deps;
+    if (config.mode !== "live") return;
+    const { perSessionPerHour, perProcessPerHour, windowMs } = config.dispatchLimits;
+    const cutoff = nowMs - windowMs;
+    this.dispatchLog.all = this.dispatchLog.all.filter((t) => t > cutoff);
+    const mine = (this.dispatchLog.bySession.get(ownerSession) ?? []).filter((t) => t > cutoff);
+    this.dispatchLog.bySession.set(ownerSession, mine);
+    if (mine.length >= perSessionPerHour) {
+      throw new ApiHttpError(429, "RATE_LIMITED", `This browser has placed ${perSessionPerHour} calls in the last hour, the limit. Try again later.`);
+    }
+    if (this.dispatchLog.all.length >= perProcessPerHour) {
+      throw new ApiHttpError(429, "RATE_LIMITED", `This server has placed ${perProcessPerHour} calls in the last hour, the limit. Try again later.`);
+    }
+  }
+
+  private recordDispatch(ownerSession: string, nowMs: number): void {
+    if (this.deps.config.mode !== "live") return;
+    this.dispatchLog.all.push(nowMs);
+    this.dispatchLog.bySession.set(ownerSession, [...(this.dispatchLog.bySession.get(ownerSession) ?? []), nowMs]);
+  }
+
   private assemble(id: string): CaseV1 {
     const row = this.deps.repo.getCase(id);
     if (!row) throw notFound();
@@ -167,6 +211,7 @@ export class CaseService {
       throw new ApiHttpError(400, "BAD_REQUEST", "Provide a summary or at least one file", ["summary", "files"]);
     }
     validateUploads(input.files, config.upload);
+    if (input.fields.supportPhone) this.assertDialableDestination(input.fields.supportPhone);
 
     const caseId = randomUUID();
     const now = this.nowIso();
@@ -227,7 +272,7 @@ export class CaseService {
     // Explicit form fields override extraction and are recorded as user input.
     const facts: Facts = {
       customer: { name: extracted.customerName, email: extracted.customerEmail },
-      merchant: { name: extracted.merchantName, supportPhone: extracted.supportPhone },
+      merchant: { name: extracted.merchantName, supportPhone: extracted.supportPhone, source: extracted.supportPhone ? { kind: "document" } : null },
       amountMinor: extracted.amountMinor,
       currency: extracted.currency ?? "USD",
       reason: summary,
@@ -252,13 +297,22 @@ export class CaseService {
     if (f.customerName) (facts.customer.name = f.customerName), userInput("customerName", f.customerName);
     if (f.customerEmail) (facts.customer.email = f.customerEmail), userInput("customerEmail", f.customerEmail);
     if (f.merchantName) (facts.merchant.name = f.merchantName), userInput("merchantName", f.merchantName);
-    if (f.supportPhone) (facts.merchant.supportPhone = f.supportPhone), userInput("supportPhone", f.supportPhone);
+    if (f.supportPhone) (facts.merchant = { ...facts.merchant, supportPhone: f.supportPhone, source: { kind: "user" } }), userInput("supportPhone", f.supportPhone);
     if (typeof f.amountMinor === "number") (facts.amountMinor = f.amountMinor), userInput("amountMinor", f.amountMinor);
     if (f.currency) (facts.currency = f.currency), userInput("currency", f.currency);
     if (f.policyNumber) (facts.policyNumber = f.policyNumber), userInput("policyNumber", f.policyNumber);
     if (f.incidentDate) (facts.incidentDate = f.incidentDate), userInput("incidentDate", f.incidentDate);
     if (f.lossDescription) (facts.lossDescription = f.lossDescription), userInput("lossDescription", f.lossDescription);
     if (f.claimType) (facts.claimType = f.claimType), userInput("claimType", f.claimType);
+
+    // Live mode: an extracted number that may not be dialed is dropped (and said so), never kept.
+    if (!f.supportPhone && facts.merchant.supportPhone && config.mode === "live") {
+      const problem = liveDestinationProblem(facts.merchant.supportPhone, config.dial.fromNumber);
+      if (problem) {
+        timeline.push(this.entry("support_phone_rejected", `Ignored the support number found in your documents (${facts.merchant.supportPhone}): ${problem}. Enter a North American support number.`));
+        facts.merchant = { ...facts.merchant, supportPhone: null, source: null };
+      }
+    }
 
     // V1.2: a named insurer with no extracted or entered number gets its verified official line.
     const registry = this.fillFromInsurerRegistry(facts, summary);
@@ -362,11 +416,21 @@ export class CaseService {
       }
       const { next, changed } = applyChanges(row.doc, changes);
       if (!changed) return;
+      if (changes.merchant?.supportPhone) this.assertDialableDestination(changes.merchant.supportPhone);
       const now = this.nowIso();
       const revision = row.revision + 1;
       // V1.2: a newly named insurer with no number gets the registry candidate (still editable).
       const nameChanged = changes.merchant !== undefined && changes.merchant.name !== row.doc.merchant.name;
+      const prevSource = row.doc.merchant.source ?? null;
+      // applyChanges drops a registry number when the insurer name changes; say so and re-resolve.
+      const registryCleared =
+        nameChanged && prevSource?.kind === "insurer_registry" && !next.merchant.supportPhone && !!row.doc.merchant.supportPhone;
       const registry = nameChanged && !next.merchant.supportPhone ? this.fillFromInsurerRegistry(next, "") : null;
+      if (registryCleared && !next.merchant.supportPhone && registry) {
+        registry.messages.push(
+          `Cleared the ${prevSource.insurerName} registry number because the insurer name changed. Enter the number from your policy documents or ID card.`,
+        );
+      }
       const evidenceList = repo.listEvidence(id).map((e) => ({ id: e.id, name: e.name, mimeType: e.mimeType }));
       const purpose = suggestedPurpose(next);
       const missing = missingFields(next, purpose);
@@ -424,6 +488,7 @@ export class CaseService {
       if (missing.length > 0) {
         throw new ApiHttpError(422, "MISSING_REQUIRED_FACTS", "Authorization requires every required fact", missing);
       }
+      this.assertDialableDestination(row.doc.merchant.supportPhone);
       const existing = repo.findAuthorization(id, row.revision);
       if (existing) {
         // One authorization per revision: a different purpose would silently reuse the other plan.
@@ -562,6 +627,11 @@ export class CaseService {
       if (row.doc.authorization?.id !== auth.id || auth.revision !== row.revision) {
         throw new ApiHttpError(409, "AUTHORIZATION_CONFLICT", "Authorization is stale; re-authorize the current revision");
       }
+      // Checked again at dispatch: only the frozen number is dialed, and limits apply to new dispatches only.
+      this.assertDialableDestination(auth.snapshot.merchant.supportPhone);
+      const nowMs = Date.parse(now);
+      this.assertDispatchAllowed(ownerSession, nowMs);
+      this.recordDispatch(ownerSession, nowMs);
       snapshot = auth.snapshot;
       repo.insertCall({
         id: attemptId,
@@ -653,6 +723,84 @@ export class CaseService {
     const call = repo.getCall(attemptId);
     if (!call) throw new Error("call attempt vanished");
     return toCallV1(call);
+  }
+
+  // -------------------------------------------------------------------------
+  // POST /api/cases/:id/calls/:callId/reconcile  (resolve a dispatch_unknown attempt)
+  // -------------------------------------------------------------------------
+  /**
+   * A dispatch_unknown attempt would otherwise lock the case. Within the provider's
+   * idempotency window the attempt is replayed through the adapter with the identical
+   * Idempotency-Key (the attempt id) and the identical frozen body: Dial answers the
+   * original call if it exists, so this never places a second call. Accepted = adopted;
+   * a definitive refusal = failed (edit a fact to approve again); unknown again = unchanged.
+   * Past the window no request is sent at all (a replay could no longer be deduplicated):
+   * the attempt is marked failed with a note to check the provider dashboard first.
+   */
+  async reconcileUnknownCall(ownerSession: string, id: string, callId: string): Promise<CallV1> {
+    const { repo, config } = this.deps;
+    const row = this.ownedRow(ownerSession, id);
+    this.assertSameMode(row);
+    const call = repo.getCall(callId);
+    if (!call || call.caseId !== id) throw notFound("Call not found");
+    if (call.state !== "dispatch_unknown") return toCallV1(call);
+    const auth = repo.getAuthorization(call.authorizationId);
+    if (!auth) throw new ApiHttpError(409, "AUTHORIZATION_CONFLICT", "The attempt's authorization is missing");
+    const frozen = auth.snapshot;
+    const ageMs = Date.parse(this.nowIso()) - Date.parse(call.createdAt);
+
+    let result: Awaited<ReturnType<VoiceAdapter["startCall"]>> | null = null;
+    if (ageMs <= RECONCILE_REPLAY_WINDOW_MS) {
+      this.assertDialableDestination(frozen.merchant.supportPhone);
+      const adapter = this.deps.voice();
+      try {
+        result = await adapter.startCall({
+          attemptId: call.id,
+          caseId: id,
+          authorizationId: call.authorizationId,
+          to: frozen.merchant.supportPhone,
+          brief: frozen.brief,
+          ...(frozen.plan ? { plan: frozen.plan } : {}),
+        });
+      } catch (err) {
+        result = { state: "dispatch_unknown", mode: config.mode, message: `Provider call threw: ${String((err as Error).message ?? err)}` };
+      }
+    }
+
+    const after = this.nowIso();
+    repo.transaction(() => {
+      const current = repo.getCall(callId);
+      const caseRow = repo.getCase(id);
+      if (!current || !caseRow || current.state !== "dispatch_unknown") return;
+      const timeline = [...caseRow.doc.timeline];
+      let outcome = caseRow.doc.outcome;
+      if (result === null) {
+        repo.updateCall(callId, { state: "failed", error: "Dispatch could not be confirmed within the idempotency window", updatedAt: after });
+        timeline.push(this.entry("call_reconciled_failed", `Attempt ${callId} could not be confirmed and was marked failed without contacting the provider.`));
+        outcome = {
+          ...outcome,
+          nextAction: `Check the provider dashboard for a call to ${frozen.merchant.supportPhone} before approving again. Edit any case fact to re-authorize.`,
+        };
+      } else if (result.state === "accepted") {
+        repo.updateCall(callId, { providerCallId: result.providerCallId, state: "queued", error: null, updatedAt: after });
+        timeline.push(this.entry("call_reconciled", `Reconciled attempt ${callId}: the provider has it as call ${result.providerCallId}.`));
+        outcome = { ...outcome, nextAction: null };
+      } else if (result.state === "rejected") {
+        repo.updateCall(callId, { state: "failed", error: `${result.code}: ${result.message}`, updatedAt: after });
+        timeline.push(this.entry("call_reconciled_failed", `Reconciled attempt ${callId}: the provider refused it (${result.code}); no call was placed.`));
+        outcome = { ...outcome, nextAction: "No call was placed. Edit any case fact to re-authorize and approve the call again." };
+      } else {
+        timeline.push(this.entry("call_reconcile_unknown", `Reconciliation of attempt ${callId} is still unknown: ${result.message}`));
+      }
+      repo.updateCase(id, { doc: { ...caseRow.doc, timeline, outcome }, updatedAt: after });
+    });
+    if (result?.state === "accepted") {
+      const pending = repo.listUnprocessedEvents(result.providerCallId);
+      if (pending.length > 0) await this.processCall(callId, "webhook");
+    }
+    const updated = repo.getCall(callId);
+    if (!updated) throw new Error("call attempt vanished");
+    return toCallV1(updated);
   }
 
   // -------------------------------------------------------------------------
@@ -1010,9 +1158,16 @@ export class CaseService {
       // Recheck ownership after the provider await, inside this transaction. A
       // completed historical call can gain a transcript without deciding new facts.
       if (auth && row.doc.authorization?.id === auth.id && auth.revision === row.revision && outcome.decision === "unknown") {
-        const ctx = { amountMinor: auth.snapshot.amountMinor, currency: auth.snapshot.currency, merchantName: auth.snapshot.merchant.name };
+        const ctx = {
+          amountMinor: auth.snapshot.amountMinor,
+          currency: auth.snapshot.currency,
+          merchantName: auth.snapshot.merchant.name,
+          policyNumber: auth.snapshot.policyNumber ?? null,
+          durationSeconds: snapshot.durationSeconds,
+          maxCallDurationSeconds: this.deps.config.dial.maxCallDurationSeconds,
+        };
         try {
-          outcome = analyzeTranscript(snapshot.transcript, ctx);
+          outcome = analyzeTranscript(snapshot.transcript, ctx, auth.snapshot.purpose ?? "request_refund");
         } catch (err) {
           outcome = unknownOutcome(`Transcript analysis failed: ${String((err as Error).message ?? err)}.`);
         }
@@ -1093,9 +1248,23 @@ export class CaseService {
       }
 
       const auth = repo.getAuthorization(call.authorizationId);
+      const callFacts = { durationSeconds: snapshot.durationSeconds, maxCallDurationSeconds: this.deps.config.dial.maxCallDurationSeconds };
       const ctx = auth
-        ? { amountMinor: auth.snapshot.amountMinor, currency: auth.snapshot.currency, merchantName: auth.snapshot.merchant.name }
-        : { amountMinor: row.doc.amountMinor ?? 0, currency: row.doc.currency, merchantName: row.doc.merchant.name ?? "the merchant" };
+        ? {
+            amountMinor: auth.snapshot.amountMinor,
+            currency: auth.snapshot.currency,
+            merchantName: auth.snapshot.merchant.name,
+            policyNumber: auth.snapshot.policyNumber ?? null,
+            ...callFacts,
+          }
+        : {
+            amountMinor: row.doc.amountMinor ?? 0,
+            currency: row.doc.currency,
+            merchantName: row.doc.merchant.name ?? "the merchant",
+            policyNumber: row.doc.policyNumber ?? null,
+            ...callFacts,
+          };
+      const purpose = auth?.snapshot.purpose ?? row.doc.authorization?.purpose ?? "request_refund";
 
       let outcome = row.doc.outcome;
       if (snapshot.state === "completed") {
@@ -1103,7 +1272,7 @@ export class CaseService {
           outcome = unknownOutcome("The call ended but no transcript arrived within the wait window.");
         } else {
           try {
-            outcome = analyzeTranscript(snapshot.transcript, ctx);
+            outcome = analyzeTranscript(snapshot.transcript, ctx, purpose);
           } catch (err) {
             outcome = unknownOutcome(`Transcript analysis failed: ${String((err as Error).message ?? err)}.`);
           }

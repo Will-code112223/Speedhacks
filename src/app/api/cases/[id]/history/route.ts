@@ -1,7 +1,7 @@
 import { getCaseService } from "@/server/cases/composition";
 import { notFound } from "@/server/http/errors";
 import { handle, json } from "@/server/http/respond";
-import { readSession } from "@/server/http/session";
+import { readSession, requireAccess } from "@/server/http/session";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,6 +14,7 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(request: Request, ctx: { params: Promise<{ id: string }> }): Promise<Response> {
   return handle(async () => {
+    requireAccess(request);
     const session = readSession(request);
     if (!session) throw notFound();
     const { id } = await ctx.params;

@@ -13,9 +13,10 @@
  * so the shell waits for the browser before rendering the workspace.
  */
 
-import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
 import type { Mode } from "../../contracts/case";
 import { detectApiMode } from "./api/client";
+import { setAccessPrompt, submitAccessCode } from "./api/http";
 import type { ApiMode } from "./api/types";
 import CallBar from "./call/CallBar";
 import CallScreen from "./call/CallScreen";
@@ -30,7 +31,7 @@ import type { CaseSessionController } from "./state/controller";
 import { decisionForCallScreen, type CaseSession } from "./state/session";
 import { useCaseSession } from "./state/useCaseSession";
 import { CloseIcon, MenuIcon } from "./ui/icons";
-import { Button, SkeletonRows, VisuallyHidden } from "./ui/primitives";
+import { Banner, Button, Field, SkeletonRows, VisuallyHidden } from "./ui/primitives";
 import styles from "./RefundApp.module.css";
 
 export interface RefundAppProps {
@@ -102,6 +103,70 @@ function BootShell() {
           <SkeletonRows rows={4} label="Loading Recourse" />
         </div>
       </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Access code (APP_ACCESS_CODE on a hosted server)
+// ---------------------------------------------------------------------------
+
+/**
+ * Hidden until a request answers 401 ACCESS_REQUIRED. The http client then waits on
+ * this prompt; a valid code sets the server's httpOnly cookie and the request is retried.
+ */
+function AccessCodePrompt() {
+  const [waiters, setWaiters] = useState<(() => void)[]>([]);
+  const [code, setCode] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    setAccessPrompt(() => new Promise<void>((resolve) => setWaiters((current) => [...current, resolve])));
+    return () => setAccessPrompt(null);
+  }, []);
+
+  if (waiters.length === 0) return null;
+
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (busy || code.trim().length === 0) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await submitAccessCode(code);
+      if (result === "wrong") {
+        setError("That access code is not correct.");
+        return;
+      }
+      setCode("");
+      for (const resolve of waiters) resolve();
+      setWaiters([]);
+    } catch {
+      setError("The server could not be reached. Try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className={styles.accessGate}>
+      <Banner tone="accent" title="Access code required" testId="access-code-prompt">
+        <form className={styles.accessForm} onSubmit={submit}>
+          <Field
+            label="Access code"
+            type="password"
+            autoComplete="current-password"
+            value={code}
+            error={error}
+            onChange={(e: ChangeEvent<HTMLInputElement>) => setCode(e.target.value)}
+            autoFocus
+          />
+          <Button type="submit" variant="primary" busy={busy} busyLabel="Checking">
+            Continue
+          </Button>
+        </form>
+      </Banner>
     </div>
   );
 }
@@ -273,6 +338,7 @@ function Workspace({ apiMode, serverMode, plans }: WorkspaceProps) {
           </div>
         </div>
       </header>
+      <AccessCodePrompt />
 
       {onboarding ? (
         <main className={styles.focused}>

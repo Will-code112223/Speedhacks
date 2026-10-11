@@ -14,6 +14,8 @@ Serverless platforms such as Vercel are not supported, because the case database
 | `DIAL_API_KEY`, `DIAL_FROM_NUMBER` | required | Outbound calls through Dial; the from-number must be a ready, calling-enabled number on that account (`GET https://api.getdial.ai/api/v1/numbers`). |
 | `DIAL_MAX_CALL_DURATION_SECONDS` | optional | 60 to 3600; free Dial accounts are capped at 300 and allow 2 concurrent calls. |
 | `DIAL_WEBHOOK_SECRET` | optional | Enables the signed webhook receiver at `/api/webhooks/dial`; without it the app reads call results from Dial by polling, which is enough for a single instance. |
+| `APP_ACCESS_CODE` | strongly recommended when hosted | A shared access code. When set, every `/api` route except `GET /api/capabilities` and the signed Dial webhook answers 401 `ACCESS_REQUIRED` until the browser posts the code to `POST /api/access`, which sets an httpOnly `recourse_access` cookie (Secure in production, SameSite=Lax, 30 days) holding the SHA-256 hash of the code. The app shows an "Access code" prompt and retries. Unset means no gate, which is only safe on localhost. |
+| `NODE_ENV` | `production` | Set by `next start`; marks the session and access cookies Secure, so serve the app over HTTPS. |
 
 Keep the secrets out of the repository.
 Locally they live in `~/.config/speedhacks/dial.env`, loaded by `npm run dev:live` and `npm run start:live`.
@@ -63,3 +65,17 @@ The receiver verifies `X-Dial-Signature` (HMAC-SHA256 over the timestamp and the
 - The agent discloses that it is an AI assistant at the start of every call and never claims to be the policyholder.
 - Facts the user did not approve are never spoken; unknown facts stay unknown.
 - A case created in simulated mode can never be dialed live.
+- Live mode dials North American numbers only (NANP rule).
+  The number must be `+1` followed by a valid 10-digit number whose area code and exchange both start with 2-9.
+  The server refuses N11 codes, unassigned N9X area codes, premium area code 900, premium exchange 976, the Caribbean and Atlantic NANP area codes that bill as international calls (242, 246, 264, 268, 284, 345, 441, 473, 649, 658, 664, 721, 758, 767, 784, 809, 829, 849, 868, 869, 876), and the account's own `DIAL_FROM_NUMBER`.
+  It checks at case creation, on every edit and again at approval and dispatch, and answers 422 `UNSUPPORTED_DESTINATION` naming the field `supportPhone`.
+  A disallowed number found in uploaded documents is dropped with a timeline note instead of being kept.
+- Live mode limits dispatches to 3 calls per browser session and 10 calls per server process in any rolling hour, answering 429 `RATE_LIMITED`.
+  Retrying the same request is not counted.
+  The counters live in memory, so run a single instance (the SQLite database already requires that) and expect them to reset on restart.
+- A call whose dispatch result is unknown can be resolved with `POST /api/cases/:id/calls/:callId/reconcile`.
+  Within an hour of the attempt it replays the identical request with the same Idempotency-Key, so Dial returns the original call if it exists and never places a second one; the call is adopted, marked failed on a definitive refusal, or left unknown.
+  Past that hour no request is sent: the attempt is marked failed with a note to check the Dial dashboard before approving again.
+- The access code gate does not apply to `/api/webhooks/dial`, which Dial calls without a browser cookie and which is authenticated by its signature.
+- An insurance claim call never reads the free-text summary aloud; only the loss description and claim type are disclosed.
+- The summary is capped at 2000 characters (422 `SUMMARY_TOO_LONG` naming `summary`), and an upload body over 51 MB is refused with 413 before it is parsed.

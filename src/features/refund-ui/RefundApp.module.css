@@ -430,3 +430,26 @@
     display: none;
   }
 }
+
+/* ------------------------------------------------------------------------- */
+/* Access code prompt (hosted servers with APP_ACCESS_CODE)                   */
+/* ------------------------------------------------------------------------- */
+
+.accessGate {
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 16px 16px 0;
+}
+
+.accessForm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.accessForm > :first-child {
+  flex: 1 1 220px;
+}
