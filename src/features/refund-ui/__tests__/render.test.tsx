@@ -203,11 +203,14 @@ describe("server render of each stage", () => {
       "approve-checkbox",
       "approve-button",
       "draft-toggle",
+      "case-documents",
+      "document-packet-download",
     ]) {
       expect(html).toContain(`data-testid="${id}"`);
     }
     expect(html).toContain("Approve the call to Northwind Mutual claims line");
     expect(html).toContain("$1,200.00");
+    expect(html.indexOf('data-testid="case-documents"')).toBeLessThan(html.indexOf('data-testid="approve-button"'));
   });
 
   it("lists missing information and holds the approval back", async () => {

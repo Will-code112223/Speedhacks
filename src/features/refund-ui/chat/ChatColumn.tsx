@@ -16,6 +16,8 @@ import { AlertIcon, ChevronRightIcon, FileIcon, PhoneIcon } from "../ui/icons";
 import { formatClock } from "../ui/format";
 import DecisionCard from "../ui/DecisionCard";
 import { caseTitle, currentCall, isCallActive, isOutcomeStatus } from "../state/call";
+import CaseDocuments from "../documents/CaseDocuments";
+import ActivityGraph from "../activity/ActivityGraph";
 import type { CaseSessionController } from "../state/controller";
 import type { CaseSession, EventTone, ThreadItem } from "../state/session";
 import ApprovalCard from "./ApprovalCard";
@@ -145,6 +147,12 @@ export default function ChatColumn({ controller, fixture, phoneHint, planCount, 
       {callBar}
       <div className={styles.scroller} ref={scrollerRef} onScroll={onScroll}>
         <div className={styles.thread}>
+          <ActivityGraph
+            caseData={caseData}
+            call={controller.call}
+            fixture={fixture}
+            defaultExpanded={false}
+          />
           {session ? (
             <Thread
               session={session}
@@ -414,6 +422,12 @@ function ThreadEntry(props: ThreadEntryProps) {
             onReload={controller.reloadCase}
             onDirtyChange={(dirty) => onFactsDirty(session.key, dirty)}
             onStartNewCase={startNewCase}
+          />
+          <CaseDocuments
+            caseData={caseData}
+            fixture={fixture}
+            packet={session.packet}
+            onDownloadPacket={controller.downloadPacket}
           />
         </li>
       );

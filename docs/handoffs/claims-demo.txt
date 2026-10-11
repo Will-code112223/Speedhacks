@@ -1,0 +1,87 @@
+CLAIMS DEMO HANDOFF — 2026-10-11
+
+CHECKPOINT
+The existing frontend polish was pushed to main at 908fc8b before this work began.
+This follow-up lives on codex/claims-demo; do not assume it is on main.
+
+DOCUMENTS
+CaseDocuments exposes CaseV1.draft, missingFields, and evidence before authorization.
+Copy keeps the preparation/not-submitted label; packet download uses the existing
+CaseApi callback and endpoint. It is available even when facts are incomplete.
+The server V1 packet is a refund request, not an official insurance claim form.
+The fixture can rehearse a fictional claim. Neither constitutes insurer submission.
+
+PROVIDER BROWSER
+User selected GEICO. Browser access was attempted and blocked by saved browser
+permissions even after terminal full access was enabled. No provider form was
+inspected, filled or submitted. Do not present a URL opener as form automation.
+The corpus lists https://claims.geico.com/ but says this URL was not fetched directly.
+It contains insurer reference information, not a customer's coverage or claim facts.
+Before real form preparation, confirm product, claimant relationship/authority,
+policy and loss details. V1 has no structured policy, loss date/location, vehicle,
+portal fields or submission receipt. Inspect the actual portal before mapping fields.
+Do not put fictional evidence into a production claim or submit it as a real loss.
+
+LIVE MISSING-DOCUMENT TEST
+The user explicitly authorized one call to a specific consenting test recipient,
+at most 60 seconds and with Dial credit use, asking about a fictional missing document.
+claim-demo.mts is an opt-in CLI, not a web dispatch endpoint or integrated case purpose.
+It reserves a private attempt artifact outside the repository before one outbound POST.
+The same path cannot redial. An unknown dispatch must be reconciled, never retried
+with a fresh path. --read only retrieves the accepted call and stores transcript
+privately; it does not dial. Console output omits recipient and transcript.
+
+After separate authorization for a FUTURE call, prepare a new private path and run:
+  DIAL_TEST_TO='<consenting E.164 recipient>' \
+  DIAL_TEST_CONSENT_TO='<same recipient>' \
+  DIAL_CLAIM_DEMO_ATTEMPT_FILE='<absolute private attempt file outside repo>' \
+  node --env-file="$HOME/.config/speedhacks/dial.env" \
+    src/integrations/dial/claim-demo.mts --live --confirm-credits
+
+Read that attempt without placing another call:
+  DIAL_CLAIM_DEMO_ATTEMPT_FILE='<same private attempt file>' \
+  node --env-file="$HOME/.config/speedhacks/dial.env" \
+    src/integrations/dial/claim-demo.mts --read
+
+The adapter's mandatory instructions now condition refund requests and support
+questions on the authorized brief. This prevents an information-only test from
+inheriting unrelated refund/reference-number prompts. Shared transport types unchanged.
+
+INTEGRATED PURPOSE WORKFLOW
+Jonathan's revised V1.1 proposal was answered through Alike. T2 retains canonical
+types, purpose authorization, frozen plans, persistence and proposed answer ownership.
+Requested amendments: omit unauthorized disclosure values before sending to Dial,
+validate bounded plan data, use server-owned action constants, and bind answers to
+the originating call/authorization/revision. Deferred SSE/event expansion from this
+demo. The CLI test does not implement that larger workflow or insurer browser control.
+
+ACTIVITY GRAPH
+The chat includes an expandable Agent activity map with selectable nodes for request,
+evidence, brief, approval, Dial and outcome. It projects the current CaseV1/CallV1
+snapshot, with an optional chronological list of recorded timeline entries. It is
+not a network trace. Unknown dispatches, absent transcripts, initial missing facts,
+fixture simulation, live mode and payment verification remain distinct.
+No knowledge-base query, insurer-browser action or inferred LLM step is marked as
+running without evidence from the contract. No new API or dependency was added.
+
+VERIFICATION
+- Application TypeScript passed; 348 frontend/backend tests across 24 files passed.
+  Used /private/tmp/speedhacks-ui-vitest.config.mts to include frontend tests as well
+  as tests/**/*.test.ts; repository test configuration remains unchanged.
+- Final review added a retained-call provenance fix: calls from prior authorizations
+  are labeled as prior calls after facts change. All 11 graph tests and the application
+  typecheck passed after that fix (one additional regression beyond the full-suite run).
+- All 212 standalone Dial tests passed with mocked provider transport. After the
+  final instruction scope adjustment, the 23 claim-demo guards passed again.
+- Separate strict/noUncheckedIndexedAccess TypeScript check passed for adapter,
+  all Dial .mts scripts and .node-test.mts tests.
+- Production build passed, with the existing DATA_DIR filesystem tracing warning.
+- ONE real authorized fictional demo call was accepted, completed at the 60-second
+  provider cap, and returned a nonempty transcript. AI disclosure and the approved
+  missing-document question are present; the participant supplied an answer and
+  the assistant acknowledged it. Private transcript/recipient are excluded here.
+  This is actual outbound calling + status/transcript retrieval, not a mocked call.
+- The live call is a CLI adapter demonstration, not an end-to-end UI/case-purpose
+  integration, provider-form submission, or deployed webhook verification.
+Browser restrictions prevent claiming a final screenshot/responsive acceptance pass.
+No deployment or real insurance submission is part of this change.
