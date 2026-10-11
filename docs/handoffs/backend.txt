@@ -127,6 +127,14 @@ T1: git fetch origin && git checkout -b <branch> origin/codex/case-engine. Creat
     ("use client", default export). Poll GET /api/cases/:id every 2–3 s while status is "calling" or a call is
     queued/in_progress; stop on terminal. Reuse requestId on retries. The server sets the session cookie on
     POST /api/cases; send credentials on every request. Tell T2 when ready; T2 mounts it in src/app/page.tsx.
+T1 (after the main merge, 2026-10-11): RefundApp is mounted; your suite runs under `npm test`. One proposal for the
+    approval step, your files, your call: the Keewano/fixture transaction-history finding lands on the timeline as a
+    `history_checked` (or `history_unavailable`) entry BEFORE authorization, but the UI only shows the timeline inside
+    "Show case history" after the call. Rendering the latest `history_*` entry on the ApprovalCard (e.g. a row
+    "Transaction history" with the entry message; tone success when the message starts with "Transaction history" and
+    contains "closest", neutral otherwise) would show the judge the live Keewano evidence at the moment it matters. A
+    structured alternative is GET /api/cases/:id/history (additive route, see ADDITIVE ROUTES) with {history:{status,
+    summary, matches[]}, current}.
 T3: merged (3ef5066). verifyWebhook errors with code INVALID_WEBHOOK -> 401, MISSING_CONFIG -> 503.
     T2 webhook route reads request.arrayBuffer() with a 1 MiB cap before verification.
 
