@@ -9,7 +9,7 @@
  * for a reload; a newer case never gets overwritten silently.
  */
 
-import { useEffect, useId, useRef, useState, type FormEvent } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
 import type { CaseChanges, CaseV1 } from "../../../contracts/case";
 import { Banner, Button, Disclosure, Field, KeyValueList, Mono, SelectField, SourcePill } from "../ui/primitives";
 import { fileKindLabel, formatMoney, formatPhone } from "../ui/format";
@@ -27,6 +27,8 @@ import {
   type FactsDraft,
 } from "../state/facts";
 import type { UiError } from "../state/errors";
+import { createInsurerWebLookupApi, type InsurerWebLookup } from "../api/insurers";
+import { useInsurerWebLookup } from "../api/use-insurer-lookup";
 import styles from "./FactsCard.module.css";
 
 export interface FactsCardProps {
@@ -50,6 +52,26 @@ export interface FactsCardProps {
   onDirtyChange?: (dirty: boolean) => void;
   /** Offered when the server says the case belongs to a different mode. */
   onStartNewCase?: () => void;
+}
+
+/** "just now" under a minute, then minutes, hours, or the date. */
+function retrievedLabel(iso: string, nowMs: number): string {
+  const at = Date.parse(iso);
+  if (Number.isNaN(at)) return "Retrieved from the web";
+  const minutes = Math.floor((nowMs - at) / 60_000);
+  if (minutes < 1) return "Retrieved just now";
+  if (minutes < 60) return `Retrieved ${minutes} minute${minutes === 1 ? "" : "s"} ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `Retrieved ${hours} hour${hours === 1 ? "" : "s"} ago`;
+  return `Retrieved ${new Date(at).toLocaleDateString()}`;
+}
+
+function hostLabel(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
 }
 
 function sameDraft(a: FactsDraft, b: FactsDraft): boolean {
@@ -156,6 +178,17 @@ export default function FactsCard(props: FactsCardProps) {
   };
 
   const missingLabels = caseData.missingFields.map(labelForServerField);
+
+  // Web lookup for the number to call: offered while the field is empty, run only on request.
+  const webApi = useMemo(() => createInsurerWebLookupApi({ mode: fixture ? "fixture" : "http" }), [fixture]);
+  const lookupName = draft.merchantName.trim() || caseData.merchant.name?.trim() || null;
+  const web = useInsurerWebLookup(webApi, lookupName);
+  const phoneEmpty = draft.supportPhone.trim() === "";
+  const applyWebNumber = (lookup: InsurerWebLookup) => {
+    if (lookup.claimsPhone === null) return;
+    set("supportPhone")(lookup.claimsPhone);
+    touch("supportPhone")();
+  };
 
   return (
     <div className={styles.card} data-testid="facts-card">
@@ -293,6 +326,90 @@ export default function FactsCard(props: FactsCardProps) {
               onBlur={touch("supportPhone")}
               data-testid="facts-edit-supportPhone"
             />
+            {lookupName !== null && (phoneEmpty || web.status !== "idle") ? (
+              <div className={`${styles.wide} ${styles.webLookup}`} data-testid="web-lookup">
+                {phoneEmpty && web.status !== "found" ? (
+                  <div className={styles.webLookupRow}>
+                    <Button
+                      size="small"
+                      variant="secondary"
+                      busy={web.status === "loading"}
+                      busyLabel="Searching the insurer's site…"
+                      onClick={web.run}
+                      data-testid="web-lookup-run"
+                    >
+                      Look it up online
+                    </Button>
+                    {web.status === "idle" ? (
+                      <span className={styles.webLookupNote}>Searches {lookupName}&apos;s own website. Nothing is filled in until you choose.</span>
+                    ) : null}
+                  </div>
+                ) : null}
+                {web.status === "loading" ? (
+                  <span className={styles.webLookupNote} role="status">
+                    Searching the insurer&apos;s site…
+                  </span>
+                ) : null}
+                {web.status === "empty" ? (
+                  <p className={styles.webLookupNote} role="status" data-testid="web-lookup-empty">
+                    Nothing citable found. Use the number on your insurance ID card.
+                  </p>
+                ) : null}
+                {web.status === "error" && web.error ? (
+                  <Banner tone="danger" role="alert" title="The web lookup did not finish." testId="web-lookup-error">
+                    {web.error.message}
+                  </Banner>
+                ) : null}
+                {web.status === "found" && web.lookup ? (
+                  <div className={styles.webResult} data-testid="web-lookup-result">
+                    <div className={styles.webResultHead}>
+                      <span className={styles.webResultLabel}>Found online for {web.lookup.insurerName}</span>
+                      <span className={styles.webResultMeta}>{retrievedLabel(web.lookup.retrievedAt, Date.now())}</span>
+                    </div>
+                    {web.lookup.claimsPhone ? (
+                      <Mono>{formatPhone(web.lookup.claimsPhone)}</Mono>
+                    ) : (
+                      <p className={styles.webLookupNote}>The insurer&apos;s site does not publish one number. Use the number on your insurance ID card.</p>
+                    )}
+                    {web.lookup.summary ? <p className={styles.webResultSummary}>{web.lookup.summary}</p> : null}
+                    <ul className={styles.webSources}>
+                      {web.lookup.claimsUrl && !web.lookup.sources.some((s) => s.url === web.lookup?.claimsUrl) ? (
+                        <li>
+                          <a href={web.lookup.claimsUrl} target="_blank" rel="noopener noreferrer">
+                            Claims page · {hostLabel(web.lookup.claimsUrl)}
+                          </a>
+                        </li>
+                      ) : null}
+                      {web.lookup.sources.map((source) => (
+                        <li key={source.url}>
+                          <a href={source.url} target="_blank" rel="noopener noreferrer" title={source.title}>
+                            {source.title} · {hostLabel(source.url)}
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                    {web.lookup.claimsPhone ? (
+                      draft.supportPhone === web.lookup.claimsPhone ? (
+                        <span className={styles.webLookupNote} data-testid="web-lookup-used">
+                          Added to {FACT_LABELS.supportPhone}. Press Save changes to keep it.
+                        </span>
+                      ) : (
+                        <div className={styles.webLookupRow}>
+                          <Button
+                            size="small"
+                            variant="primary"
+                            onClick={() => web.lookup && applyWebNumber(web.lookup)}
+                            data-testid="web-lookup-use"
+                          >
+                            Use this number
+                          </Button>
+                        </div>
+                      )
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
             <Field
               id={fieldId("policyNumber")}
               label={FACT_LABELS.policyNumber}

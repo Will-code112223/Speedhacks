@@ -177,6 +177,85 @@
   color: var(--rc-ink-3);
 }
 
+.webLookup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: -4px;
+}
+
+.webLookupRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.webLookupNote {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--rc-ink-3);
+}
+
+.webResult {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: var(--rc-radius);
+  background: var(--rc-surface);
+  border: 1px solid var(--rc-border);
+}
+
+.webResultHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+  width: 100%;
+}
+
+.webResultLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--rc-ink-2);
+}
+
+.webResultMeta {
+  font-size: 12px;
+  color: var(--rc-ink-3);
+}
+
+.webResultSummary {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--rc-ink);
+}
+
+.webSources {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 2px;
+  max-width: 100%;
+  font-size: 12px;
+}
+
+.webSources a {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--rc-ink-2);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 @media (max-width: 560px) {
   .grid {
     grid-template-columns: minmax(0, 1fr);

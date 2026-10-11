@@ -8,7 +8,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { InsurerLookup } from "./insurer-types";
-import { insurerQuery, type InsurerApi } from "./insurers";
+import { insurerQuery, type InsurerApi, type InsurerWebLookup, type InsurerWebLookupApi } from "./insurers";
 
 export type InsurerLookupStatus = "idle" | "loading" | "found" | "not_found" | "error";
 
@@ -67,4 +67,72 @@ export function useInsurerLookup(api: InsurerApi | null, name: string | null): I
   if (current.error !== null) return { insurer: null, status: "error", error: current.error, refresh };
   if (current.insurer === null) return { insurer: null, status: "not_found", error: null, refresh };
   return { insurer: current.insurer, status: "found", error: null, refresh };
+}
+
+// ---------------------------------------------------------------------------
+// Web lookup, on demand
+// ---------------------------------------------------------------------------
+
+export type InsurerWebLookupStatus = "idle" | "loading" | "found" | "empty" | "error";
+
+export interface InsurerWebLookupState {
+  status: InsurerWebLookupStatus;
+  /** Set only when status is "found". */
+  lookup: InsurerWebLookup | null;
+  /** Set only when status is "error". */
+  error: Error | null;
+  /** Starts a lookup for the current name. Does nothing while api or name is blank. */
+  run: () => void;
+}
+
+interface WebSettled {
+  key: string;
+  lookup: InsurerWebLookup | null;
+  error: Error | null;
+}
+
+/**
+ * React binding for InsurerWebLookupApi.webLookupInsurer. Runs only when asked
+ * (it searches the web). A result belongs to the name and region it answered:
+ * when either changes, the state returns to idle. Pass a stable api.
+ */
+export function useInsurerWebLookup(
+  api: InsurerWebLookupApi | null,
+  name: string | null,
+  region: string | null = null,
+): InsurerWebLookupState {
+  const query = insurerQuery(name);
+  const key = `${query ?? ""}|${region?.trim() ?? ""}`;
+  const [pending, setPending] = useState<string | null>(null);
+  const [settled, setSettled] = useState<WebSettled | null>(null);
+  const sequence = useRef(0);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+
+  const run = useCallback(() => {
+    if (api === null || query === null) return;
+    const ticket = ++sequence.current;
+    setPending(key);
+    const settle = (lookup: InsurerWebLookup | null, error: Error | null): void => {
+      if (!mounted.current || ticket !== sequence.current) return;
+      setPending(null);
+      setSettled({ key, lookup, error });
+    };
+    api.webLookupInsurer(query, region).then(
+      (lookup) => settle(lookup, null),
+      (cause: unknown) => settle(null, cause instanceof Error ? cause : new Error(String(cause))),
+    );
+  }, [api, query, region, key]);
+
+  if (api === null || query === null) return { status: "idle", lookup: null, error: null, run };
+  if (pending === key) return { status: "loading", lookup: null, error: null, run };
+  if (settled === null || settled.key !== key) return { status: "idle", lookup: null, error: null, run };
+  if (settled.error !== null) return { status: "error", lookup: null, error: settled.error, run };
+  if (settled.lookup === null) return { status: "empty", lookup: null, error: null, run };
+  return { status: "found", lookup: settled.lookup, error: null, run };
 }

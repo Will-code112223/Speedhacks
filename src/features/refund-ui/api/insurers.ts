@@ -421,6 +421,97 @@ function createFixtureInsurerApi(latencyMs: number): InsurerApi {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Web lookup: GET /api/insurers/web-lookup (src/app/api/insurers/web-lookup/route.ts)
+// ---------------------------------------------------------------------------
+
+/** A candidate claims contact found on the web. The user decides whether to use it. */
+export interface InsurerWebLookup {
+  insurerName: string;
+  /** E.164, cited from the insurer's own site; null when none could be cited. */
+  claimsPhone: string | null;
+  claimsUrl: string | null;
+  /** One sentence on how to file. */
+  summary: string;
+  sources: { url: string; title: string }[];
+  /** ISO timestamp. */
+  retrievedAt: string;
+  provider: "web_search";
+}
+
+export interface InsurerWebLookupApi {
+  /** Null when nothing citable was found (404 WEB_LOOKUP_EMPTY) or the name is blank. */
+  webLookupInsurer(name: string, region?: string | null): Promise<InsurerWebLookup | null>;
+}
+
+export function createInsurerWebLookupApi(options: CreateInsurerApiOptions): InsurerWebLookupApi {
+  switch (options.mode) {
+    case "fixture":
+      return createFixtureWebLookupApi(options.fixture?.latencyMs ?? 0);
+    case "http":
+      return createHttpWebLookupApi(options.baseUrl ?? "");
+    default:
+      return assertNever(options.mode);
+  }
+}
+
+function isWebLookup(v: unknown): v is InsurerWebLookup {
+  return isRecord(v) && typeof v.insurerName === "string" && nullableText(v.claimsPhone) && nullableText(v.claimsUrl)
+    && typeof v.summary === "string" && typeof v.retrievedAt === "string" && v.provider === "web_search"
+    && Array.isArray(v.sources) && v.sources.every((s) => isRecord(s) && typeof s.url === "string" && typeof s.title === "string");
+}
+
+function createHttpWebLookupApi(baseUrl: string): InsurerWebLookupApi {
+  const base = baseUrl.replace(/\/+$/, "");
+  return {
+    async webLookupInsurer(name, region) {
+      const query = insurerQuery(name);
+      if (query === null) return null;
+      const params = new URLSearchParams({ name: query });
+      const where = region?.trim();
+      if (where) params.set("region", where);
+      let res: Response;
+      try {
+        res = await globalThis.fetch(`${base}/api/insurers/web-lookup?${params.toString()}`, {
+          method: "GET",
+          headers: new Headers({ accept: "application/json" }),
+          credentials: "same-origin",
+          cache: "no-store",
+        });
+      } catch (cause) {
+        throw unreachable("The server could not be reached.", cause);
+      }
+      const body = await readJson(res);
+      if (res.status === 404 && readApiError(body)?.code === "WEB_LOOKUP_EMPTY") return null;
+      if (!res.ok) throw requestError(res.status, body);
+      const lookup = isRecord(body) ? body.lookup : undefined;
+      if (!isWebLookup(lookup)) throw unexpectedShape(res.status);
+      return lookup;
+    },
+  };
+}
+
+function createFixtureWebLookupApi(latencyMs: number): InsurerWebLookupApi {
+  const delayMs = Math.max(0, latencyMs);
+  return {
+    async webLookupInsurer(name) {
+      const query = insurerQuery(name);
+      if (query === null) return null;
+      if (delayMs > 0) await new Promise<void>((resolve) => setTimeout(resolve, delayMs));
+      // Canned, fictional answer for any name: no network call in fixture mode.
+      return {
+        insurerName: query,
+        claimsPhone: "+14155550147",
+        claimsUrl: "https://example.invalid/claims",
+        summary: "Members file a claim online or by phone, with the itemized bill and the date of service.",
+        sources: [{ url: "https://example.invalid/claims", title: "How to file a claim (fixture)" }],
+        retrievedAt: new Date().toISOString(),
+        provider: "web_search",
+      };
+    },
+  };
+}
+
 function toSummary(insurer: FixtureInsurer): InsurerSummary {
   const { id, name, legalName, parentId, categories, lines, aliases, eligibility, website, tosUrl, privacyUrl, notes } =
     insurer;
