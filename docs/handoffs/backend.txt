@@ -100,7 +100,8 @@ ERROR CODES (ApiError.error.code)
 
 MODES AND ENVIRONMENT (.env.example)
 - REFUND_MODE=simulated (default): no credentials; case.mode === "simulated"; heuristic extraction; T2's simulated
-  voice adapter. Scenario by destination suffix: …0001 rejected before dispatch, …0002 dispatch_unknown,
+  voice adapter = T3's createDialAdapter in its live code path against an in-process fake Dial server (injected
+  fetch/now; no network), results relabeled mode "simulated". Scenario by destination suffix: …0001 rejected before dispatch, …0002 dispatch_unknown,
   …0003 completed/denied, …0004 completed/needs information, …0005 failed, …0006 cancelled, else completed/approved
   with a reference number. Timings: SIMULATED_QUEUED_MS (2000), SIMULATED_IN_PROGRESS_MS (6000).
 - REFUND_MODE=live: requires LLM_MODEL + OPENAI_API_KEY (POST /api/cases is 503 otherwise) and DIAL_API_KEY,

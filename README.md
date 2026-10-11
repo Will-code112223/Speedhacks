@@ -46,7 +46,7 @@ See `team-prompts/00-shared-contract.txt` → "SHARED HTTP API". Routes are unde
 
 `REFUND_MODE=simulated` (default) runs end to end with no credentials and labels everything as simulated. `REFUND_MODE=live` requires the provider configuration in `.env.example`; a missing value fails visibly (503) and never falls back to simulation.
 
-Simulated call scenarios are chosen by the last four digits of the merchant support number:
+Simulated calls run through the real Dial adapter (`src/integrations/dial`) against an in-process fake Dial server, so the demo uses the same request, response and webhook code as a live call. Scenarios are chosen by the last four digits of the merchant support number:
 
 | Suffix | Result |
 | --- | --- |
