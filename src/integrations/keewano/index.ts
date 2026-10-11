@@ -15,7 +15,7 @@ import { CaseRepository } from "@/server/persistence/repository";
 import { EVENTS_HASH, EVENT_TYPES } from "./events";
 import { FixtureTransactionHistory, KeewanoTransactionHistory } from "./history";
 import { KeewanoIngestClient } from "./ingest";
-import { KeewanoMcpClient } from "./mcp";
+import { KeewanoMcpClient, projectIdFromApiKey } from "./mcp";
 import { MirroredCaseRepository } from "./mirror";
 import { KeewanoSink } from "./sink";
 
@@ -43,7 +43,14 @@ export function createKeewano(config: Pick<AppConfig, "mode" | "keewano">, logge
   let history: TransactionHistory | null = null;
   if (k.accessToken) {
     history = new KeewanoTransactionHistory(
-      new KeewanoMcpClient({ token: k.accessToken, url: k.mcpUrl, sqlTool: k.sqlTool, sqlArg: k.sqlArg, timeoutMs: k.timeoutMs }),
+      new KeewanoMcpClient({
+        token: k.accessToken,
+        url: k.mcpUrl,
+        sqlTool: k.sqlTool,
+        sqlArg: k.sqlArg,
+        projectId: k.projectId ?? projectIdFromApiKey(k.apiKey),
+        timeoutMs: k.timeoutMs,
+      }),
     );
   } else if (config.mode === "simulated" && k.fixtureHistory) {
     history = new FixtureTransactionHistory();

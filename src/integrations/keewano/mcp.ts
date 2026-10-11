@@ -4,9 +4,11 @@
  * endpoint. This client connects per call, discovers the SQL tool, runs one statement
  * and normalizes the result into rows.
  *
- * Tool and argument names are discovered from tools/list (anything with "sql" in its
- * name, then its first sql/query-like string argument). KEEWANO_SQL_TOOL and
- * KEEWANO_SQL_ARG override the guess once the real names are known.
+ * Verified live on 2026-10-11: the tool is `run_sql_query({ projectId, sqlQuery, maxRows })`
+ * and returns `{ columns, rows }`. Discovery is kept so a renamed tool still works:
+ * KEEWANO_SQL_TOOL and KEEWANO_SQL_ARG override the guess. The project id comes from
+ * KEEWANO_PROJECT_ID, else the SDK API key's `projectId` claim, else `list_projects`
+ * when exactly one project is accessible.
  *
  * Only package imports here: plain `node` loads this module from the sql CLI.
  */
@@ -41,8 +43,31 @@ export interface KeewanoMcpOptions {
   url?: string;
   sqlTool?: string | null;
   sqlArg?: string | null;
+  /** Keewano project UUID; discovered when omitted (see module notes). */
+  projectId?: string | null;
   timeoutMs?: number;
   fetch?: typeof fetch;
+}
+
+export interface KeewanoProject {
+  id: string;
+  name: string | null;
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** The SDK API key is a JWT whose payload carries the project id; null when absent or unreadable. */
+export function projectIdFromApiKey(apiKey: string | null | undefined): string | null {
+  if (!apiKey) return null;
+  const payload = apiKey.split(".")[1] ?? "";
+  if (!payload) return null;
+  try {
+    const json = Buffer.from(payload.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf8");
+    const claims = JSON.parse(json) as { projectId?: unknown };
+    return typeof claims.projectId === "string" && UUID.test(claims.projectId) ? claims.projectId : null;
+  } catch {
+    return null;
+  }
 }
 
 export class KeewanoMcpClient {
@@ -50,6 +75,7 @@ export class KeewanoMcpClient {
   private readonly token: string;
   private readonly sqlTool: string | null;
   private readonly sqlArg: string | null;
+  private projectId: string | null;
   private readonly timeoutMs: number;
   private readonly fetchImpl: typeof fetch | undefined;
 
@@ -59,6 +85,7 @@ export class KeewanoMcpClient {
     this.url = opts.url ?? DEFAULT_MCP_URL;
     this.sqlTool = opts.sqlTool ?? null;
     this.sqlArg = opts.sqlArg ?? null;
+    this.projectId = opts.projectId ?? null;
     this.timeoutMs = opts.timeoutMs ?? 10_000;
     this.fetchImpl = opts.fetch;
   }
@@ -84,16 +111,54 @@ export class KeewanoMcpClient {
     });
   }
 
+  /** Projects this token can read (the `list_projects` tool). */
+  async listProjects(): Promise<KeewanoProject[]> {
+    return this.withClient(async (client) => projectsFromResult(await this.invoke(client, "list_projects", {})));
+  }
+
+  /** Call any tool by name; `projectId` is filled in when the tool takes one and none was given. */
+  async callTool(name: string, args: Record<string, unknown> = {}): Promise<ToolResultLike> {
+    return this.withClient(async (client) => {
+      const { tools } = await client.listTools(undefined, { timeout: this.timeoutMs });
+      const tool = tools.find((t) => t.name === name);
+      if (!tool) throw new KeewanoQueryError(`Tool ${name} is not offered; tools: ${names(tools)}`);
+      const merged = { ...args };
+      if (takesProjectId(tool.inputSchema) && merged.projectId === undefined) merged.projectId = await this.resolveProjectId(client, tools);
+      return this.invoke(client, name, merged);
+    });
+  }
+
   /** Run one statement and return the raw tool result (for debugging result shapes). */
   async runSqlRaw(sql: string): Promise<{ tool: string; arg: string; result: ToolResultLike }> {
     return this.withClient(async (client) => {
       const { tools } = await client.listTools(undefined, { timeout: this.timeoutMs });
       const pick = pickSqlTool(tools, this.sqlTool, this.sqlArg);
-      const result = (await client.callTool({ name: pick.name, arguments: { [pick.arg]: sql } }, undefined, {
-        timeout: this.timeoutMs,
-      })) as ToolResultLike;
+      const args: Record<string, unknown> = { [pick.arg]: sql };
+      if (pick.needsProjectId) args.projectId = await this.resolveProjectId(client, tools);
+      const result = await this.invoke(client, pick.name, args);
       return { tool: pick.name, arg: pick.arg, result };
     });
+  }
+
+  private async invoke(client: Client, name: string, args: Record<string, unknown>): Promise<ToolResultLike> {
+    return (await client.callTool({ name, arguments: args }, undefined, { timeout: this.timeoutMs })) as ToolResultLike;
+  }
+
+  private async resolveProjectId(client: Client, tools: readonly McpToolInfo[]): Promise<string> {
+    if (this.projectId) return this.projectId;
+    if (!tools.some((t) => t.name === "list_projects")) {
+      throw new KeewanoQueryError("Keewano project id is required; set KEEWANO_PROJECT_ID (the server offers no list_projects tool)");
+    }
+    const projects = projectsFromResult(await this.invoke(client, "list_projects", {}));
+    if (projects.length === 1 && projects[0]) {
+      this.projectId = projects[0].id;
+      return this.projectId;
+    }
+    throw new KeewanoQueryError(
+      projects.length === 0
+        ? "No Keewano project is accessible to this token"
+        : `Several Keewano projects are accessible (${projects.map((p) => `${p.name ?? "?"}=${p.id}`).join(", ")}); set KEEWANO_PROJECT_ID`,
+    );
   }
 
   async runSql(sql: string): Promise<SqlRow[]> {
@@ -107,11 +172,31 @@ export class KeewanoMcpClient {
 // Tool discovery and result normalization (pure; unit tested without a server)
 // ---------------------------------------------------------------------------
 
+export function takesProjectId(inputSchema: unknown): boolean {
+  return isRecord(inputSchema) && isRecord(inputSchema.properties) && "projectId" in inputSchema.properties;
+}
+
+export function projectsFromResult(result: ToolResultLike): KeewanoProject[] {
+  let rows: SqlRow[] = [];
+  try {
+    rows = parseRows(result);
+  } catch {
+    rows = [];
+  }
+  const out: KeewanoProject[] = [];
+  for (const r of rows) {
+    const id = [r.id, r.projectId, r.project_id].find((v) => typeof v === "string" && UUID.test(v));
+    if (typeof id !== "string") continue;
+    out.push({ id, name: typeof r.name === "string" ? r.name : null });
+  }
+  return out;
+}
+
 export function pickSqlTool(
   tools: readonly McpToolInfo[],
   toolOverride: string | null = null,
   argOverride: string | null = null,
-): { name: string; arg: string } {
+): { name: string; arg: string; needsProjectId: boolean } {
   let tool: McpToolInfo | undefined;
   if (toolOverride) {
     tool = tools.find((t) => t.name === toolOverride);
@@ -123,7 +208,7 @@ export function pickSqlTool(
       tools.find((t) => /sql/i.test(t.description ?? ""));
     if (!tool) throw new KeewanoQueryError(`No SQL tool found on the Keewano MCP server; tools: ${names(tools)}`);
   }
-  return { name: tool.name, arg: argOverride ?? guessSqlArg(tool.inputSchema) };
+  return { name: tool.name, arg: argOverride ?? guessSqlArg(tool.inputSchema), needsProjectId: takesProjectId(tool.inputSchema) };
 }
 
 function names(tools: readonly McpToolInfo[]): string {
@@ -197,7 +282,7 @@ function rowsFromValue(v: unknown, depth = 0): SqlRow[] | null {
   if (Array.isArray(v)) return v.every(isRecord) ? v : null;
   if (!isRecord(v)) return null;
   const columns = columnNames(v.columns) ?? columnNames(v.fields) ?? columnNames(v.headers);
-  for (const key of ["rows", "data", "results", "result", "records", "values"]) {
+  for (const key of ["rows", "data", "results", "result", "records", "values", "projects", "items"]) {
     const inner = v[key];
     if (Array.isArray(inner)) {
       if (inner.length === 0) return [];

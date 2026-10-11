@@ -87,4 +87,4 @@ npm run keewano:sql -- --charges sam@example.com   # the exact query the duplica
 npm run keewano:sql -- "SELECT count(DISTINCT user_id) AS entities, count(*) AS events FROM events"
 ```
 
-Events become queryable a few minutes after ingestion. The in-app check and both CLIs are verified against a fake transport only; the live MCP tool names and result shape are discovered at runtime (`npm run keewano:sql -- --raw` shows what came back if parsing fails).
+Verified live on 2026-10-11: the MCP tool is `run_sql_query({ projectId, sqlQuery })` returning `{ columns, rows }`; the project id is read from the SDK key (or `list_projects`), so nothing extra is needed. Keewano numbers custom events by position, so the registry in `events.ts` must stay contiguous from 2000 (append only). Events become queryable a few minutes after ingestion.

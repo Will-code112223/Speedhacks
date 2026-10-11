@@ -18,7 +18,7 @@ import {
 } from "@/integrations/keewano/events";
 import { FixtureTransactionHistory, KeewanoTransactionHistory } from "@/integrations/keewano/history";
 import { KeewanoIngestClient, KeewanoIngestError, type KeewanoIngestEvent } from "@/integrations/keewano/ingest";
-import { guessSqlArg, parseRows, pickSqlTool } from "@/integrations/keewano/mcp";
+import { guessSqlArg, parseRows, pickSqlTool, projectIdFromApiKey, projectsFromResult } from "@/integrations/keewano/mcp";
 import { KeewanoSink, type EventSink } from "@/integrations/keewano/sink";
 import {
   evaluateHistory,
@@ -128,7 +128,7 @@ describe("keewano event registry", () => {
   it("has unique ids from 2000 and a stable non-zero hash", () => {
     const ids = EVENT_TYPES.map((t) => t.eventTypeId);
     expect(new Set(ids).size).toBe(ids.length);
-    expect(Math.min(...ids)).toBeGreaterThanOrEqual(2000);
+    expect(ids).toEqual(ids.map((_, i) => 2000 + i)); // Keewano numbers the list by position
     expect(EVENTS_HASH).toBeGreaterThan(0);
     expect(EVENTS_HASH).toBe(crc32(canonicalJson(EVENT_TYPES)) || 1);
   });
@@ -470,12 +470,25 @@ describe("keewano MCP client helpers", () => {
       { name: "run_lua", inputSchema: { type: "object", properties: { script: { type: "string" } } } },
       { name: "execute_sql", inputSchema: { type: "object", properties: { limit: { type: "number" }, query: { type: "string" } } } },
     ];
-    expect(pickSqlTool(tools)).toEqual({ name: "execute_sql", arg: "query" });
-    expect(pickSqlTool(tools, "run_lua", "script")).toEqual({ name: "run_lua", arg: "script" });
+    expect(pickSqlTool(tools)).toEqual({ name: "execute_sql", arg: "query", needsProjectId: false });
+    expect(pickSqlTool(tools, "run_lua", "script")).toEqual({ name: "run_lua", arg: "script", needsProjectId: false });
+    const live = [{ name: "run_sql_query", inputSchema: { type: "object", properties: { projectId: { type: "string" }, sqlQuery: { type: "string" }, maxRows: { type: "integer" } }, required: ["projectId", "sqlQuery"] } }];
+    expect(pickSqlTool(live)).toEqual({ name: "run_sql_query", arg: "sqlQuery", needsProjectId: true });
     expect(() => pickSqlTool(tools, "missing")).toThrow(/not offered; tools: run_lua, execute_sql/);
     expect(() => pickSqlTool([{ name: "nothing" }])).toThrow(/No SQL tool found/);
     expect(guessSqlArg({ type: "object", properties: { statement: { type: "string" } } })).toBe("statement");
     expect(guessSqlArg(undefined)).toBe("sql");
+  });
+
+  it("reads the project id from the SDK key's JWT claim and from list_projects results", () => {
+    const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString("base64url");
+    const key = `${b64({ alg: "RS256" })}.${b64({ projectId: "2acca7df-ee33-42aa-926c-e4625fbfef46", type: "sdk" })}.sig`;
+    expect(projectIdFromApiKey(key)).toBe("2acca7df-ee33-42aa-926c-e4625fbfef46");
+    expect(projectIdFromApiKey(`${b64({})}.${b64({ projectId: "not-a-uuid" })}.sig`)).toBeNull();
+    expect(projectIdFromApiKey("garbage")).toBeNull();
+    expect(projectIdFromApiKey(null)).toBeNull();
+    const result = { content: [{ type: "text", text: JSON.stringify({ projects: [{ id: "2acca7df-ee33-42aa-926c-e4625fbfef46", name: "Speedhacks" }, { id: "nope" }] }) }] };
+    expect(projectsFromResult(result)).toEqual([{ id: "2acca7df-ee33-42aa-926c-e4625fbfef46", name: "Speedhacks" }]);
   });
 
   it("normalizes structured, JSON, markdown and CSV results into rows", () => {

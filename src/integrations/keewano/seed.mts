@@ -33,7 +33,8 @@ for (const customer of fixture.customers) {
     event("ChargeCurrency", c.currency, c.at),
     event("ChargeId", c.chargeId, c.at), // last: the row that describes the charge
   ]);
-  const dataSessionId = uuidV5(`speedhacks-refund:seed:${entityId}:${canonicalJson(charges)}`);
+  // Stable per customer, charges and registry: a resend is a no-op until one of them changes.
+  const dataSessionId = uuidV5(`speedhacks-refund:seed:${EVENTS_HASH}:${entityId}:${canonicalJson(charges)}`);
   const result = await client.sendBatch(entityId, events, { dataSessionId, batch: 1, testUserName: customer.name });
   console.log(`${customer.email} → entity ${entityId}: ${charges.length} charges, ${events.length} events, received ${result.received}, accepted ${result.accepted}${result.accepted === 0 ? " (already seeded or rejected)" : ""}`);
 }

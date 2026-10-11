@@ -35,6 +35,8 @@ export interface AppConfig {
     mcpUrl: string;
     sqlTool: string | null;
     sqlArg: string | null;
+    /** Explicit project UUID; otherwise read from the API key, else discovered via list_projects. */
+    projectId: string | null;
     historyWindowMinutes: number;
     timeoutMs: number;
     retryMs: number;
@@ -102,6 +104,7 @@ export function loadConfig(env: EnvSource = process.env): AppConfig {
       mcpUrl: str(env.KEEWANO_MCP_URL) ?? "https://api.keewano.com/mcp",
       sqlTool: str(env.KEEWANO_SQL_TOOL),
       sqlArg: str(env.KEEWANO_SQL_ARG),
+      projectId: str(env.KEEWANO_PROJECT_ID),
       historyWindowMinutes: int(env.KEEWANO_HISTORY_WINDOW_MINUTES, 24 * 60) || 24 * 60,
       timeoutMs: int(env.KEEWANO_TIMEOUT_MS, 6000) || 6000,
       retryMs: int(env.KEEWANO_RETRY_MS, 30_000),

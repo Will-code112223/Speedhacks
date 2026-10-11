@@ -171,10 +171,11 @@ KEEWANO (optional sponsor integration; nothing in the shared contract changed)
   no_history | unavailable.
 - Synthetic data only: src/integrations/keewano/seed/transactions.json (sam@example.com = the duplicate). npm run
   keewano:seed backfills it (idempotent per customer); npm run keewano:sql -- --tools | --charges <email> | "<SQL>" [--raw].
-- Not verified live: no Keewano credentials on this machine. REST payloads follow the SpeedHacks quickstart + REST page;
-  MCP tool/argument names are discovered at runtime (override with KEEWANO_SQL_TOOL / KEEWANO_SQL_ARG) and result rows
-  are normalized from structuredContent / JSON / markdown / CSV. First live run: seed → wait a few minutes →
-  `npm run keewano:sql -- --charges sam@example.com --raw` and fix parsing if the shape differs.
+- Verified live 2026-10-11 (credentials in .env.local, git-ignored): /custom + /in accept the registry and the seed
+  (all batches accepted); MCP tool is run_sql_query({projectId, sqlQuery, maxRows}) → structuredContent {columns, rows};
+  projectId comes from KEEWANO_PROJECT_ID, else the SDK key's JWT claim, else list_projects. Keewano numbers custom
+  events by position (list_event_types showed 2000..2011), so EVENT_TYPES must stay contiguous (guarded at load).
+  Full simulated case ran against the dev server with the mirror on: no rejected batches.
 - New dependency: @modelcontextprotocol/sdk (MCP client). T1: nothing to do; the timeline already carries the finding.
   Judging criteria from the quickstart: Keewano must be load-bearing (here: the brief changes with the finding) and at
   least one live query must run in the demo (here: the check on case creation / review screen).

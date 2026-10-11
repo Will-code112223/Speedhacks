@@ -11,7 +11,10 @@
  *     the row where the other three columns describe that charge.
  *
  * Append only: a registered id never changes its name or type (Keewano rejects
- * that); add a new id instead. Ids start at 2000 as in the SpeedHacks quickstart.
+ * that); add a new id instead. Ids start at 2000 as in the SpeedHacks quickstart and
+ * MUST stay contiguous: observed live (list_event_types, 2026-10-11), Keewano numbers
+ * the list by position (2000 + index) regardless of the eventTypeId sent, so a gap
+ * would make the ids in /in batches point at the wrong columns.
  *
  * No "@/" or relative imports here: plain `node` loads this module from the seed CLI.
  */
@@ -36,11 +39,16 @@ export const EVENT_TYPES = [
   { eventTypeId: 2006, name: "RefundOutcome", dataType: "string" },
   { eventTypeId: 2007, name: "RefundHistoryCheck", dataType: "string" },
   // Customer entity (id = customerEntityId): synthetic transaction history
-  { eventTypeId: 2010, name: "ChargeMerchant", dataType: "string" },
-  { eventTypeId: 2011, name: "ChargeAmount", dataType: "price_usd_cent" },
-  { eventTypeId: 2012, name: "ChargeCurrency", dataType: "string" },
-  { eventTypeId: 2013, name: "ChargeId", dataType: "string" },
+  { eventTypeId: 2008, name: "ChargeMerchant", dataType: "string" },
+  { eventTypeId: 2009, name: "ChargeAmount", dataType: "price_usd_cent" },
+  { eventTypeId: 2010, name: "ChargeCurrency", dataType: "string" },
+  { eventTypeId: 2011, name: "ChargeId", dataType: "string" },
 ] as const satisfies readonly KeewanoEventType[];
+
+// Guard the positional contract above at module load.
+EVENT_TYPES.forEach((t, i) => {
+  if (t.eventTypeId !== 2000 + i) throw new Error(`Keewano event ids must be contiguous from 2000: ${t.name} is ${t.eventTypeId}, expected ${2000 + i}`);
+});
 
 export type KeewanoEventName = (typeof EVENT_TYPES)[number]["name"];
 

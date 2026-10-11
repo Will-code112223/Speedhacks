@@ -2,10 +2,12 @@
 //   npm run keewano:sql -- --tools
 //   npm run keewano:sql -- "SELECT count(DISTINCT user_id) AS users, count(*) AS events FROM events"
 //   npm run keewano:sql -- --charges sam@example.com      (the exact query the duplicate check runs)
+//   npm run keewano:sql -- --projects                     (projects this token can read)
+//   npm run keewano:sql -- --tool list_event_types '{"nameFilter":"Charge"}'   (any tool; projectId filled in)
 //   add --raw to print the untouched tool result when parsing fails.
 import { buildChargesSql, chargesFromRows } from "./charges.ts";
 import { customerEntityId } from "./events.ts";
-import { DEFAULT_MCP_URL, KeewanoMcpClient, parseRows } from "./mcp.ts";
+import { DEFAULT_MCP_URL, KeewanoMcpClient, parseRows, projectIdFromApiKey, textOf } from "./mcp.ts";
 
 const token = process.env.KEEWANO_ACCESS_TOKEN;
 if (!token) throw new Error("Set KEEWANO_ACCESS_TOKEN (Keewano → Settings → Personal → Security).");
@@ -18,10 +20,27 @@ const client = new KeewanoMcpClient({
   url: process.env.KEEWANO_MCP_URL ?? DEFAULT_MCP_URL,
   sqlTool: process.env.KEEWANO_SQL_TOOL ?? null,
   sqlArg: process.env.KEEWANO_SQL_ARG ?? null,
+  projectId: process.env.KEEWANO_PROJECT_ID ?? projectIdFromApiKey(process.env.KEEWANO_API_KEY),
 });
 
 if (rest.length === 0 || rest[0] === "--tools") {
   console.log(JSON.stringify(await client.listTools(), null, 2));
+} else if (rest[0] === "--projects") {
+  console.log(JSON.stringify(await client.listProjects(), null, 2));
+} else if (rest[0] === "--tool") {
+  const name = rest[1];
+  if (!name) throw new Error("--tool needs a tool name");
+  const args = rest[2] ? (JSON.parse(rest[2]) as Record<string, unknown>) : {};
+  const result = await client.callTool(name, args);
+  if (raw) console.log(JSON.stringify(result, null, 2));
+  else {
+    const text = textOf(result);
+    try {
+      console.log(JSON.stringify(result.structuredContent ?? JSON.parse(text), null, 2));
+    } catch {
+      console.log(text);
+    }
+  }
 } else if (rest[0] === "--charges") {
   const email = rest[1];
   if (!email) throw new Error("--charges needs a customer email");
