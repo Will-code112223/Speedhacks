@@ -62,6 +62,15 @@ describe("live website call recovery", () => {
   });
 });
 describe("website output and transport", () => {
+  it("offers the evidence handoff only for returned document requirements on the latest finished call", () => {
+    const onRequestEvidence = vi.fn();
+    const output = (value: WorkflowCallAttempt, latest = true) => renderToStaticMarkup(<CallOutput call={value} latest={latest} onRequestEvidence={onRequestEvidence} />);
+    expect(output(call)).toContain("Add requested documents");
+    expect(output(call, false)).not.toContain("Add requested documents");
+    expect(output({ ...call, state: "in_progress" })).not.toContain("Add requested documents");
+    expect(output({ ...call, result: { ...call.result, highlights: [] } })).not.toContain("Add requested documents");
+    expect(onRequestEvidence).not.toHaveBeenCalled();
+  });
   it("renders actual transcript, returned document requirements and private download without autoplay", () => {
     const html = renderToStaticMarkup(<CallOutput call={call} latest />);
     expect(html).toContain("We need photos and a repair estimate."); expect(html).toContain("67 seconds");

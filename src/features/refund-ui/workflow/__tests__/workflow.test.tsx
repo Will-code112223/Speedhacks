@@ -1,11 +1,16 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import type { WorkflowResponse } from "../../../../contracts/workflow";
+import type { BrowserRun } from "../../../../contracts/browser";
+import { parseSavedPreparation, startPreparation } from "../../browser/PreparationPreview";
 import { createFixtureCaseApi } from "../../api/fixture";
 import { ApiRequestError, ApiUnreachableError } from "../../api/types";
 import { createWorkflowApi, type WorkflowApi } from "../client";
 import WorkflowPanel, { EvidencePicker, publicContactUrl } from "../WorkflowPanel";
 import { createWorkflowSession, EMPTY_WORKFLOW } from "../session";
+import ChatColumn from "../../chat/ChatColumn";
+import type { CaseSessionController } from "../../state/controller";
+import { initialSessionsState, sessionsReducer } from "../../state/session";
 
 async function response(revision = 1): Promise<WorkflowResponse> {
   const caseData = await createFixtureCaseApi({ scenario: "insurance_claim", latencyMs: 0 }).createCase({ summary: "Help prepare my car claim" });
@@ -134,6 +139,49 @@ describe("workflow recovery and mutation ordering", () => {
 });
 
 describe("workflow evidence and action UI", () => {
+  it.each(["ready", "processing", "failed", "conflict", "missing fact", "no evidence", "busy", "uncertain"])("shows provider upload review only for a prepared local packet: %s", async state => {
+    const value = await response(4);
+    value.workflow.stage = "ready"; value.workflow.questions = [];
+    value.workflow.facts.insuranceProvider = { label: "Insurer", value: "AAA", source: "user", sourceRefs: ["m1"] };
+    if (state === "processing" || state === "failed") value.workflow.analysisStatus = state;
+    if (state === "conflict") value.workflow.conflicts = ["Incident date differs"];
+    if (state === "missing fact") value.workflow.questions = [{ id: "loss", field: "lossDate", question: "When?", required: true }];
+    const html = renderToStaticMarkup(<WorkflowPanel controller={{ ...EMPTY_WORKFLOW, workflow: value.workflow, busy: state === "busy", uncertain: state === "uncertain", refresh: async () => {}, upload: async () => false, retry: async () => false, analyze: async () => false }} evidence={state === "no evidence" ? [] : [{ id: "photo", name: "damage-photo.png", mimeType: "image/png" }, { id: "quote", name: "repair-estimate.txt", mimeType: "text/plain" }]} />);
+    if (state === "ready") {
+      expect(html).toContain("Packet prepared for AAA"); expect(html).toContain("Not uploaded");
+      expect(html).toContain("2 saved attachments"); expect(html).toContain("no files have been sent to the insurer");
+      expect(html).toContain("Prepare in browser"); expect(html).toContain("Recourse preparation — not an insurer website");
+      expect(html).not.toContain("Packet ready for review · Not submitted");
+    } else { expect(html).not.toContain('aria-label="Provider upload review"'); expect(html).not.toContain("Prepare in browser"); }
+    expect(html).not.toContain("Upload complete"); expect(html).not.toContain("Approved by AAA");
+  });
+  it("keeps an insurance case out of the legacy refund facts and approval form", async () => {
+    const value = await response();
+    value.case.mode = "live";
+    value.case.evidence = [{ id: "evidence-photo", name: "damage-photo.png", mimeType: "image/png" }];
+    const api = createFixtureCaseApi({ latencyMs: 0 });
+    let sessions = sessionsReducer(initialSessionsState, { type: "session/started", key: "insurance", api, scenario: null, text: "Prepare my claim", attachments: [], notice: null, at: value.case.createdAt });
+    sessions = sessionsReducer(sessions, { type: "create/succeeded", key: "insurance", caseData: value.case, liveCapable: false, at: value.case.updatedAt });
+    const noop = () => {};
+    const controller: CaseSessionController = {
+      apiMode: "http", scenario: null, setScenario: noop, fixtureSettings: { showLoading: false, v1Only: false }, setFixtureSettings: noop,
+      sessions: sessions.sessions, active: sessions.sessions[0]!, capabilities: null, call: null, live: null, liveError: null, pendingDecision: null, activeMs: 0,
+      selectCase: noop, send: async () => true, retryCreate: noop, saveFacts: async () => null, reloadCase: noop, retryUpdates: noop, approve: noop,
+      answerDecision: noop, dismissDecision: noop, stepIn: noop, leaveCall: noop, downloadPacket: noop,
+      workflow: { ...EMPTY_WORKFLOW, workflow: value.workflow, refresh: async () => {}, upload: async () => false, retry: async () => false, analyze: async () => false },
+    };
+    const html = renderToStaticMarkup(<ChatColumn controller={controller} fixture={false} phoneHint={null} planCount={0} callBar={null} metrics={null} />);
+    expect(html).toContain("Insurance packet"); expect(html).toContain("damage-photo.png");
+    expect(html).toContain("When did the damage happen?"); expect(html).toContain("Review call");
+    expect(html).not.toContain('data-testid="facts-card"'); expect(html).not.toContain('data-testid="approve-button"');
+    expect(html).not.toContain('data-testid="case-documents"');
+  });
+  it("shows the updated evidence revision without claiming an insurer submission", async () => {
+    const value = await response(4);
+    const html = renderToStaticMarkup(<WorkflowPanel controller={{ ...EMPTY_WORKFLOW, workflow: value.workflow, refresh: async () => {}, upload: async () => false, retry: async () => false, analyze: async () => false }} evidence={[{ id: "photo", name: "damage-photo.png", mimeType: "image/png" }, { id: "quote", name: "repair-estimate.txt", mimeType: "text/plain" }]} />);
+    expect(html).toContain("Revision 4"); expect(html).toContain("damage-photo.png"); expect(html).toContain("repair-estimate.txt");
+    expect(html).toContain("not submitted to an insurer");
+  });
   it("shows unknown facts, questions and real brief download without authorizing insurance calls", async () => {
     const value = await response(); const onAction = vi.fn();
     const html = renderToStaticMarkup(<WorkflowPanel controller={{ ...EMPTY_WORKFLOW, workflow: value.workflow, refresh: async () => {}, upload: async () => false, retry: async () => false, analyze: async () => false }} onAction={onAction} />);
@@ -150,5 +198,41 @@ describe("workflow evidence and action UI", () => {
   it("rejects executable and credential-bearing contact URLs", () => {
     expect(publicContactUrl("javascript:alert(1)")).toBeNull(); expect(publicContactUrl("https://user:pass@example.com")).toBeNull();
     expect(publicContactUrl("https://www.geico.com/claims/")).toBe("https://www.geico.com/claims/");
+  });
+});
+
+describe("preparation browser boundary", () => {
+  const request = { expectedRevision: 4, requestId: "preparation-request" };
+  const run: BrowserRun = {
+    id: "browser-one", caseId: "case-owned", requestId: request.requestId, caseRevision: 4,
+    task: "Prepare local packet", startUrl: "https://recourse.invalid/preparation", allowedHosts: [],
+    currentUrl: null, pageTitle: null, status: "running", pendingAction: null,
+    frameAvailable: false, events: [], artifacts: [], message: "Opening preparation form",
+    createdAt: "2026-10-11T12:00:00Z", updatedAt: "2026-10-11T12:00:00Z",
+  };
+  it("sends a scoped preparation request and preserves a lost response identity on explicit retry", async () => {
+    const fetcher = vi.fn().mockRejectedValueOnce(new Error("connection lost")).mockResolvedValueOnce(new Response(JSON.stringify({ run })));
+    await expect(startPreparation("case-owned", request, fetcher)).rejects.toMatchObject({ status: null });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(await startPreparation("case-owned", request, fetcher)).toEqual(run);
+    for (const call of fetcher.mock.calls) {
+      expect(call[0]).toBe("/api/cases/case-owned/preparation");
+      expect(call[1]).toMatchObject({ method: "POST", credentials: "same-origin", cache: "no-store", body: JSON.stringify(request) });
+    }
+  });
+  it.each([{ caseId: "someone-else" }, { caseRevision: 5 }, { requestId: "other-request" }, { status: "pretend_success" }])("rejects unrelated or invalid preparation run data: %j", async changed => {
+    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({ run: { ...run, ...changed } })));
+    await expect(startPreparation("case-owned", request, fetcher)).rejects.toMatchObject({ status: null });
+  });
+  it("distinguishes a definite revision rejection from an ambiguous transport failure", async () => {
+    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: { message: "Refresh the case revision first." } }), { status: 409 }));
+    await expect(startPreparation("case-owned", request, fetcher)).rejects.toMatchObject({ status: 409, message: "Refresh the case revision first." });
+  });
+  it("recovers only preparation identity, dropping unrelated saved properties", () => {
+    expect(parseSavedPreparation(JSON.stringify({ request: { ...request, facts: "must not be copied" }, runId: "browser-one", documents: "must not be copied" }))).toEqual({ request, runId: "browser-one" });
+    expect(parseSavedPreparation(JSON.stringify({ request, runId: null }))).toEqual({ request, runId: null });
+  });
+  it.each(["not-json", "{}", JSON.stringify({ request: { ...request, expectedRevision: -1 }, runId: null }), JSON.stringify({ request, runId: {} })])("rejects invalid saved preparation identity: %s", raw => {
+    expect(() => parseSavedPreparation(raw)).toThrow();
   });
 });

@@ -56,6 +56,38 @@ describe("durable live information call boundary (mock provider)", () => {
     expect(h.startCall).toHaveBeenCalledWith(expect.objectContaining({ to: auth.to, brief: auth.brief, authorizationId: auth.id }));
     expect((await h.cases.getCase(OWNER, h.c.id)).outcome.decision).toBe("unknown");
   });
+  it("asks how to file the specific claim while preserving the no-submission boundary", async () => {
+    const h = await harness(); const auth = h.approve();
+    expect(auth.brief).toContain("helping prepare an auto insurance claim");
+    expect(auth.brief).toContain("Immediately summarize the known vehicle, damage, date and location");
+    expect(auth.brief).toContain("How should the customer file an auto insurance claim for the specific vehicle damage");
+    expect(auth.brief).toContain("Answer the representative's follow-up questions using only those approved facts");
+    expect(auth.brief).toContain("Do not ask the representative to open a claim");
+    expect(auth.brief).not.toContain("ask general requirements only");
+    expect(h.startCall).not.toHaveBeenCalled();
+    await h.service.start(OWNER, h.c.id, { requestId: randomUUID(), authorizationId: auth.id });
+    expect(h.startCall).toHaveBeenCalledWith(expect.objectContaining({ brief: auth.brief }));
+  });
+  it.each([true, false])("freezes known loss date/location without guessing absent facts or exposing identity (known: %s)", async known => {
+    const h = await harness();
+    const w = h.workflow.get(OWNER, h.c.id).workflow;
+    if (known) {
+      w.facts.lossDate = { label: "Loss date", value: "October 10, 2026", source: "user", sourceRefs: [] };
+      w.facts.lossLocation = { label: "Loss location", value: "Oakland parking lot", source: "user", sourceRefs: [] };
+    }
+    w.facts.customerName = { label: "Name", value: "PRIVATE-NAME", source: "user", sourceRefs: [] };
+    w.facts.customerEmail = { label: "Email", value: "private@example.com", source: "user", sourceRefs: [] };
+    new WorkflowStore(h.db).save(OWNER, w);
+    const auth = h.approve();
+    expect(auth.brief).toContain(known ? '"lossDate":"October 10, 2026"' : '"lossDate":null');
+    expect(auth.brief).toContain(known ? '"lossLocation":"Oakland parking lot"' : '"lossLocation":null');
+    expect(auth.brief).not.toContain("PRIVATE-POLICY");
+    expect(auth.brief).not.toContain("PRIVATE-NAME");
+    expect(auth.brief).not.toContain("private@example.com");
+    await h.service.start(OWNER, h.c.id, { requestId: randomUUID(), authorizationId: auth.id });
+    expect(h.startCall).toHaveBeenCalledWith(expect.objectContaining({ brief: auth.brief }));
+    expect((await h.service.list(OWNER, h.c.id)).authorizations.find(item => item.id === auth.id)?.brief).toBe(auth.brief);
+  });
   it("rejects stale or superseded authorizations before any dispatch", async () => {
     const h = await harness(); const first = h.approve(); h.approve();
     await expect(h.service.start(OWNER, h.c.id, { requestId: randomUUID(), authorizationId: first.id })).rejects.toMatchObject({ code: "AUTHORIZATION_CONFLICT" });

@@ -9,7 +9,7 @@ import { createWorkflowCallApi, validCallNumber, workflowCallDownload } from "./
 import { createWorkflowCallSession, hasUnresolvedCall, type WorkflowCallState } from "./call-session";
 import styles from "./WorkflowCallPanel.module.css";
 
-export default function WorkflowCallPanel({ caseData, workflow, actionId, visible }: { caseData: CaseV1; workflow: CaseWorkflow | null; actionId?: string; visible: boolean }) {
+export default function WorkflowCallPanel({ caseData, workflow, actionId, visible, onRequestEvidence }: { caseData: CaseV1; workflow: CaseWorkflow | null; actionId?: string; visible: boolean; onRequestEvidence?: () => void }) {
   const session = useMemo(() => createWorkflowCallSession(caseData.id, createWorkflowCallApi(), {
     getItem: key => window.sessionStorage.getItem(key), setItem: (key, value) => window.sessionStorage.setItem(key, value), removeItem: key => window.sessionStorage.removeItem(key),
   }), [caseData.id]);
@@ -23,7 +23,7 @@ export default function WorkflowCallPanel({ caseData, workflow, actionId, visibl
     document.addEventListener("visibilitychange", poll);
     return () => { abort.abort(); clearInterval(interval); document.removeEventListener("visibilitychange", poll); };
   }, [session, visible, state.loading, hasUnresolvedCall(state.data)]);
-  return <WorkflowCallPanelView caseData={caseData} workflow={workflow} actionId={actionId} state={state}
+  return <WorkflowCallPanelView caseData={caseData} workflow={workflow} actionId={actionId} state={state} onRequestEvidence={onRequestEvidence}
     onAuthorize={input => void session.authorize(input)} onStart={auth => void session.start(auth)} onSelectAuthorization={session.selectAuthorization}
     onRefresh={() => void session.refresh(undefined, true)} onRetry={() => void session.retry()} />;
 }
@@ -33,8 +33,9 @@ export interface WorkflowCallPanelViewProps {
   onAuthorize: (input: Omit<WorkflowCallAuthorizeRequest, "requestId">) => void;
   onStart: (authorization: WorkflowCallAuthorization) => void; onSelectAuthorization: (id: string | null) => void;
   onRefresh: () => void; onRetry: () => void;
+  onRequestEvidence?: () => void;
 }
-export function WorkflowCallPanelView({ caseData, workflow, actionId, state, onAuthorize, onStart, onSelectAuthorization, onRefresh, onRetry }: WorkflowCallPanelViewProps) {
+export function WorkflowCallPanelView({ caseData, workflow, actionId, state, onAuthorize, onStart, onSelectAuthorization, onRefresh, onRetry, onRequestEvidence }: WorkflowCallPanelViewProps) {
   const id = useId();
   const actions = workflow?.actions.filter(action => action.type === "call" && action.call) ?? [];
   const [chosen, setChosen] = useState<string | null>(null);
@@ -52,6 +53,7 @@ export function WorkflowCallPanelView({ caseData, workflow, actionId, state, onA
       {state.loading ? <p className={styles.note} role="status">Checking saved calls…</p> : null}
       {state.error ? <div role="alert" className={styles.error}><p>{state.error}</p>{state.pending ? <Button size="small" onClick={onRetry} busy={state.busy} busyLabel="Checking original request" disabled={state.loading || state.readFailed || state.recoveryBlocked}>{state.pending.kind === "authorize" ? "Retry same approval" : "Retry same call request"}</Button> : null}</div> : null}
       {state.pending?.kind === "start" ? <p className={styles.note}>The call may have started. Refresh or retry only the saved request.</p> : null}
+      {calls.length ? <section className={styles.section} aria-label="Saved call results"><h3>Call results</h3>{calls.map((call, index) => <CallOutput key={call.id} call={call} latest={index === 0} onRequestEvidence={workflow?.kind === "auto_insurance" ? onRequestEvidence : undefined} />)}</section> : null}
       {!ready ? <p className={styles.note}>Finish reviewing the current case details before approving a call.</p> : null}
       {authorization && !used ? <section className={styles.section} aria-label="Approved call">
         <div className={styles.heading}><h3>Approved call</h3><Pill>Ready to place</Pill></div>
@@ -69,7 +71,6 @@ export function WorkflowCallPanelView({ caseData, workflow, actionId, state, onA
         </section> : !state.loading ? <p className={styles.note}>Prepare a call action in chat to choose a recipient.</p> : null}
       </>}
       {hasUnresolvedCall(state.data) ? <p className={styles.note}>A call is active or its dispatch is unresolved. Check its status before approving another.</p> : null}
-      {calls.length ? <section className={styles.section} aria-label="Saved call results"><h3>Call results</h3>{calls.map((call, index) => <CallOutput key={call.id} call={call} latest={index === 0} />)}</section> : null}
     </div>
   </section>;
 }
@@ -99,7 +100,7 @@ function CallReviewForm({ action, workflow, pending, disabled, busy, onAuthorize
   </form>;
 }
 const labels: Record<WorkflowCallAttempt["state"], string> = { dispatch_pending: "Preparing call", queued: "Queued", in_progress: "In progress", completed: "Call ended", failed: "Failed", cancelled: "Cancelled", dispatch_unknown: "Dispatch unconfirmed" };
-export function CallOutput({ call, latest }: { call: WorkflowCallAttempt; latest: boolean }) {
+export function CallOutput({ call, latest, onRequestEvidence }: { call: WorkflowCallAttempt; latest: boolean; onRequestEvidence?: () => void }) {
   const [recording, setRecording] = useState(false);
   const [audioError, setAudioError] = useState(false);
   const terminal = ["completed", "failed", "cancelled"].includes(call.state);
@@ -112,6 +113,7 @@ export function CallOutput({ call, latest }: { call: WorkflowCallAttempt; latest
       {call.result.status === "transcript_pending" ? <p className={styles.note}>The call ended. Its transcript is still being checked.</p> : null}
       {call.result.highlights.length ? <section><h4>From the conversation</h4>{call.result.highlights.map((item, index) => <blockquote key={index}><span className={styles.note}>{item.kind.replaceAll("_", " ")}</span><p>{item.quote}</p></blockquote>)}</section> : null}
       {call.result.nextSteps.length ? <section><h4>Next actions</h4><ul>{call.result.nextSteps.map((step, index) => <li key={index}>{step}</li>)}</ul></section> : null}
+      {latest && terminal && call.result.highlights.some(item => item.kind === "documents") && onRequestEvidence ? <Button size="small" variant="primary" onClick={onRequestEvidence}>Add requested documents</Button> : null}
       {call.transcript?.trim() ? <details><summary>Transcript</summary><p className={styles.brief}>{call.transcript}</p><a href={workflowCallDownload(call.caseId, call.id, "transcript")} download>Download transcript</a></details> : <p className={styles.note}>No transcript available yet.</p>}
       {terminal ? <div>{recording ? <><audio className={styles.audio} controls preload="none" src={workflowCallDownload(call.caseId, call.id, "recording")} onError={() => setAudioError(true)} />{audioError ? <p className={styles.note} role="status">No recording is available from Dial yet.</p> : null}</> : <Button size="small" variant="secondary" onClick={() => setRecording(true)}>Load call recording</Button>}</div> : null}
     </div>

@@ -1,9 +1,10 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { BrowserCommand, BrowserRun, StartBrowserRequest } from "@/contracts/browser";
 import type { CaseRow } from "@/server/persistence/repository";
-import { ApiHttpError, notFound } from "@/server/http/errors";
+import { ApiHttpError, badRequest, notFound } from "@/server/http/errors";
 import { BrowserStore } from "./store";
-import { parseCommand, parseStart, scopedUrl } from "./security";
+import { parseCommand, parseStart, scopedUrl, UUID } from "./security";
+import { fillPreparation, type PreparationField } from "./preparation";
 import { parseStep, PlannerError } from "./planner";
 import type { BrowserPort, Observation, Planner, StoredArtifact, StoredRun } from "./types";
 import { BrowserPageChangedError } from "./types";
@@ -15,6 +16,9 @@ export interface BrowserDependencies {
   evidence(owner: string, caseId: string): Promise<StoredArtifact[]>;
   /** Current persisted interview brief, when the additive workflow is available. */
   preparation?(owner: string, caseId: string, revision: number): Promise<string | null>;
+  executionPolicy?(owner: string, caseId: string): Promise<NonNullable<BrowserRun["executionPolicy"]>>;
+  preparationFields?(owner: string, caseId: string): Promise<PreparationField[]>;
+  fillPreparation?: typeof fillPreparation;
   launch(input: { startUrl: string; hosts: string[]; signal: AbortSignal; onLost(): void; onBlocked(host?: string): void }): Promise<BrowserPort>;
   now?: () => number;
 }
@@ -85,7 +89,18 @@ export class BrowserService {
     return this.get(owner, saved.run.id);
   }
   async start(owner: string, raw: unknown): Promise<BrowserRun> {
-    const input = parseStart(raw); const requestHash = hash(input);
+    return this.startRun(owner, parseStart(raw), false);
+  }
+  async startPreparation(owner: string, caseId: string, raw: unknown): Promise<BrowserRun> {
+    if (!UUID.test(caseId) || !raw || typeof raw !== "object" || Array.isArray(raw)) throw badRequest("Invalid preparation request");
+    const input = raw as Record<string, unknown>;
+    if (Object.keys(input).sort().join() !== "expectedRevision,requestId" || typeof input.requestId !== "string" || !UUID.test(input.requestId) ||
+      !Number.isSafeInteger(input.expectedRevision) || Number(input.expectedRevision) < 1) throw badRequest("Review the current case revision before preparation");
+    return this.startRun(owner, { caseId, expectedRevision: Number(input.expectedRevision), requestId: input.requestId,
+      task: "Fill the local Recourse insurance preparation form and stop at review. No external submission.", startUrl: "about:blank", allowedHosts: [] }, true);
+  }
+  private async startRun(owner: string, input: StartBrowserRequest, local: boolean): Promise<BrowserRun> {
+    const requestHash = hash(input);
     const old = this.deps.store.byRequest(owner, input.requestId);
     if (old) {
       if (old.requestHash !== requestHash) throw new ApiHttpError(409, "REQUEST_CONFLICT", "This request ID already belongs to different browser instructions");
@@ -96,6 +111,9 @@ export class BrowserService {
     this.caseMatches(c, input);
     const artifacts = await this.deps.evidence(owner, c.id);
     const interviewBrief = await this.deps.preparation?.(owner, c.id, input.expectedRevision);
+    const executionPolicy = local ? "local_preparation" : await this.deps.executionPolicy?.(owner, c.id) ?? "review_each_action";
+    const preparationFields = local ? await this.deps.preparationFields?.(owner, c.id) : undefined;
+    if (local && !preparationFields?.length) throw badRequest("Prepare the insurance facts before opening the local form");
     const afterRead = await this.deps.loadCase(owner, c.id); this.caseMatches(afterRead, input);
     const existing = this.deps.store.byRequest(owner, input.requestId);
     if (existing) {
@@ -112,8 +130,8 @@ export class BrowserService {
     const id = randomUUID(); const now = new Date(this.now()).toISOString();
     const draft = interviewBrief ?? preparationDocument(afterRead);
     artifacts.unshift({ id: randomUUID(), name: "request.txt", mimeType: "text/plain", bytes: Buffer.from(draft) });
-    const row: StoredRun = { owner, requestHash, draft, pending: null, executing: false, steps: 0,
-      run: { id, caseId: c.id, caseRevision: c.revision, requestId: input.requestId, status: "starting", task: input.task,
+    const row: StoredRun = { owner, requestHash, draft, pending: null, executing: false, steps: 0, preparationFields,
+      run: { id, caseId: c.id, caseRevision: c.revision, requestId: input.requestId, status: "starting", task: input.task, executionPolicy,
         startUrl: input.startUrl, allowedHosts: input.allowedHosts, currentUrl: null, pageTitle: null,
         message: "Starting a real isolated browser.", pendingAction: null, frameAvailable: false, events: [], createdAt: now, updatedAt: now,
         artifacts: artifacts.map(a => ({ id: a.id, name: a.name, mimeType: a.mimeType, sizeBytes: a.bytes.length, downloadUrl: `/api/browser/${id}/artifacts/${a.id}` })),
@@ -130,6 +148,15 @@ export class BrowserService {
   }
   private async boot(w: Worker): Promise<void> {
     try {
+      if (w.row.run.executionPolicy === "local_preparation") {
+        w.row.run.status = "running"; w.row.run.pageTitle = "Recourse insurance preparation"; w.row.run.currentUrl = "about:blank";
+        this.event(w.row, "Filling the local Recourse form from this reviewed case. No insurer connection."); this.persist(w.row);
+        const artifacts = w.row.run.artifacts.slice(1).map(a => this.deps.store.artifact(w.row.run.id, a.id)!);
+        await (this.deps.fillPreparation ?? fillPreparation)({ fields: w.row.preparationFields!, artifacts, signal: w.controller.signal,
+          onFrame: (frame, message) => { if (!this.active(w)) return; w.frame = Buffer.from(frame); w.row.run.frameAvailable = true; this.event(w.row, message); this.persist(w.row); } });
+        const c = await this.deps.loadCase(w.row.owner, w.row.run.caseId); this.caseMatches(c, { expectedRevision: w.row.run.caseRevision });
+        this.finish(w, "completed", "Recourse packet ready for review. Form filled and evidence attached locally; nothing submitted to an insurer."); return;
+      }
       w.port = await this.deps.launch({ startUrl: w.row.run.startUrl, hosts: w.row.run.allowedHosts, signal: w.controller.signal,
         onLost: () => this.finish(w, "uncertain", "The browser connection was lost. No action will be replayed; verify any previous changes independently."),
         onBlocked: host => {
@@ -140,6 +167,15 @@ export class BrowserService {
         },
       });
       if (!this.active(w)) { await w.port.close(); return; }
+      if (w.row.run.executionPolicy === "inspect_only") {
+        const observed = await this.observation(w);
+        if (observed.hasPassword) {
+          this.finish(w, "completed", "Provider sign-in is required. The sample packet stays in Recourse; no sign-in, form filling or upload was performed.");
+        } else {
+          this.finish(w, "completed", "Provider page opened for reference. The sample packet stays in Recourse; no form filling, upload, or claim submission was performed.");
+        }
+        return;
+      }
       await this.plan(w);
     } catch (error) { this.finish(w, "failed", safeFailure(error, "Real browser could not start or observe the approved page. Check Chromium installation, approved hosts, and local display setup.")); }
     finally { w.busy = false; }
@@ -255,6 +291,10 @@ export class BrowserService {
   }
   async frame(owner: string, id: string): Promise<Buffer> {
     const row = this.recover(owner, id); const w = this.workers.get(id);
+    if (row.run.executionPolicy === "local_preparation") {
+      if (!w?.frame || !row.run.frameAvailable) throw notFound("Browser frame unavailable");
+      return Buffer.from(w.frame);
+    }
     if (!w?.port || !row.run.frameAvailable || row.run.status === "needs_login") throw notFound("Browser frame unavailable");
     // Live screenshots are read-only; approval still validates the original DOM fingerprint.
     // Credentials, active mutations and terminal runs never request a new screenshot.

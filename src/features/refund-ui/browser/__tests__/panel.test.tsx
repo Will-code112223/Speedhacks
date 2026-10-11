@@ -36,6 +36,15 @@ describe("browser panel honest controls", () => {
   it("pauses the screenshot during login and exposes only an explicit resume", () => {
     const html = render({ run: run({ status: "needs_login" }) }); expect(html).toContain("Screen capture is paused during sign-in"); expect(html).toContain("Resume after sign-in"); expect(html).not.toContain("<img");
   });
+  it("identifies a public website preview without presenting sample uploads or insurer approval", () => {
+    const html = render({ run: run({ executionPolicy: "inspect_only", status: "completed", message: "Public provider page inspected. No details sent.", currentUrl: "https://www.aaa.com/", pageTitle: "AAA" }) });
+    expect(html).toContain("Public website preview");
+    expect(html).toContain("nothing is filled or uploaded to this provider");
+    expect(html).toContain("Browser task complete");
+    expect(html).toContain("https://www.aaa.com/");
+    expect(html).not.toContain("claim approved");
+    expect(html).not.toContain("<img");
+  });
   it("shows real recorded events and safe artifacts without fictional activity or external download links", () => {
     const html = render({ run: run({ events: [{ id: "event-1", at: "2026-10-11T20:00:00.000Z", message: "Observed the order list" }], artifacts: [{ id: "doc", name: "request.txt", mimeType: "text/plain", sizeBytes: 2048, downloadUrl: "/api/browser/run-1/artifacts/doc" }, { id: "bad", name: "untrusted.txt", mimeType: "text/plain", sizeBytes: 20, downloadUrl: "https://evil.example/file" }] }) });
     expect(html).toContain("Observed the order list"); expect(html).toContain('href="/api/browser/run-1/artifacts/doc"'); expect(html).not.toContain('href="https://evil.example'); expect(html).toContain("download unavailable"); expect(html).not.toContain("<img");

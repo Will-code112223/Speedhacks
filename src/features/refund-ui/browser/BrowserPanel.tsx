@@ -67,7 +67,7 @@ interface BrowserPanelViewProps {
   onNewTask: () => void;
 }
 
-const statusLabels: Record<BrowserRun["status"], string> = { starting: "Starting browser", running: "Running", needs_approval: "Approval required", needs_login: "Sign-in needed", completed: "Completed", failed: "Failed", cancelled: "Stopped", uncertain: "Action outcome unknown" };
+const statusLabels: Record<BrowserRun["status"], string> = { starting: "Starting browser", running: "Running", needs_approval: "Review next step", needs_login: "Sign-in needed", completed: "Browser task complete", failed: "Failed", cancelled: "Stopped", uncertain: "Action outcome unknown" };
 const terminal = new Set<BrowserRun["status"]>(["completed", "failed", "cancelled"]);
 
 export function BrowserPanelView(props: BrowserPanelViewProps) {
@@ -88,12 +88,13 @@ export function BrowserPanelView(props: BrowserPanelViewProps) {
       </> : null}
       {state.error ? <div className={styles.error} role="alert"><p>{state.error}</p>{run ? <Button size="small" onClick={onRefresh} disabled={state.busy}>Refresh status</Button> : null}</div> : null}
       {run ? <>
+        {run.executionPolicy === "inspect_only" ? <p className={styles.notice}>Public website preview. Sample details and documents stay in Recourse; nothing is filled or uploaded to this provider.</p> : null}
         <div className={styles.location}><span>{run.pageTitle || "Browser window"}</span><span title={run.currentUrl ?? run.startUrl}>{run.currentUrl ?? run.startUrl}</span></div>
         <BrowserFrame run={run} visible={watching} api={api} />
         <p className={styles.message} role="status">{run.message}</p>
         {run.status === "needs_login" ? <div className={styles.notice}><strong>Sign in in the browser window</strong><p>Use the browser opened on this computer. Return here when sign-in is complete.</p><Button onClick={() => onCommand({ command: "resume" })} busy={state.busy} busyLabel="Resuming browser" disabled={state.commandNeedsRefresh}>Resume after sign-in</Button></div> : null}
         {run.status === "needs_approval" && pending ? <section className={styles.approval} aria-labelledby={`${id}-approval`}>
-          <h3 id={`${id}-approval`}>Approve the next action</h3><p>{pending.description}</p>
+          <h3 id={`${id}-approval`}>Review the next browser step</h3><p>{pending.description}</p>
           <dl><dt>Action</dt><dd>{pending.kind}</dd><dt>Target</dt><dd>{pending.target}</dd>{pending.value !== null ? <><dt>Value</dt><dd className={styles.actionValue}>{pending.value}</dd></> : null}{pending.artifactId ? <><dt>Document</dt><dd>{run.artifacts.find((artifact) => artifact.id === pending.artifactId)?.name ?? pending.artifactId}</dd></> : null}</dl>
           <div className={styles.actions}><Button variant="primary" onClick={() => onCommand({ command: "approve", pendingActionId: pending.id, observationId: pending.observationId })} busy={state.busy} busyLabel="Sending approval" disabled={state.commandNeedsRefresh}>Approve action</Button><Button onClick={() => onCommand({ command: "reject", pendingActionId: pending.id })} disabled={state.busy || state.commandNeedsRefresh}>Reject</Button></div>
         </section> : null}

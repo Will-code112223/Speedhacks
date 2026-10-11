@@ -11,6 +11,52 @@ afterEach(async () => { for (const f of fixtures.splice(0)) await f.cleanup(); }
 const approve = (run: Awaited<ReturnType<typeof ready>>) => ({ command: "approve", pendingActionId: run.pendingAction!.id, observationId: run.pendingAction!.observationId });
 
 describe("real browser service boundaries (mock browser and planner, no live network)", () => {
+  it("visits an inspect-only provider once, retains its real captured frame and never plans or sends case data", async () => {
+    const executionPolicy = vi.fn(async () => "inspect_only" as const);
+    const f = setup({ executionPolicy });
+    const run = await ready(f);
+    expect(executionPolicy).toHaveBeenCalledWith(OWNER, f.c.id);
+    expect(run).toMatchObject({ executionPolicy: "inspect_only", status: "completed", frameAvailable: true, pendingAction: null, currentUrl: f.observation.url });
+    expect(run.message).toContain("sample packet stays in Recourse");
+    expect(f.port.observe).toHaveBeenCalledTimes(1);
+    expect(f.port.screenshot).toHaveBeenCalledTimes(1);
+    expect(f.port.execute).not.toHaveBeenCalled();
+    expect(f.port.loginHandoff).not.toHaveBeenCalled();
+    expect(f.planner.next).not.toHaveBeenCalled();
+    expect(await f.service.frame(OWNER, run.id)).toEqual(Buffer.from("MOCK-JPEG"));
+    expect(f.port.screenshot).toHaveBeenCalledTimes(1);
+    await expect(f.service.command(OWNER, run.id, { command: "resume" })).rejects.toMatchObject({ code: "BROWSER_NOT_ACTIVE" });
+    await expect(f.service.command(OWNER, run.id, { command: "approve", pendingActionId: randomUUID(), observationId: randomUUID() })).rejects.toMatchObject({ code: "BROWSER_NOT_ACTIVE" });
+    expect((await f.service.start(OWNER, f.input)).id).toBe(run.id);
+    expect(f.launch).toHaveBeenCalledTimes(1);
+    expect(f.port.execute).not.toHaveBeenCalled();
+    expect(() => f.service.get(OTHER, run.id)).toThrow("not found");
+    await expect(f.service.frame(OTHER, run.id)).rejects.toMatchObject({ status: 404 });
+    expect(() => f.service.artifact(OTHER, run.id, run.artifacts[0]!.id)).toThrow("not found");
+  });
+  it("stops inspect-only at provider login without opening a credential handoff or capturing a login screen", async () => {
+    const f = setup({ executionPolicy: async () => "inspect_only" });
+    f.observation.hasPassword = true;
+    const run = await ready(f);
+    expect(run).toMatchObject({ status: "completed", frameAvailable: false, pendingAction: null });
+    expect(run.message).toContain("Provider sign-in is required");
+    expect(f.port.loginHandoff).not.toHaveBeenCalled();
+    expect(f.port.screenshot).not.toHaveBeenCalled();
+    expect(f.planner.next).not.toHaveBeenCalled();
+    expect(f.port.execute).not.toHaveBeenCalled();
+    await expect(f.service.frame(OWNER, run.id)).rejects.toMatchObject({ status: 404 });
+  });
+  it("preserves the genuine reviewed workflow and rejects client attempts to select another execution policy", async () => {
+    const f = setup({ executionPolicy: async () => "review_each_action" });
+    await expect(f.service.start(OWNER, { ...f.input, executionPolicy: "inspect_only" })).rejects.toMatchObject({ status: 400 });
+    expect(f.launch).not.toHaveBeenCalled();
+    const run = await ready(f);
+    expect(run).toMatchObject({ executionPolicy: "review_each_action", status: "needs_approval" });
+    expect(f.planner.next).toHaveBeenCalledTimes(1);
+    expect(f.port.execute).not.toHaveBeenCalled();
+    expect((await f.service.command(OWNER, run.id, approve(run))).status).toBe("completed");
+    expect(f.port.execute).toHaveBeenCalledTimes(1);
+  });
   it("reserves one startup across concurrent requests and recovers a lost response without another launch", async () => {
     const f = setup();
     const [a, b] = await Promise.all([f.service.start(OWNER, f.input), f.service.start(OWNER, f.input)]);

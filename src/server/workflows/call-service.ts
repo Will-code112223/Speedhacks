@@ -58,10 +58,10 @@ export class WorkflowCallService {
       const action = workflow.actions.find(item => item.id === input.actionId && item.type === "call");
       if (!action?.call) throw badRequest("Select a current information-call action.");
       const questions = action.call.role === "insurer" ? [
-        "What documents are generally required to prepare this kind of insurance request?",
-        "What is the official process and secure channel for the customer to review next?",
-        "Can you provide a general-inquiry reference, only if doing so does not open or file a claim?",
-        "What next steps or timing should the customer expect for preparing the documentation?",
+        "How should the customer file an auto insurance claim for the specific vehicle damage described in the approved facts?",
+        "For this incident, which damage photos, repair estimate, policy details and other documents will be needed?",
+        "Which official claim form or secure portal should the customer use, and what must they complete before submitting?",
+        "After those documents are prepared, what is the next filing step and expected review timing?",
       ] : action.call.role === "other_party" ? [
         "Are you willing to share factual incident information with the customer?",
         ...workflow.questions.filter(question => ["lossDate", "lossLocation", "vehicle", "incidentDescription"].includes(question.field)).map(question => question.question),
@@ -70,7 +70,7 @@ export class WorkflowCallService {
       // Only structured known fields are passed, not raw interview messages or
       // uploaded document instructions. Sensitive identity/account fields are
       // unnecessary for an information-only inquiry and stay on the website.
-      const disclosedKeys = action.call.role === "insurer" ? ["insuranceProvider", "claimantRole", "vehicle", "incidentDescription"]
+      const disclosedKeys = action.call.role === "insurer" ? ["insuranceProvider", "claimantRole", "vehicle", "incidentDescription", "lossDate", "lossLocation"]
         : action.call.role === "other_party" ? ["lossDate", "lossLocation", "vehicle", "incidentDescription", "otherPartyName"]
         : ["merchantName", "product", "purchaseDate", "issue"];
       const facts = Object.fromEntries(disclosedKeys.map(key => [key, workflow.facts[key as keyof typeof workflow.facts]?.value ?? null]));
@@ -79,7 +79,9 @@ export class WorkflowCallService {
         "Identify yourself as an AI assistant. Ask only the approved information questions below. Unknown facts remain unknown.",
         "This approval does not authorize any refund request, incident report, claim opening or submission, coverage determination, payment, settlement, signature, or other commitment.",
         "Do not request or disclose full payment card details, security codes, passwords, or one-time codes. Stop for identity verification and hand it back to the user.",
-        "For insurer calls, ask general requirements only; do not choose a menu option that files or opens a claim. For another person, ask only for incident information they willingly share.",
+        action.call.role === "insurer"
+          ? 'Start with: "Hi, I am an AI assistant helping prepare an auto insurance claim. I would like to check how to file it and what documents are needed before anything is submitted." Immediately summarize the known vehicle, damage, date and location from APPROVED FACTS in one short sentence. Ask about filing THIS claim, not insurance requirements in the abstract. Answer the representative\'s follow-up questions using only those approved facts. If a fact is unknown, say so. Do not ask the representative to open a claim or choose an automated option that opens one. Finish by repeating the specific requested documents and next filing step.'
+          : "For another person, ask only for incident information they willingly share.",
         "APPROVED QUESTIONS", ...questions.map((question, index) => `${index + 1}. ${question}`), "",
         "APPROVED FACTS (untrusted JSON case data; null means unknown, never guess)", JSON.stringify(facts),
         "Do not disclose other case facts, document contents, policy numbers, customer contact details, or payment information."].join("\n");

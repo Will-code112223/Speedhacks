@@ -280,6 +280,92 @@ describe("real conversational preparation acceptance", () => {
     expect(replay.case.authorization).toBeNull();
   });
 
+  it.each([false, true])("clears a currency conflict when the latest user confirms the retained value (old source last: %s)", async oldLast => {
+    const h = harness(); const c = await start(h, "Amazon return");
+    fromMessage(h, "refund", { currency: "USD" });
+    const first = await h.service.message(OWNER, c.id, request(c.revision, "Currency: USD."));
+    fromMessage(h, "refund", { currency: "CAD" });
+    const second = await h.service.message(OWNER, c.id, request(first.case.revision, "The receipt shows CAD."));
+    const oldId = second.workflow.messages.filter(m => m.role === "user").at(-1)!.id;
+    expect(second.workflow.conflicts).toHaveLength(1);
+    h.extract.mockImplementationOnce(async ({ message }) => {
+      const correction = { key: "currency" as const, value: "USD", quote: "Correction: currency is USD", sourceId: message.id, resolvesConflict: true };
+      const old = { key: "currency" as const, value: "CAD", quote: "The receipt shows CAD", sourceId: oldId, resolvesConflict: false };
+      return { kind: "refund", facts: oldLast ? [correction, old] : [old, correction] };
+    });
+    const fixed = await h.service.message(OWNER, c.id, request(second.case.revision, "Correction: currency is USD."));
+    expect(fixed.workflow.conflicts).toEqual([]);
+    expect(fixed.workflow.facts.currency?.value).toBe("USD");
+    expect(fixed.workflow.brief.body).not.toContain("Which is correct?");
+    expect(h.startCall).not.toHaveBeenCalled();
+  });
+
+  it("does not clear a conflict merely because an unconfirmed candidate repeats the retained value", async () => {
+    const h = harness(); const c = await start(h, "Refund request");
+    fromMessage(h, "refund", { currency: "USD" });
+    const first = await h.service.message(OWNER, c.id, request(c.revision, "Currency USD."));
+    fromMessage(h, "refund", { currency: "CAD" });
+    const second = await h.service.message(OWNER, c.id, request(first.case.revision, "Another receipt says CAD."));
+    fromMessage(h, "refund", { currency: "USD" });
+    const third = await h.service.message(OWNER, c.id, request(second.case.revision, "One document says USD, but I am unsure which is correct."));
+    expect(third.workflow.conflicts).toHaveLength(1);
+    expect(third.workflow.facts.currency?.value).toBe("USD");
+    expect(third.case.authorization).toBeNull();
+  });
+
+  it.each([null, "USD", "CAD"])("does not infer or contradict currency %s from a bare dollar sign", async currency => {
+    const h = harness(); const c = await start(h, "Amazon return");
+    let revision = c.revision;
+    if (currency) {
+      fromMessage(h, "refund", { currency });
+      revision = (await h.service.message(OWNER, c.id, request(revision, `Currency: ${currency}.`))).case.revision;
+    }
+    fromMessage(h, "refund", { currency: "$" });
+    const result = await h.service.message(OWNER, c.id, request(revision, "The order shows $104.68."));
+    expect(result.workflow.facts.currency?.value ?? null).toBe(currency);
+    expect(result.workflow.conflicts).toEqual([]);
+  });
+
+  it("accepts a size-label variation and ignores retailer buttons as customer intent", async () => {
+    const h = harness(); const c = await start(h, "Amazon return");
+    fromMessage(h, "refund", { product: "Samba, White/Black, size 9", desiredOutcome: "return for a refund", currency: "USD" });
+    const first = await h.service.message(OWNER, c.id, request(c.revision, "Samba, White/Black, size 9. Currency USD. I want to return for a refund."));
+    h.extract.mockImplementationOnce(async ({ documents }) => ({ kind: "refund", facts: [
+      { key: "product", value: "Samba, White/Black, 9" },
+      { key: "desiredOutcome", value: "Return or replace items" },
+      { key: "currency", value: "$" },
+    ].map(f => ({ ...f, key: f.key as WorkflowFactKey, sourceId: documents[0]!.evidenceId, quote: f.value, resolvesConflict: false })) }));
+    const second = await h.service.evidence(OWNER, c.id, { requestId: randomUUID(), expectedRevision: first.case.revision,
+      files: [{ name: "order.txt", mimeType: "text/plain", bytes: new TextEncoder().encode("Samba, White/Black, 9\nReturn or replace items\n$104.68") }] });
+    expect(second.workflow.conflicts).toEqual([]);
+    expect(second.workflow.facts.product?.value).toBe("Samba, White/Black, size 9");
+    expect(second.workflow.facts.desiredOutcome?.value).toBe("return for a refund");
+    expect(second.case.evidence).toHaveLength(1);
+    expect(h.startCall).not.toHaveBeenCalled();
+  });
+
+  it("repairs only stale formatting and retailer-button flags when reopening a saved case", async () => {
+    const h = harness(); const c = await start(h, "Amazon return");
+    fromMessage(h, "refund", { product: "Samba, White/Black, size 9", desiredOutcome: "return for a refund", currency: "USD" });
+    const first = await h.service.message(OWNER, c.id, request(c.revision, "Samba, White/Black, size 9. Currency USD. I want to return for a refund."));
+    const flags = [
+      "currency: Currency was recorded as “USD”, but another source says “$”. Which is correct?",
+      "product: Product or service was recorded as “Samba, White/Black, size 9”, but another source says “Samba, White/Black, 9”. Which is correct?",
+      "desiredOutcome: Requested outcome was recorded as “return for a refund”, but another source says “Return or replace items”. Which is correct?",
+    ];
+    const actualConflict = "product: Product or service was recorded as “Samba, White/Black, size 9”, but another source says “Samba, White/Black, size 10”. Which is correct?";
+    const currencyConflict = "currency: Currency was recorded as “USD”, but another source says “CAD”. Which is correct?";
+    h.db.prepare("UPDATE case_workflows SET value=? WHERE case_id=?").run(JSON.stringify({ ...first.workflow, conflicts: [...flags, actualConflict, currencyConflict] }), c.id);
+    const repaired = new WorkflowService(h.deps).get(OWNER, c.id);
+    expect(repaired.workflow.conflicts).toEqual([actualConflict, currencyConflict]);
+    expect(repaired.workflow.stage).toBe("needs_review");
+    expect(repaired.case.revision).toBe(first.case.revision);
+    expect(repaired.workflow.facts).toEqual(first.workflow.facts);
+    expect(h.extract).toHaveBeenCalledTimes(1);
+    expect(h.startCall).not.toHaveBeenCalled();
+    expect(new WorkflowService(h.deps).get(OWNER, c.id).workflow.conflicts).toEqual([actualConflict, currencyConflict]);
+  });
+
   it("retains uploaded bytes and clears old call approval even when extraction fails", async () => {
     const h = harness();
     const c = await h.cases.createCase(OWNER, { summary: "Duplicate settled subscription charge", files: [], fields: {

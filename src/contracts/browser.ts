@@ -22,6 +22,8 @@ export interface BrowserArtifact {
 }
 
 export interface BrowserRun {
+  /** Server-selected boundary. Inspection never sends case facts or evidence. */
+  executionPolicy?: "review_each_action" | "inspect_only" | "local_preparation";
   id: string;
   caseId: string;
   caseRevision: number;

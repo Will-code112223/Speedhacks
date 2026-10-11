@@ -18,6 +18,7 @@ import { caseFacts, e164Phone, FACT_KEYS, FACT_LABELS, initialKind, isPhoneKey, 
 import { parseWorkflowExtraction, WorkflowModelError, type WorkflowExtractor, type WorkflowExtraction } from "./extractor";
 import { nextAssistantMessage, rebuildWorkflow } from "./planning";
 import { WorkflowStore, type WorkflowOperation } from "./store";
+import { isRetailerButton, productIdentity, reviewedConflicts } from "./review";
 
 export interface WorkflowDependencies {
   config: AppConfig; db: Db; repo: CaseRepository; cases: CaseService; extractor: WorkflowExtractor;
@@ -108,6 +109,10 @@ export class WorkflowService {
       workflow.analysisStatus = "not_started";
       workflow.messages.push({ id: randomUUID(), role: "assistant", createdAt: this.now(), content: "The case changed outside this interview. I refreshed the canonical facts; analyze the saved information to review the preparation again." });
       workflow = this.plan(workflow, this.assembled(c));
+    }
+    const conflicts = reviewedConflicts(workflow);
+    if (conflicts.length !== workflow.conflicts.length) {
+      workflow = this.plan({ ...workflow, conflicts }, this.assembled(c));
     }
     this.store.save(owner, workflow);
     return { case: this.assembled(c), workflow: structuredClone(workflow) };
@@ -225,24 +230,33 @@ export class WorkflowService {
     for (const d of documents) sources.set(d.evidenceId, { source: "document", text: textFromDocument(d.mimeType, d.bytes) });
     const ambiguousNew = new Set<WorkflowFactKey>();
     const latestUserId = [...workflow.messages].reverse().find(message => message.role === "user")?.id;
-    for (const candidate of extraction.facts) {
+    // Re-extracted older sources must be considered before the latest answer,
+    // regardless of the order in which the model returned its candidates.
+    const candidates = [...extraction.facts].sort((a, b) => Number(a.sourceId === latestUserId) - Number(b.sourceId === latestUserId));
+    for (const candidate of candidates) {
       if (ambiguousNew.has(candidate.key)) continue;
       const source = sources.get(candidate.sourceId);
       if (!source || (source.text !== null && !normal(source.text).includes(normal(candidate.quote))) || !normal(candidate.quote).includes(normal(candidate.value))) continue;
+      // A bare dollar sign does not distinguish USD, CAD, AUD, etc. It cannot
+      // establish a currency or contradict an explicitly supplied currency code.
+      if (candidate.key === "currency" && candidate.value.trim() === "$") continue;
+      // A merchant's available actions are not evidence of the customer's intent.
+      if (candidate.key === "desiredOutcome" && (source.source !== "user" || isRetailerButton(candidate.value))) continue;
       const existing = next.facts[candidate.key];
       const value = isPhoneKey(candidate.key) ? e164Phone(candidate.value) : candidate.value;
       const proposed: WorkflowFact = { label: FACT_LABELS[candidate.key], value, source: source.source, sourceRefs: [candidate.sourceId] };
       if (!existing?.value) { next.facts[candidate.key] = proposed; continue; }
       const same = normal(existing.value) === normal(candidate.value) ||
+        (candidate.key === "product" && productIdentity(existing.value) === productIdentity(candidate.value)) ||
         (candidate.key === "amount" && amountMinor(existing.value) !== null && amountMinor(existing.value) === amountMinor(candidate.value)) ||
         (isPhoneKey(candidate.key) && samePhone(existing.value, candidate.value));
-      if (same) { existing.sourceRefs = [...new Set([...existing.sourceRefs, candidate.sourceId])]; continue; }
       const explicitIntent = candidate.key === "desiredOutcome" && source.source === "user" && candidate.sourceId === latestUserId && /\b(?:want|need|request|seek|please|help|get|prepare)\b/i.test(source.text ?? "");
       const explicitCorrection = source.source === "user" && candidate.sourceId === latestUserId && candidate.resolvesConflict &&
         (/\b(?:actually|correction|correct|instead|meant|previous|replace|not)\b/i.test(source.text ?? "") || workflow.conflicts.some(c => c.startsWith(`${candidate.key}:`)));
       if (explicitIntent || explicitCorrection) {
         next.facts[candidate.key] = proposed; next.conflicts = next.conflicts.filter(c => !c.startsWith(`${candidate.key}:`)); continue;
       }
+      if (same) { existing.sourceRefs = [...new Set([...existing.sourceRefs, candidate.sourceId])]; continue; }
       if ((candidate.key === "issue" || candidate.key === "incidentDescription") &&
         (normal(existing.value).includes(normal(candidate.value)) || normal(candidate.value).includes(normal(existing.value)))) {
         if (candidate.value.length > existing.value.length) existing.value = candidate.value;
