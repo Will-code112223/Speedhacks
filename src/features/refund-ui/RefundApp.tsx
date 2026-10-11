@@ -15,6 +15,7 @@
 
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import type { Mode } from "../../contracts/case";
+import type { WorkflowAction } from "../../contracts/workflow";
 import BrowserPanel from "./browser/BrowserPanel";
 import CallBar from "./call/CallBar";
 import CallScreen from "./call/CallScreen";
@@ -99,11 +100,14 @@ function Workspace({ plans }: WorkspaceProps) {
   const sheetTitleId = useId();
   const [railOpen, setRailOpen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [browserPreset, setBrowserPreset] = useState<{ caseId: string; revision: number; action: WorkflowAction } | null>(null);
   const [sideTab, setSideTab] = useState<"browser" | "call">("browser");
 
   const active = controller.active;
   const call = controller.call;
   const caseData = active?.caseData ?? null;
+  const intakeKind = controller.workflow?.workflow?.kind;
+  const callsSupported = caseData?.mode !== "live" || (controller.workflow?.workflow?.analysisStatus === "complete" && controller.workflow.workflow.caseRevision === caseData.revision && (intakeKind === "refund" || intakeKind === "duplicate_charge"));
   const hasCall = active !== null && caseData !== null && call !== null;
   const hasBrowserCase = caseData?.mode === "live";
   const selectedTool = hasBrowserCase ? sideTab : "call";
@@ -221,7 +225,7 @@ function Workspace({ plans }: WorkspaceProps) {
       {hasBrowserCase ? <Button variant="ghost" size="small" aria-pressed={selectedTool === "browser"} onClick={() => setSideTab("browser")}>Browser</Button> : null}
       {hasTool ? <Button variant="ghost" size="small" aria-pressed={selectedTool === "call"} onClick={() => setSideTab("call")}>Call support</Button> : null}
     </div>
-    {selectedTool === "browser" && hasBrowserCase && caseData ? <BrowserPanel key={caseData.id} caseData={caseData} visible={view === "chat" && (wide || sheetOpen)} /> : hasCall ? callScreen() : <div className={styles.callGuide}><h2>Call support</h2><p>Review the contact and request in chat, then approve the call when you are ready.</p></div>}
+    {selectedTool === "browser" && hasBrowserCase && caseData ? <BrowserPanel preset={browserPreset?.caseId === caseData.id && browserPreset.revision === caseData.revision ? browserPreset.action.browser ?? undefined : undefined} key={caseData.id} caseData={caseData} visible={view === "chat" && (wide || sheetOpen)} /> : hasCall ? callScreen() : <div className={styles.callGuide}><h2>Call support</h2><p>{callsSupported ? "Review the contact and request in chat, then approve the call when you are ready." : intakeKind === "auto_insurance" ? "Your call plans are in the action list. Calling additional insurance contacts requires a separate recipient-specific authorization flow." : "Finish preparing the case before reviewing its call contact and request."}</p></div>}
   </>;
 
 
@@ -288,7 +292,8 @@ function Workspace({ plans }: WorkspaceProps) {
                 controller={controller}
                 fixture={fixture}
                 phoneHint={null}
-                allowCallApproval={selectedTool === "call" || hasCall}
+                allowCallApproval={Boolean(callsSupported && (selectedTool === "call" || hasCall))}
+                onWorkflowAction={action => { if (caseData && action.type === "browser" && action.browser) { setBrowserPreset({ caseId: caseData.id, revision: caseData.revision, action }); setSideTab("browser"); setSheetOpen(true); setRailOpen(false); } }}
                 planCount={plans.plans.length}
                 callBar={callBar}
                 metrics={metrics}

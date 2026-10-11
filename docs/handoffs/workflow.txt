@@ -1,0 +1,171 @@
+CONVERSATIONAL WORKFLOW HANDOFF
+
+Purpose
+
+The three starter prompts begin real, owner-scoped case preparation. They are
+not canned scenarios or an alternate fixture runtime. Preparation is distinct
+from provider submission, claim acceptance, a completed call, or payment.
+
+Expected user journeys
+
+Amazon shoes refund:
+- Ask what happened, the order/date/item, amount if known, and desired resolution.
+- Invite the order confirmation, receipt, photographs, or prior support exchange.
+- Keep missing facts unknown; an unavailable support number must not prevent
+  preparation of a browser action or a case brief.
+- Prepare a factual brief, evidence index, and next actions. The browser action
+  starts at the reviewed merchant URL; sign-in and material external actions
+  remain subject to the browser execution controls.
+- Do not call automatically or promise that the return/refund is eligible.
+
+Duplicate subscription charge:
+- Ask which subscription, the two charge dates/amounts, whether both settled,
+  account identity, and the requested resolution.
+- Compare the user's explanation with attached billing evidence. Conflicting
+  amounts or dates require clarification rather than silently choosing one.
+- Prepare a request for the duplicate amount, with the existing paid charge
+  distinguished from the disputed charge. Never infer that every refund request
+  concerns a duplicate charge.
+- A support call is a separate reviewed action; preparing a plan is not consent
+  to dial and the presence of a call plan does not establish a refund outcome.
+
+Car insurance claim:
+- Ask the provider/policy, claimant's role, incident date/location, vehicle,
+  incident description, other-party details if applicable, and desired next step.
+- Invite policy documents, photos, estimate, and report/correspondence as relevant.
+- Keep general knowledge-base contacts visibly sourced and subject to recipient
+  and plan applicability review. A general claims number is not customer consent.
+- Produce a preparation brief and evidence list even when loss value is unknown.
+- Prepare distinct insurer/other-party contact actions if supplied and relevant.
+  Do not infer fault, coverage, an accepted claim, or a recoverable amount.
+- The current refund-oriented VoiceAdapter must not be represented as a completed
+  general insurance adjudication or automatic multi-recipient calling system.
+
+Acceptance boundary
+
+Follow-up messages and uploads must survive reload in the same owned case.
+Attached evidence must be saved as actual private file bytes and indexed in the
+case, with the preparation revision tracking the canonical CaseV1 revision.
+Stale edits and another session's case must be rejected. Retrying the same
+request must not add duplicate messages, evidence, or revisions. Failed model
+requests must not silently become heuristic or successful canned responses.
+Preparation must leave external outcome/payment unknown until evidence exists.
+
+API handoff
+
+Canonical case shapes remain in src/contracts/case.ts. The additive workflow
+shape is src/contracts/workflow.ts. A workflow references caseId/caseRevision;
+it is not another case database or an independently approved copy of the facts.
+
+GET /api/cases/:id/workflow loads the owned workflow and current case.
+POST /api/cases/:id/workflow accepts requestId and expectedRevision to analyze
+the already saved conversation and evidence without adding another user turn.
+The UI starts this analysis when a newly opened workflow is not_started.
+POST /api/cases/:id/messages accepts requestId, expectedRevision, and message.
+POST /api/cases/:id/evidence accepts multipart requestId, expectedRevision,
+optional message, and repeated files. GET /api/cases/:id/workflow/brief downloads
+the preparation text. Mutation retries must retain the same requestId and body;
+requestId reuse with changed content must fail rather than silently replay.
+
+User messages/evidence are persisted before model work and invalidate stale call
+authorization. A failed model request keeps the user's work for review, does not
+fabricate answers, and does not advance an external action. The successful model
+result is applied only if the canonical case has not changed in the meantime.
+
+An ambiguous response keeps the exact pending request ID, body and File objects
+in the current UI session. Retry previous update recovers its saved result; it
+does not manufacture another conversation turn or upload. A known failed model
+operation is returned as saved failed state on the same-ID replay. Analyze saved
+information again starts an explicit new analysis request. A WORKFLOW_BUSY or
+WORKFLOW_REVISION_CONFLICT response retains the original request identity.
+Preflight REVISION_CONFLICT reloads the current facts without replaying the edit.
+
+The workflow action list populates BrowserPanel with the prepared task, exact
+provider URL and host list. Opening that panel does not dispatch a browser action.
+BrowserService loads the persisted workflow brief at the canonical case revision,
+checks the revision again after loading, and saves that brief as request.txt for
+the browser planner and reviewed uploads. Later case edits invalidate the browser
+run's action approvals. The browser remains a locally hosted Chromium workflow:
+sign-in happens in its actual window, and each external action requires review.
+An explicitly rejected first browser start (such as a stale case revision or an
+unfinished workflow) releases its saved request so the person can review and edit
+the task. Network/5xx failures, unresolved/busy responses and any later rejection
+after an ambiguous attempt retain the original request ID and instructions.
+
+Insurance call plans are visible as separate recipient/purpose briefs. They do
+not call the legacy refund authorization route. Unknown or unprepared workflows
+also cannot expose that approval. Existing refund calls remain separately
+reviewed; no workflow plan can create a call outcome or verified payment.
+
+Verification
+
+Lead final checks on 2026-10-11: npm test passed 665 tests in 46 files;
+npm run typecheck and npm run build passed. All 21 production trace manifests
+exclude private runtime data and local environment files. next.config.ts now
+explicitly excludes these files after native SQLite tracing included an existing
+developer database; no deployment or public exposure occurred.
+
+A separately authorized 120-second real call to Jonathan's armed test receiver
+used the case service, frozen authorization and live Dial adapter. The actual
+transcript exposed a false denial from the caller's multiline "approve or deny"
+question. outcome.ts now preserves speaker attribution and ignores unanswered
+questions; 18 regressions cover this and sensitive-information requests. The
+test receiver requested full card details and the calling agent refused. No
+refund decision, reference, real claim or payment was established.
+
+The official Dial dashboard implements GET /api/v1/calls/:id/recording and uses
+the returned URL for playback. Authenticated retrieval of this test's recording
+succeeded; the recording remains private outside git. This verifies post-call
+recording playback, not live audio streaming. A participant's phone on speaker
+is the immediate live-audio option for the separately authorized teammate calls.
+
+2026-10-11: npx vitest run src/features/refund-ui first passed 397 tests in 24 files;
+the final rerun after browser recovery fixes passed 408 tests in those 24 files.
+This includes 16 workflow transport/state/render tests, the existing case and
+call recovery coverage, and new rendering checks that unknown/insurance workflows
+do not expose legacy refund approval. Browser preset rendering is covered.
+npx tsc --noEmit and scoped git diff --check passed after the frontend changes.
+Final review reproduced a stale rejected browser start that permanently froze its
+old revision. The client now retains server error codes and releases only a fresh,
+definitively rejected pre-dispatch request. Eleven additional regression cases
+cover editable rejection, preservation of ambiguous attempts and error metadata.
+
+2026-10-11: npx vitest run tests/workflows passed 41 tests in four files, including
+18 backend acceptance tests, four recovery tests, 15 extractor checks and four
+contact-directory checks. This was independently rerun during final review.
+Tests inject model responses
+while exercising real service, SQLite repository and private file storage. They
+cover the three intake paths, evidence persistence, ownership, stale revisions,
+conflicting or unavailable facts, duplicate mutations, model failures, saved-input
+recovery and separation from call dispatch and external outcomes.
+
+The lead integrator also completed scripts/workflow-model-smoke.ts against the
+actual configured OpenAI API and disposable SQLite storage for all three scenarios
+(Amazon return, duplicate charge and auto insurance preparation). Inputs were
+clearly synthetic. The first attempt exposed omission of a supplied order number
+and product; the extraction prompt was corrected and all three scenarios passed
+the subsequent real-model run. These were real model requests, not injected
+responses. The smoke script forbids Dial dispatch and launches no browser.
+
+The local UI preview was retried after the user permitted it, but computer-use
+access remained blocked by a saved setting. No rendered-browser inspection or
+actual merchant/insurer form execution was verified in this workflow pass.
+Screenshots, provider authentication, iframe-heavy forms and final receipts
+therefore remain unverified against a real provider. No submission or payment is
+established by the model smoke or offline suites. The user's separately authorized
+call to Jonathan's test counterpart is tracked by the lead; it is not evidence of
+an insurer claim or production multi-recipient call support.
+
+Remaining integration limits
+
+- Initial POST /api/cases does not accept a stable creation request ID. A lost
+  creation response can leave an orphaned saved case, and a retry may create a
+  second case. Follow-up messages, evidence and analyses have idempotent IDs.
+- Request IDs/File references for an ambiguous workflow update are retained only
+  while the current UI session remains mounted. Reload reads persisted server
+  state and never automatically replays an uncertain mutation.
+- Browser execution has reviewed hosts, bounded sessions and explicit action
+  approvals. It does not yet establish unattended success on arbitrary provider
+  sites, remote browser sign-in, claim eligibility or confirmed money movement.
+- General insurance and other-party calls are prepared plans only. They require
+  a purpose-specific execution/authorization integration before production use.

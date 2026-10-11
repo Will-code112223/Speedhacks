@@ -16,7 +16,7 @@ import { analyzeTranscript, unknownOutcome } from "@/server/cases/outcome";
 import { type AppConfig, assertLiveLlmConfig, assertModeValid } from "@/server/config";
 import type { ExtractedFields, Extractor } from "@/server/documents/extractor";
 import { buildPacket } from "@/server/documents/packet";
-import { type UploadInput, UploadStore, validateUploads } from "@/server/documents/storage";
+import { type StoredUpload, type UploadInput, UploadStore, validateUploads } from "@/server/documents/storage";
 import { ApiHttpError, notFound } from "@/server/http/errors";
 import type {
   AuthorizationSnapshot,
@@ -266,6 +266,40 @@ export class CaseService {
         });
       }
       repo.updateCase(id, { doc, revision, updatedAt: now });
+    });
+    return this.assemble(id);
+  }
+
+  /**
+   * Additive interview bridge. Its caller journals the workflow in an enclosing
+   * transaction on the same SQLite connection. New evidence/messages invalidate
+   * authorization even before extraction completes; model completion is another
+   * revision, so concurrent edits or calls can never consume stale interview facts.
+   */
+  applyWorkflowUpdate(ownerSession: string, id: string, expectedRevision: number, update: {
+    changes: CaseChanges;
+    evidence?: StoredUpload[];
+    draft: CaseV1["draft"];
+    message: string;
+    provenance?: Array<{ field: string; value: string | null; sourceKind: "user_input" | "document" | "llm"; sourceRef: string | null; excerpt: string | null }>;
+  }): CaseV1 {
+    const { repo, config } = this.deps;
+    repo.transaction(() => {
+      const row = this.ownedRow(ownerSession, id);
+      this.assertSameMode(row);
+      if (hasActiveCall(repo.listCalls(id))) throw new ApiHttpError(409, "CALL_IN_PROGRESS", "Interview edits are blocked while a call is active or its dispatch is unknown");
+      if (row.revision !== expectedRevision) throw new ApiHttpError(409, "REVISION_CONFLICT", "Case changed while the interview was being updated");
+      const incoming = update.evidence ?? [];
+      if (repo.listEvidence(id).length + incoming.length > config.upload.maxFiles) throw new ApiHttpError(400, "BAD_REQUEST", `At most ${config.upload.maxFiles} evidence files per case`, ["files"]);
+      const now = this.nowIso(); const revision = row.revision + 1;
+      const { next } = applyChanges(row.doc, update.changes);
+      for (const evidence of incoming) repo.insertEvidence({ ...evidence, caseId: id, createdAt: now });
+      for (const p of update.provenance ?? []) repo.insertProvenance({ id: randomUUID(), caseId: id, revision, createdAt: now, ...p });
+      const timeline = [...row.doc.timeline, this.entry("workflow_updated", update.message)];
+      for (const evidence of incoming) timeline.push(this.entry("evidence_added", `Attached ${evidence.name} (${evidence.mimeType}, ${evidence.sizeBytes} bytes).`));
+      if (row.doc.authorization) timeline.push(this.entry("authorization_cleared", "New interview information cleared the previous call authorization."));
+      repo.updateCase(id, { revision, updatedAt: now, doc: { ...row.doc, ...next, missingFields: missingFields(next),
+        draft: update.draft, authorization: null, outcome: unknownOutcome("Review the updated interview before authorizing any external action."), timeline } });
     });
     return this.assemble(id);
   }

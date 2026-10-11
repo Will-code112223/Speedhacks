@@ -19,6 +19,7 @@ import Rail from "../rail/Rail";
 import { currentCall } from "../state/call";
 import type { CaseSessionController } from "../state/controller";
 import { toUiError } from "../state/errors";
+import { EMPTY_WORKFLOW } from "../workflow/session";
 import {
   decisionForCallScreen,
   initialSessionsState,
@@ -48,6 +49,27 @@ afterEach(() => {
 const V2: CaseApiCapabilities = { liveCall: true, stepIn: true, decisions: true };
 const V1: CaseApiCapabilities = { liveCall: false, stepIn: false, decisions: false };
 const noop = () => {};
+
+it("never offers the legacy refund call for an unknown or insurance HTTP workflow", async () => {
+  const s = stage("duplicate_charge");
+  s.begin("Prepare my case");
+  await s.create("Prepare my case");
+  const controller = s.controller();
+  controller.apiMode = "http";
+  const unknown = chat(controller);
+  expect(unknown).not.toContain("Approve this call");
+  const current = controller.active!.caseData!;
+  controller.workflow = { ...EMPTY_WORKFLOW, refresh: async () => {}, upload: async () => false, retry: async () => false, analyze: async () => false, workflow: {
+    caseId: current.id, caseRevision: current.revision, kind: "auto_insurance", stage: "ready", analysisStatus: "complete", facts: {},
+    messages: [], questions: [], conflicts: [], contacts: [], actions: [], updatedAt: current.updatedAt,
+    brief: { title: "Prepared auto claim", body: "The user described vehicle damage. Liability is unknown.", updatedAt: current.updatedAt },
+  } };
+  const insurance = chat(controller);
+  expect(insurance).toContain("Prepared auto claim");
+  expect(insurance).not.toContain("Approve this call");
+  expect(insurance).not.toContain('data-testid="case-documents"');
+  expect(insurance).not.toContain("Notes are local");
+});
 
 function stage(scenario: FixtureScenario, options: Omit<FixtureOptions, "now" | "scenario"> = {}) {
   const api: CaseApi = createFixtureCaseApi({ ...options, scenario, now: () => Date.now() });

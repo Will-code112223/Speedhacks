@@ -34,6 +34,20 @@ describe("real browser service boundaries (mock browser and planner, no live net
     expect(body).toContain("Unknown — clarification required"); expect(body).toContain(f.c.doc.reason);
     expect(body).not.toContain("Invented refund assertion"); expect(body).toContain("Not an insurer form");
   });
+  it("provides the persisted interview brief to the real planner and generated artifact", async () => {
+    const brief = "PREPARATION ONLY\nVehicle: user-supplied sedan\nLoss date: 2026-10-01\nPolicy: user-supplied policy";
+    const preparation = vi.fn(async () => brief); const f = setup({ preparation }); const run = await ready(f);
+    expect(preparation).toHaveBeenCalledWith(OWNER, f.c.id, 1);
+    expect(f.service.artifact(OWNER, run.id, run.artifacts[0]!.id).bytes.toString()).toBe(brief);
+    expect(f.planner.next.mock.calls[0]![0].draft).toBe(brief);
+  });
+  it("rejects stale case facts when an edit races with preparation loading", async () => {
+    const gate = deferred<string | null>(); const f = setup({ preparation: async () => gate.promise });
+    const attempt = f.service.start(OWNER, f.input);
+    await vi.waitFor(() => expect(f.loadCase).toHaveBeenCalledTimes(1));
+    f.c.revision = 2; gate.resolve("old brief");
+    await expect(attempt).rejects.toMatchObject({ code: "REVISION_CONFLICT" }); expect(f.launch).not.toHaveBeenCalled();
+  });
   it("never exposes another owner's run, recovery, screenshot, or artifact", async () => {
     const f = setup(); const run = await ready(f);
     expect(() => f.service.get(OTHER, run.id)).toThrow("not found");

@@ -4,12 +4,13 @@
  * The chat column: the conversation for the active case and the composer
  * pinned to the bottom.
  *
- * The shared contract has no chat endpoint. The first message creates the
- * case; later messages stay in this browser and get a local acknowledgement.
- * Everything else in the thread renders from the server's case and call.
+ * The first message creates the case; follow-ups and evidence are persisted
+ * by the workflow API. Questions and action plans render from the server.
  */
 
 import { useCallback, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import type { WorkflowAction } from "../../../contracts/workflow";
+import WorkflowPanel, { EvidencePicker } from "../workflow/WorkflowPanel";
 import type { CallV1, CaseV1 } from "../../../contracts/case";
 import { Banner, Button, SkeletonRows } from "../ui/primitives";
 import { FileIcon } from "../ui/icons";
@@ -38,6 +39,7 @@ export interface ChatColumnProps {
   metrics: ReactNode;
   /** Browser tasks do not enter the call authorization flow. */
   allowCallApproval?: boolean;
+  onWorkflowAction?: (action: WorkflowAction) => void;
 }
 
 const ASSISTANT_KINDS: ReadonlySet<ThreadItem["kind"]> = new Set(["assistant", "understood", "approval", "result"]);
@@ -47,11 +49,28 @@ const SAMPLE_PROMPTS = [
   "Help me prepare a car insurance claim.",
 ] as const;
 
-export default function ChatColumn({ controller, fixture, phoneHint, callBar, metrics, allowCallApproval = true }: ChatColumnProps) {
+export default function ChatColumn({ controller, fixture, phoneHint, callBar, metrics, allowCallApproval = true, onWorkflowAction }: ChatColumnProps) {
   const session = controller.active;
+  const workflowBusy = Boolean(controller.workflow?.busy || controller.workflow?.workflow?.analysisStatus === "processing");
+  const workflow = controller.workflow?.workflow;
+  const callApprovalAllowed = allowCallApproval && (controller.apiMode !== "http" || (workflow?.analysisStatus === "complete" && workflow.caseRevision === session?.caseData?.revision && (workflow.kind === "refund" || workflow.kind === "duplicate_charge")));
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const draftKey = session?.key ?? "new";
   const draft = drafts[draftKey] ?? "";
+  const [evidence, setEvidence] = useState<Record<string, File[]>>({});
+  const files = evidence[draftKey] ?? [];
+  const setFiles = (next: File[]) => setEvidence(current => ({ ...current, [draftKey]: next }));
+  const retryWorkflow = () => {
+    const workflow = controller.workflow;
+    if (!workflow) return;
+    const attemptedText = workflow.pendingMessage;
+    const attemptedUpload = workflow.pendingUpload;
+    void workflow.retry().then(accepted => {
+      if (accepted && attemptedText === draft.trim()) setDraft("");
+      if (accepted && attemptedUpload) setFiles([]);
+    });
+  };
+  const send = async (text: string) => { const accepted = await controller.send(text, files); if (accepted) setFiles([]); return accepted; };
   const setDraft = useCallback((value: string) => setDrafts((current) => ({ ...current, [draftKey]: value })), [draftKey]);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   // Unsaved edits in a case's facts card hold back its approval step.
@@ -64,7 +83,7 @@ export default function ChatColumn({ controller, fixture, phoneHint, callBar, me
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const stickToBottom = useRef(true);
   const [unseen, setUnseen] = useState(false);
-  const itemCount = (session?.thread.length ?? 0) + (session?.create.busy ? 1 : 0) + (session?.create.error ? 1 : 0);
+  const itemCount = (session?.thread.length ?? 0) + (session?.create.busy ? 1 : 0) + (session?.create.error ? 1 : 0) + (controller.workflow?.workflow?.messages.length ?? 0);
 
   const onScroll = () => {
     const node = scrollerRef.current;
@@ -103,10 +122,10 @@ export default function ChatColumn({ controller, fixture, phoneHint, callBar, me
 
   const caseData = session?.caseData ?? null;
   const placeholder = caseData
-    ? "Add a note to this case…"
-    : "Who charged you, what happened, and how much are you owed?";
+    ? "Answer the questions or add more details…"
+    : "Tell us what happened and what you need help with.";
 
-  const hint = caseData ? "Notes are local. Edit the facts to update the call brief." : null;
+  const hint = caseData ? "Answers and uploaded evidence update your saved case brief." : null;
 
   return (
     <section className={styles.column} aria-label="Conversation">
@@ -140,7 +159,9 @@ export default function ChatColumn({ controller, fixture, phoneHint, callBar, me
               phoneHint={phoneHint}
               factsDirty={dirtyFacts[session.key] ?? false}
               onFactsDirty={reportFactsDirty}
-              allowCallApproval={allowCallApproval}
+              allowCallApproval={callApprovalAllowed}
+              onWorkflowAction={onWorkflowAction}
+              onRetryWorkflow={retryWorkflow}
             />
           ) : null}
         </div>
@@ -154,15 +175,16 @@ export default function ChatColumn({ controller, fixture, phoneHint, callBar, me
       </div>
       {metrics}
       <Composer
-        suggestions={!session ? (
-          <div className={styles.prompts} role="group" aria-label="Sample requests">
-            {SAMPLE_PROMPTS.map((prompt) => <button className={styles.prompt} type="button" key={prompt} onClick={() => { setDraft(prompt); textareaRef.current?.focus(); }}>{prompt}</button>)}
-          </div>
-        ) : null}
+        suggestions={<>
+          {!session ? <div className={styles.prompts} role="group" aria-label="Sample requests">
+            {SAMPLE_PROMPTS.map(prompt => <button className={styles.prompt} type="button" key={prompt} onClick={() => { setDraft(prompt); void send(prompt).then(accepted => { if (accepted) setDraft(""); }); }}>{prompt}</button>)}
+          </div> : null}
+          <EvidencePicker files={files} onFiles={setFiles} existing={Boolean(caseData)} busy={Boolean(session?.create.busy || workflowBusy || controller.workflow?.uncertain)} onUpload={() => { void controller.workflow?.upload(files).then(accepted => { if (accepted) setFiles([]); }); }} />
+        </>}
         value={draft}
         onChange={setDraft}
-        onSend={controller.send}
-        busy={session?.create.busy ?? false}
+        onSend={send}
+        busy={Boolean(session?.create.busy || workflowBusy)}
         busyLabel="Reading your request"
         placeholder={placeholder}
         hint={hint}
@@ -180,6 +202,8 @@ function Thread({
   factsDirty,
   onFactsDirty,
   allowCallApproval,
+  onWorkflowAction,
+  onRetryWorkflow,
 }: {
   session: CaseSession;
   controller: CaseSessionController;
@@ -188,6 +212,8 @@ function Thread({
   factsDirty: boolean;
   onFactsDirty: (key: string, dirty: boolean) => void;
   allowCallApproval: boolean;
+  onWorkflowAction?: (action: WorkflowAction) => void;
+  onRetryWorkflow: () => void;
 }) {
   const caseData = session.caseData;
   const call = currentCall(caseData, session.startedCall);
@@ -213,6 +239,8 @@ function Thread({
             factsDirty={factsDirty}
             onFactsDirty={onFactsDirty}
             allowCallApproval={allowCallApproval}
+            onWorkflowAction={onWorkflowAction}
+            onRetryWorkflow={onRetryWorkflow}
           />
         );
       })}
@@ -296,6 +324,7 @@ function EventLine({ text, tone, at }: { text: string; tone: EventTone; at: stri
 }
 
 interface ThreadEntryProps {
+  onRetryWorkflow: () => void;
   item: ThreadItem;
   grouped: boolean;
   session: CaseSession;
@@ -308,6 +337,7 @@ interface ThreadEntryProps {
   factsDirty: boolean;
   onFactsDirty: (key: string, dirty: boolean) => void;
   allowCallApproval: boolean;
+  onWorkflowAction?: (action: WorkflowAction) => void;
 }
 
 function lockedReason(session: CaseSession, caseData: CaseV1, call: CallV1 | null): string | null {
@@ -319,12 +349,13 @@ function lockedReason(session: CaseSession, caseData: CaseV1, call: CallV1 | nul
 }
 
 function ThreadEntry(props: ThreadEntryProps) {
-  const { item, grouped, session, caseData, call, currentApprovalId, controller, fixture, phoneHint, factsDirty, onFactsDirty, allowCallApproval } = props;
+  const { item, grouped, session, caseData, call, currentApprovalId, controller, fixture, phoneHint, factsDirty, onFactsDirty, allowCallApproval, onWorkflowAction, onRetryWorkflow } = props;
   const startNewCase = () => controller.selectCase(null);
   const groupedClass = grouped ? styles.grouped : "";
 
   switch (item.kind) {
     case "user":
+      if (controller.workflow?.workflow?.messages.length) return null;
       return (
         <li className={styles.user}>
           <MessageMeta who="You" at={item.at} />
@@ -353,12 +384,13 @@ function ThreadEntry(props: ThreadEntryProps) {
       return (
         <li className={[styles.assistant, groupedClass].join(" ")}>
           {grouped ? null : <MessageMeta who="Recourse" at={item.at} />}
-          <p className={styles.text}>Here is what I understood.</p>
+          {controller.workflow ? <WorkflowPanel controller={controller.workflow} onAction={onWorkflowAction} onRetry={onRetryWorkflow} /> : null}
+          <p className={styles.text}>Case details</p>
           <FactsCard
             key={session.reloads}
             caseData={caseData}
             fixture={fixture}
-            lockedReason={lockedReason(session, caseData, call)}
+            lockedReason={controller.workflow?.busy || controller.workflow?.workflow?.analysisStatus === "processing" ? "Finishing the current analysis before updating case facts." : lockedReason(session, caseData, call)}
             saving={session.save.busy}
             saveError={session.save.error}
             conflict={session.conflict}
@@ -372,12 +404,12 @@ function ThreadEntry(props: ThreadEntryProps) {
             onDirtyChange={(dirty) => onFactsDirty(session.key, dirty)}
             onStartNewCase={startNewCase}
           />
-          <CaseDocuments
+          {controller.workflow?.workflow?.kind !== "auto_insurance" ? <CaseDocuments
             caseData={caseData}
             fixture={fixture}
             packet={session.packet}
             onDownloadPacket={controller.downloadPacket}
-          />
+          /> : null}
         </li>
       );
     case "approval": {

@@ -9,6 +9,12 @@ function render(overrides: Partial<BrowserSessionState> = {}, configured = true)
 }
 
 describe("browser panel honest controls", () => {
+  it("opens the actual prepared workflow task and provider URL without starting it during rendering", () => {
+    const html = renderToStaticMarkup(<BrowserPanelView preset={{ task: "Prepare the current claim using the reviewed case brief.", startUrl: "https://claims.geico.com/", allowedHosts: ["claims.geico.com"] }} caseData={caseData()} state={state()} runtime={ready} runtimeError={null} canStart={true} watching={true} api={api()} onRetryRuntime={() => {}} onStart={async () => { throw new Error("Rendering cannot start a browser"); }} onCommand={() => {}} onRefresh={() => {}} onNewTask={() => {}} />);
+    expect(html).toContain("Prepare the current claim using the reviewed case brief.");
+    expect(html).toContain('value="https://claims.geico.com/"');
+    expect(html).toContain("Start browser task");
+  });
   it("permits a browser task when amount and support phone are unknown, without requiring a call", () => {
     const html = render(); expect(html).toContain("Starting website"); expect(html).toContain(request.startUrl); expect(html).toContain("Start browser task");
     expect(html).not.toContain("Approve this call"); expect(html).not.toContain("<img");

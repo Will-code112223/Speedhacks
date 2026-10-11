@@ -16,6 +16,12 @@ describe("real browser HTTP transport", () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(json({ error: { message: "Chromium is missing" } }, 503)).mockRejectedValueOnce(new Error("offline")); const api = createBrowserApi(fetcher);
     await expect(api.start(request)).rejects.toThrow("Chromium is missing"); await expect(api.start(request)).rejects.toThrow("last action may still be running"); expect(fetcher).toHaveBeenCalledTimes(2);
   });
+  it("preserves rejection codes so a stale request can be distinguished from uncertain dispatch", async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(json({ error: { code: "REVISION_CONFLICT", message: "Case changed" } }, 409)).mockResolvedValueOnce(json({ error: { code: "BROWSER_BUSY", message: "Busy" } }, 409));
+    const api = createBrowserApi(fetcher);
+    await expect(api.start(request)).rejects.toMatchObject({ status: 409, code: "REVISION_CONFLICT" });
+    await expect(api.start(request)).rejects.toMatchObject({ status: 409, code: "BROWSER_BUSY" });
+  });
   it.each([{ events: null }, { pendingAction: { id: "missing fields" } }, { artifacts: [{}] }, { frameAvailable: "yes" }, { status: "pretend" }])("rejects malformed response %j", async (patch) => {
     expect(isBrowserRun(run(patch as never))).toBe(false);
     await expect(createBrowserApi(vi.fn<typeof fetch>().mockResolvedValue(json({ run: run(patch as never) }))).get("run-1")).rejects.toThrow("invalid run data");

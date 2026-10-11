@@ -1,5 +1,5 @@
 import type { BrowserCommand, BrowserRun, StartBrowserRequest } from "../../../contracts/browser";
-import type { BrowserApi } from "./client";
+import { BrowserApiError, type BrowserApi } from "./client";
 
 export interface BrowserSessionState { run: BrowserRun | null; request: StartBrowserRequest | null; busy: boolean; recovering: boolean; recoveryBlocked: boolean; commandNeedsRefresh: boolean; error: string | null; }
 export interface BrowserStorage { getItem(key: string): string | null; setItem(key: string, value: string): void; removeItem(key: string): void; }
@@ -14,6 +14,7 @@ export function createBrowserSession(caseId: string, api: BrowserApi, storage: B
   let recoverySequence = 0;
   let disposed = false;
   let storedRunId: string | null = null;
+  let startUncertain = false;
   const listeners = new Set<() => void>();
   const publish = (patch: Partial<BrowserSessionState>) => { if (!disposed) { state = { ...state, ...patch }; listeners.forEach((listener) => listener()); } };
   function save(request: StartBrowserRequest, runId: string | null) { storage.setItem(browserStorageKey(caseId), JSON.stringify({ caseId, request, runId })); }
@@ -44,6 +45,9 @@ export function createBrowserSession(caseId: string, api: BrowserApi, storage: B
           const saved: unknown = JSON.parse(raw);
           if (!isStoredRequest(saved, caseId)) throw new Error("Saved browser session is invalid. No browser task was replayed.");
           storedRunId = saved.runId;
+          // A stored attempt may have reached the server before a reload. A
+          // later rejection cannot prove the original attempt did not commit.
+          startUncertain = saved.runId === null;
           publish({ request: saved.request });
           if (storedRunId) await refresh(signal);
           else {
@@ -62,7 +66,20 @@ export function createBrowserSession(caseId: string, api: BrowserApi, storage: B
       generation++; latestRead++;
       try { save(frozen, null); } catch { publish({ error: "Session storage is unavailable. Enable it before starting a recoverable browser task." }); return; }
       publish({ request: frozen, busy: true, error: null });
-      try { accept(await api.start(frozen)); } catch (error) { publish({ error: message(error) }); }
+      try { accept(await api.start(frozen)); } catch (error) {
+        if (!startUncertain && definiteStartRejection(error)) {
+          try {
+            storage.removeItem(browserStorageKey(caseId));
+            storedRunId = null;
+            publish({ request: null, error: `${message(error)} Review the current case and edit the task before starting again.` });
+          } catch {
+            publish({ recoveryBlocked: true, error: "The rejected browser request could not be cleared from session storage. No new task was started." });
+          }
+        } else {
+          startUncertain = true;
+          publish({ error: message(error) });
+        }
+      }
       finally { publish({ busy: false }); }
     },
     async command(command: BrowserCommand) {
@@ -78,11 +95,21 @@ export function createBrowserSession(caseId: string, api: BrowserApi, storage: B
       if (state.busy || !state.run || !["completed", "failed", "cancelled"].includes(state.run.status)) return;
       try { storage.removeItem(browserStorageKey(caseId)); }
       catch { publish({ error: "The saved browser session could not be cleared. No new task was started." }); return; }
-      generation++; latestRead++; storedRunId = null;
+      generation++; latestRead++; storedRunId = null; startUncertain = false;
       publish({ ...initial, recovering: false });
     },
     dispose() { disposed = true; generation++; latestRead++; recoverySequence++; },
   };
+}
+
+/** Only documented pre-dispatch rejections permit editing a fresh attempt. */
+function definiteStartRejection(error: unknown): boolean {
+  if (!(error instanceof BrowserApiError)) return false;
+  const expected: Record<string, number> = {
+    BAD_REQUEST: 400, ORIGIN_REQUIRED: 403, NOT_FOUND: 404, PAYLOAD_TOO_LARGE: 413,
+    REVISION_CONFLICT: 409, MODE_MISMATCH: 409, WORKFLOW_REVIEW_REQUIRED: 409,
+  };
+  return error.code !== null && expected[error.code] === error.status;
 }
 
 function message(error: unknown) { return error instanceof Error ? error.message : "Browser status is unavailable."; }

@@ -4,11 +4,12 @@ import { createHash } from "node:crypto";
 import { getRuntimeReadiness, loadConfig } from "@/server/config";
 import { CaseRepository } from "@/server/persistence/repository";
 import { openDatabase } from "@/server/persistence/db";
-import { notFound } from "@/server/http/errors";
+import { ApiHttpError, notFound } from "@/server/http/errors";
 import { BrowserService } from "./service";
 import { BrowserStore } from "./store";
 import { OpenAIPlanner } from "./planner";
 import { launchBrowser } from "./playwright";
+import { getWorkflowService } from "@/server/workflows/composition";
 
 const globals = globalThis as unknown as { __recourseBrowserService?: { key: string; service: BrowserService } };
 export function getBrowserService(): BrowserService {
@@ -24,6 +25,16 @@ export function getBrowserService(): BrowserService {
     store: new BrowserStore(path.join(config.dataDir, "browser")),
     planner: new OpenAIPlanner({ model: config.llm.model ?? "", apiKey: config.llm.apiKey ?? "", baseUrl: config.llm.baseUrl }),
     loadCase: async (owner, id) => owned(owner, id),
+    preparation: async (owner, id, revision) => {
+      const response = getWorkflowService().get(owner, id);
+      if (response.case.revision !== revision || response.workflow.caseRevision !== revision) {
+        throw new ApiHttpError(409, "REVISION_CONFLICT", "The case changed; review the current preparation before starting browser work.");
+      }
+      if (response.workflow.analysisStatus !== "complete" || response.workflow.conflicts.length > 0) {
+        throw new ApiHttpError(409, "WORKFLOW_REVIEW_REQUIRED", "Complete the case analysis and resolve conflicting information before starting browser work.");
+      }
+      return response.workflow.brief.body;
+    },
     evidence: async (owner, id) => {
       owned(owner, id);
       return repo.listEvidence(id).map(e => {

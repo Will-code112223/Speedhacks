@@ -13,6 +13,8 @@ export interface BrowserDependencies {
   enabled: boolean; configured: boolean;
   loadCase(owner: string, id: string): Promise<CaseRow>;
   evidence(owner: string, caseId: string): Promise<StoredArtifact[]>;
+  /** Current persisted interview brief, when the additive workflow is available. */
+  preparation?(owner: string, caseId: string, revision: number): Promise<string | null>;
   launch(input: { startUrl: string; hosts: string[]; signal: AbortSignal; onLost(): void; onBlocked(host?: string): void }): Promise<BrowserPort>;
   now?: () => number;
 }
@@ -93,6 +95,7 @@ export class BrowserService {
     const c = await this.deps.loadCase(owner, input.caseId);
     this.caseMatches(c, input);
     const artifacts = await this.deps.evidence(owner, c.id);
+    const interviewBrief = await this.deps.preparation?.(owner, c.id, input.expectedRevision);
     const afterRead = await this.deps.loadCase(owner, c.id); this.caseMatches(afterRead, input);
     const existing = this.deps.store.byRequest(owner, input.requestId);
     if (existing) {
@@ -107,7 +110,7 @@ export class BrowserService {
     }
     if (active.length >= 4) throw new ApiHttpError(409, "BROWSER_BUSY", "Browser capacity is occupied; try after another run finishes");
     const id = randomUUID(); const now = new Date(this.now()).toISOString();
-    const draft = preparationDocument(afterRead);
+    const draft = interviewBrief ?? preparationDocument(afterRead);
     artifacts.unshift({ id: randomUUID(), name: "request.txt", mimeType: "text/plain", bytes: Buffer.from(draft) });
     const row: StoredRun = { owner, requestHash, draft, pending: null, executing: false, steps: 0,
       run: { id, caseId: c.id, caseRevision: c.revision, requestId: input.requestId, status: "starting", task: input.task,

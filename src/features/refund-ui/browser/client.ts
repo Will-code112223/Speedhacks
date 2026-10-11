@@ -1,7 +1,7 @@
 import type { BrowserCommand, BrowserRun, RuntimeReadiness, StartBrowserRequest } from "../../../contracts/browser";
 
 export class BrowserApiError extends Error {
-  constructor(message: string, readonly status: number | null = null) { super(message); this.name = "BrowserApiError"; }
+  constructor(message: string, readonly status: number | null = null, readonly code: string | null = null) { super(message); this.name = "BrowserApiError"; }
 }
 
 export interface BrowserApi {
@@ -27,8 +27,12 @@ export function createBrowserApi(fetcher: typeof fetch = (...args) => fetch(...a
     }
     if (!response.ok) {
       let message = `Browser service returned HTTP ${response.status}.`;
-      try { const value = await response.json(); if (record(value) && record(value.error) && typeof value.error.message === "string") message = value.error.message; } catch { /* Preserve status when the server returns non-JSON. */ }
-      throw new BrowserApiError(message, response.status);
+      let code: string | null = null;
+      try { const value = await response.json(); if (record(value) && record(value.error)) {
+        if (typeof value.error.message === "string") message = value.error.message;
+        if (typeof value.error.code === "string") code = value.error.code;
+      } } catch { /* Preserve status when the server returns non-JSON. */ }
+      throw new BrowserApiError(message, response.status, code);
     }
     return response;
   }

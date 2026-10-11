@@ -5,12 +5,15 @@ import { formatAmount } from "@/server/cases/facts";
  * Deterministic transcript analysis. Rules:
  *  - only the support side can approve, deny or ask for information; lines
  *    spoken by our agent or the customer are ignored when speakers are labeled;
- *  - questions, conditionals, quoted claims and negated statements never count
- *    as approval; a later decisive statement overrides an earlier one;
+ *  - speaker attribution continues across line breaks; questions never establish
+ *    a decision, and conditionals, quoted claims and negated statements never
+ *    count as approval; a later decisive statement overrides an earlier one;
  *  - approval needs an explicit refund statement; paymentStatus stays
  *    "unverified" because a transcript is not payment evidence.
  */
 const NON_SUPPORT_SPEAKERS = new Set(["agent", "ai", "ai assistant", "assistant", "bot", "caller", "customer", "me", "you"]);
+// Dial's "user" is the remote party; "agent" is our outbound assistant.
+const SUPPORT_SPEAKERS = new Set(["user", "support", "support agent", "representative", "rep", "merchant", "merchant support", "customer service", "customer support", "operator", "transfer_target"]);
 const REFUND_CONTEXT = /\b(refund|refunded|credit|credited|reimburse(?:d|ment)?|charge|request|dispute|money back)\b/i;
 const NEGATION = /\b(not|no|never|cannot|can't|can not|won't|will not|unable|isn't|wasn't|hasn't|haven't|aren't|don't|doesn't|didn't|n't)\b/i;
 const CONDITIONAL = /\b(if|once|assuming|should|unless|provided that|in case)\b/i;
@@ -20,7 +23,8 @@ const OFFER = /\b(offer(?:ed|ing)?|propos(?:al|ed)|would be willing|can (?:give|
 const LIMITED_REFUND = /\b(partial(?:ly)?|portion|half|store credit|account credit|voucher|coupon|gift card|deduct(?:ion|ed|ible)?|minus|less|up to|at most|capped)\b|\d\s*%/i;
 const AMOUNT_CONTINUATION = /^(?:(?:actually|correction|to clarify)[,:]?\s*)?(?:it(?:'s| is| will be)|that(?:'s| is| will be)|the (?:approved )?(?:amount|total|refund))\b/i;
 const DENIAL_WORD = /\b(denied|deny|declined|decline|rejected|reject|not eligible|ineligible|non-?refundable|final sale|no refunds?|not approved|cannot|can't|can not|unable to|won't|will not|not able to)\b/i;
-const NEEDS_INFO = /\b(call back|callback|call us back|need (?:you|the customer|the account holder) to|please (?:send|provide|submit|email|upload|fax)|we(?:'ll| will) need|order number|last four|verify|verification|proof of|through the (?:customer )?portal)\b/i;
+const NEEDS_INFO = /\b(call back|callback|call us back|need (?:you|the customer|the account holder) to|please (?:send|provide|submit|email|upload|fax)|(?:we|I)(?:['’]ll| will) need|order number|last four|verify|verification|proof of|through the (?:customer )?portal)\b/i;
+const SENSITIVE_INFO = /\b(full (?:card|credit card|debit card) number|security code|cvv|cvc|password|one[- ]time (?:code|password))\b/i;
 const REFERENCE_KEYWORD = /\b(?:reference|confirmation|ticket|case|claim)\b(?:\s*(?:number|no\.?|#|id))?\s*(?:is|:|-)?\s*(?:number\s*)?(?:is\s*)?([A-Za-z0-9][A-Za-z0-9-]{3,}\d[A-Za-z0-9-]*)/i;
 const REFERENCE_TOKEN = /\b([A-Z]{2,6}-[A-Z0-9-]*\d[A-Z0-9-]*)\b/;
 
@@ -32,12 +36,20 @@ interface Sentence {
 
 function splitSentences(transcript: string): Sentence[] {
   const out: Sentence[] = [];
+  let currentSpeaker: string | null = null;
   for (const rawLine of transcript.split(/\r?\n/)) {
     const line = rawLine.trim();
     if (!line) continue;
+    // Provider-injected instructions are metadata, not something support said.
+    if (/^\[additional context\]:/i.test(line)) continue;
     const labeled = /^([A-Za-z][A-Za-z ()_-]{0,30}):\s*(.*)$/.exec(line);
-    const speaker = labeled?.[1]?.trim().toLowerCase() ?? null;
-    const body = labeled?.[2] ?? line;
+    const candidateSpeaker = labeled?.[1]?.trim().toLowerCase();
+    // A paragraph heading such as "Summary:" must not turn caller speech into
+    // support speech. Only known role labels can change an established turn.
+    const isSpeaker = candidateSpeaker !== undefined && (NON_SUPPORT_SPEAKERS.has(candidateSpeaker) || SUPPORT_SPEAKERS.has(candidateSpeaker));
+    if (isSpeaker) currentSpeaker = candidateSpeaker;
+    const speaker = currentSpeaker;
+    const body = isSpeaker ? labeled![2]! : line;
     const support = speaker === null ? true : !NON_SUPPORT_SPEAKERS.has(speaker);
     for (const part of body.split(/(?<=[.?!])\s+/)) {
       const text = part.trim();
@@ -49,11 +61,15 @@ function splitSentences(transcript: string): Sentence[] {
 
 /** Remove quoted material so a repeated claim ("you wrote 'approved'") is not a statement. */
 function stripQuotes(text: string): string {
-  return text.replace(/"[^"]*"|“[^”]*”|'[^']{3,}'|‘[^’]*’/g, " ");
+  // Apostrophes inside possessives/contractions are not quote delimiters:
+  // "the customer's account, I'll need ..." must keep the request intact.
+  return text.replace(/"[^"]*"|“[^”]*”|(?<![\p{L}\p{N}])'[^']{3,}'(?![\p{L}\p{N}])|(?<![\p{L}\p{N}])‘[^’]*’(?![\p{L}\p{N}])/gu, " ");
 }
 
 function isQuestion(text: string): boolean {
-  return /\?\s*$/.test(text) || /^(has|have|is|was|were|did|do|does|can|could|would|will)\b/i.test(text.trim());
+  const body = text.trim().replace(/^(?:(?:[-*•]|\d+[.)])\s*)+/, "");
+  return /\?\s*$/.test(body) || /^(has|have|is|was|were|did|do|does|can|could|would|will|whether|who|what|which|when|where|why|how)\b/i.test(body)
+    || /\b(?:ask(?:ed|ing)?|wonder(?:ed|ing)?|tell me|let me know|confirm|clarify|determine)\b[^.!?]*\b(?:whether|if)\b/i.test(body);
 }
 
 function findReference(sentences: Sentence[]): string | null {
@@ -186,7 +202,9 @@ export function analyzeTranscript(
       decision: "needs_information",
       referenceNumber,
       supportingQuote: needsInfo,
-      nextAction: "Support asked for more information. Provide what was requested, then re-authorize a follow-up call or send the refund packet by email.",
+      nextAction: SENSITIVE_INFO.test(needsInfo)
+        ? "Support requested sensitive payment or authentication details; no refund decision was established. Do not share full card numbers, security codes, passwords, or one-time codes in this workflow. Verify the provider and use its official secure process if further verification is needed."
+        : "Support asked for more information. Review the request and use the provider's official secure process for any necessary verification, then re-authorize a follow-up call or send the refund packet by email.",
     };
   }
   return {

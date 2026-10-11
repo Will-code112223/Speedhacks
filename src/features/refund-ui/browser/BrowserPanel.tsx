@@ -9,9 +9,10 @@ import { startBrowserFrames, type BrowserFrameState } from "./frames";
 import { browserHosts, browserStartUrl, createBrowserSession, type BrowserSessionState } from "./session";
 import styles from "./BrowserPanel.module.css";
 
-export interface BrowserPanelProps { caseData: CaseV1; visible: boolean; api?: BrowserApi; }
+export interface BrowserTaskPreset { task: string; startUrl: string; allowedHosts: string[] }
+export interface BrowserPanelProps { caseData: CaseV1; visible: boolean; api?: BrowserApi; preset?: BrowserTaskPreset; }
 
-export default function BrowserPanel({ caseData, visible, api: suppliedApi }: BrowserPanelProps) {
+export default function BrowserPanel({ caseData, visible, api: suppliedApi, preset }: BrowserPanelProps) {
   const api = useMemo(() => suppliedApi ?? createBrowserApi(), [suppliedApi]);
   const session = useMemo(() => createBrowserSession(caseData.id, api, { getItem: (key) => window.sessionStorage.getItem(key), setItem: (key, value) => window.sessionStorage.setItem(key, value), removeItem: (key) => window.sessionStorage.removeItem(key) }), [caseData.id, api]);
   const state = useSyncExternalStore(session.subscribe, session.getSnapshot, session.getServerSnapshot);
@@ -45,12 +46,13 @@ export default function BrowserPanel({ caseData, visible, api: suppliedApi }: Br
   }, [watching, state.run?.id, session]);
 
   const canStart = caseData.mode === "live" && runtime?.browser.ready === true && !state.recoveryBlocked;
-  return <BrowserPanelView caseData={caseData} state={state} runtime={runtime} runtimeError={runtimeError} canStart={canStart} watching={watching} api={api} onRetryRuntime={() => setRetryRuntime((value) => value + 1)} onStart={async (task, url, hosts) => {
+  return <BrowserPanelView preset={preset} caseData={caseData} state={state} runtime={runtime} runtimeError={runtimeError} canStart={canStart} watching={watching} api={api} onRetryRuntime={() => setRetryRuntime((value) => value + 1)} onStart={async (task, url, hosts) => {
     await session.start({ caseId: caseData.id, expectedRevision: caseData.revision, requestId: state.request?.requestId ?? crypto.randomUUID(), task, startUrl: url, allowedHosts: hosts });
   }} onCommand={(command) => void session.command(command)} onRefresh={() => void session.refresh()} onNewTask={() => session.newTask()} />;
 }
 
 interface BrowserPanelViewProps {
+  preset?: BrowserTaskPreset;
   caseData: CaseV1;
   state: BrowserSessionState;
   runtime: RuntimeReadiness | null;
@@ -82,7 +84,7 @@ export function BrowserPanelView(props: BrowserPanelViewProps) {
         {runtime && !runtime.browser.ready ? <div className={styles.notice}><strong>Browser setup needed</strong><p>{runtime.browser.missing.join(", ") || "The browser service is not configured."}</p><Button size="small" variant="ghost" onClick={props.onRetryRuntime}>Check again</Button></div> : null}
         {!runtime && !runtimeError ? <p className={styles.note}>Checking browser configuration…</p> : null}
         {caseData.mode !== "live" ? <p className={styles.notice}>Start a new live case to use the browser.</p> : null}
-        <StartForm caseData={caseData} state={state} canStart={props.canStart} onStart={props.onStart} />
+        <StartForm key={JSON.stringify(props.preset ?? null)} preset={props.preset} caseData={caseData} state={state} canStart={props.canStart} onStart={props.onStart} />
       </> : null}
       {state.error ? <div className={styles.error} role="alert"><p>{state.error}</p>{run ? <Button size="small" onClick={onRefresh} disabled={state.busy}>Refresh status</Button> : null}</div> : null}
       {run ? <>
@@ -104,11 +106,11 @@ export function BrowserPanelView(props: BrowserPanelViewProps) {
   </section>;
 }
 
-function StartForm({ caseData, state, canStart, onStart }: Pick<BrowserPanelViewProps, "caseData" | "state" | "canStart" | "onStart">) {
+function StartForm({ caseData, state, canStart, onStart, preset }: Pick<BrowserPanelViewProps, "caseData" | "state" | "canStart" | "onStart" | "preset">) {
   const id = useId();
-  const [task, setTask] = useState(caseData.reason);
-  const [url, setUrl] = useState(browserStartUrl(caseData.merchant.name));
-  const [extraHosts, setExtraHosts] = useState("");
+  const [task, setTask] = useState(preset?.task ?? caseData.reason);
+  const [url, setUrl] = useState(preset?.startUrl ?? browserStartUrl(caseData.merchant.name));
+  const [extraHosts, setExtraHosts] = useState(preset?.allowedHosts.join(", ") ?? "");
   const [error, setError] = useState<string | null>(null);
   const request = state.request;
   async function submit(event: FormEvent) {

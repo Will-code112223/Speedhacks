@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { BrowserRun } from "../../../../contracts/browser";
+import { BrowserApiError } from "../client";
 import { browserHosts, browserStartUrl, browserStorageKey, createBrowserSession } from "../session";
 import { api, deferred, request, run, storage } from "./support";
 
@@ -38,6 +39,51 @@ describe("real browser session recovery", () => {
     await session.start({ ...request, requestId: "new-id", task: "different", expectedRevision: 3 });
     expect(service.start).toHaveBeenNthCalledWith(2, request);
     expect(session.getSnapshot().run?.id).toBe("run-1");
+  });
+  it.each([[409, "REVISION_CONFLICT"], [409, "WORKFLOW_REVIEW_REQUIRED"], [400, "BAD_REQUEST"]] as const)("a fresh rejected start %i %s becomes editable without launching again", async (status, code) => {
+    const { service, session, store } = setup(); await session.recover();
+    service.start.mockRejectedValueOnce(new BrowserApiError("Review the request", status, code));
+    await session.start(request);
+    expect(session.getSnapshot()).toMatchObject({ request: null, run: null, busy: false });
+    expect(store.getItem(browserStorageKey(request.caseId))).toBeNull();
+    expect(service.start).toHaveBeenCalledTimes(1);
+    const corrected = { ...request, requestId: "new-reviewed-id", expectedRevision: 3, task: "Corrected task" };
+    service.start.mockResolvedValueOnce(run({ requestId: corrected.requestId, caseRevision: corrected.expectedRevision, task: corrected.task }));
+    await session.start(corrected);
+    expect(service.start).toHaveBeenNthCalledWith(2, corrected);
+    expect(session.getSnapshot().run?.caseRevision).toBe(3);
+  });
+  it.each([
+    new BrowserApiError("Response unavailable", 503, "BROWSER_UNAVAILABLE"),
+    new BrowserApiError("Busy", 409, "BROWSER_BUSY"),
+    new BrowserApiError("Unresolved run", 409, "BROWSER_UNRESOLVED"),
+    new BrowserApiError("Different request", 409, "REQUEST_CONFLICT"),
+    new BrowserApiError("Undocumented conflict", 409),
+  ])("retains the frozen start when rejection cannot establish no dispatch: $message", async error => {
+    const { service, session, store } = setup(); await session.recover();
+    service.start.mockRejectedValueOnce(error);
+    await session.start(request);
+    expect(session.getSnapshot().request).toEqual(request);
+    expect(store.removeItem).not.toHaveBeenCalled();
+    await session.start({ ...request, requestId: "must-not-use", expectedRevision: 7 });
+    expect(service.start).toHaveBeenNthCalledWith(2, request);
+  });
+  it("a later 4xx cannot erase uncertainty from an earlier lost response", async () => {
+    const { service, session, store } = setup(); await session.recover();
+    service.start.mockRejectedValueOnce(new Error("connection lost")).mockRejectedValueOnce(new BrowserApiError("Case changed", 409, "REVISION_CONFLICT"));
+    await session.start(request); await session.start({ ...request, expectedRevision: 4 });
+    expect(session.getSnapshot().request).toEqual(request);
+    expect(store.removeItem).not.toHaveBeenCalled();
+  });
+  it("restored ambiguous attempts keep their identity after a later definite rejection", async () => {
+    const { service, session, store } = setup(null);
+    service.find.mockRejectedValueOnce(new BrowserApiError("Run not found", 404, "NOT_FOUND"));
+    await session.recover();
+    service.start.mockRejectedValueOnce(new BrowserApiError("Case changed", 409, "REVISION_CONFLICT"));
+    await session.start({ ...request, expectedRevision: 4 });
+    expect(service.start).toHaveBeenCalledWith(request);
+    expect(session.getSnapshot().request).toEqual(request);
+    expect(store.removeItem).not.toHaveBeenCalled();
   });
   it.each([{ caseId: "other" }, { requestId: "other" }, { caseRevision: 99 }, { id: "other" }])("rejects a response outside the saved case/request/revision/run: %j", async (patch) => {
     const { service, session } = setup("run-1"); service.get.mockResolvedValue(run(patch)); await session.recover();

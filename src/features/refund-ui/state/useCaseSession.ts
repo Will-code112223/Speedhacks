@@ -16,11 +16,11 @@
  *             until it ends, one more GET case when it ends
  *   decide    answerDecision / stepIn, adopting the live call they return
  *
- * The shared contract has no chat endpoint: once the case exists, further
- * messages stay in this browser with a local acknowledgement.
+ * The additive workflow API persists follow-up messages, facts, questions and
+ * evidence; no local acknowledgement substitutes for a server update.
  */
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore } from "react";
 import type { CallV1, CaseChanges, CaseV1 } from "../../../contracts/case";
 import { createCaseApi } from "../api/client";
 import { inferScenario } from "../api/fixture";
@@ -28,6 +28,8 @@ import { useActiveTime, useCasePolling, useLiveCall } from "../api/hooks";
 import { browserSessionStorage, getOrCreateRequestId } from "../api/request-id";
 import type { ApiMode, CaseApi, CaseApiCapabilities, CreateCaseInput, FixtureScenario, LiveCallV2 } from "../api/types";
 import type { PlanRecord } from "../plans/store";
+import { createWorkflowApi } from "../workflow/client";
+import { createWorkflowSession, EMPTY_WORKFLOW } from "../workflow/session";
 import { attachmentsFor } from "./attachments";
 import { currentCall } from "./call";
 import type { CaseSessionController, FixtureSettings } from "./controller";
@@ -75,11 +77,6 @@ function canHaveLiveRecord(call: CallV1): boolean {
   return call.state !== "dispatch_unknown";
 }
 
-/** The local acknowledgement for a message sent after the case exists. */
-function noteReply(): string {
-  return "Saved in this conversation. To update the call brief, edit the case facts above.";
-}
-
 function packetFileName(session: CaseSession): string {
   const merchant = session.caseData?.merchant.name ?? "";
   const slug =
@@ -104,6 +101,9 @@ function saveBlob(blob: Blob, fileName: string): void {
   // Revoking in the same task can cancel the download in some browsers.
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+
+const idleSubscribe = () => () => {};
+const emptyWorkflowSnapshot = () => EMPTY_WORKFLOW;
 
 export function useCaseSession({ apiMode, plans, measuring }: UseCaseSessionOptions): CaseSessionController {
   const [state, dispatch] = useReducer(sessionsReducer, initialSessionsState);
@@ -251,6 +251,45 @@ export function useCaseSession({ apiMode, plans, measuring }: UseCaseSessionOpti
     if (current.active?.key === key) current.polled.replace(caseData);
   }, []);
 
+  const workflowApi = useMemo(() => createWorkflowApi(), []);
+  const workflowSessions = useRef(new Map<string, ReturnType<typeof createWorkflowSession>>());
+  const workflowSession = useMemo(() => {
+    if (!activeKey || !activeCaseId || apiMode !== "http") return null;
+    let manager = workflowSessions.current.get(activeCaseId);
+    if (!manager) {
+      const key = activeKey;
+      manager = createWorkflowSession(activeCaseId, workflowApi, response => {
+        dispatch({ type: "case/received", key, caseData: response.case, liveCapable: latest.current.liveCapable, at: nowIso() });
+        adoptCase(key, response.case);
+      });
+      workflowSessions.current.set(activeCaseId, manager);
+    }
+    return manager;
+  }, [activeKey, activeCaseId, apiMode, workflowApi, adoptCase]);
+  const workflowState = useSyncExternalStore(workflowSession?.subscribe ?? idleSubscribe, workflowSession?.getSnapshot ?? emptyWorkflowSnapshot, emptyWorkflowSnapshot);
+  const caseRevision = active?.caseData?.revision ?? null;
+  useEffect(() => {
+    if (!workflowSession || caseRevision === null) return;
+    workflowSession.setRevision(caseRevision);
+    const abort = new AbortController();
+    void workflowSession.refresh(abort.signal);
+    return () => abort.abort();
+  }, [workflowSession, caseRevision]);
+  // A reload may reconnect while another request is still analyzing. These
+  // reads observe its result; they never resend a message, upload or call.
+  const workflowProcessing = workflowState.workflow?.analysisStatus === "processing";
+  useEffect(() => {
+    if (!workflowSession || !workflowProcessing) return;
+    const abort = new AbortController();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const poll = async () => {
+      if (document.visibilityState !== "hidden") await workflowSession.refresh(abort.signal);
+      if (!abort.signal.aborted && workflowSession.getSnapshot().workflow?.analysisStatus === "processing") timer = setTimeout(poll, 2500);
+    };
+    timer = setTimeout(poll, 2500);
+    return () => { abort.abort(); clearTimeout(timer); };
+  }, [workflowSession, workflowProcessing]);
+
   const adoptLive = useCallback((key: string, live: LiveCallV2) => {
     const current = latest.current;
     if (current.active?.key === key) current.liveCall.replace(live);
@@ -277,13 +316,13 @@ export function useCaseSession({ apiMode, plans, measuring }: UseCaseSessionOpti
         adoptCase(key, caseData);
       } catch (error) {
         dispatch({ type: "create/failed", key, error: toUiError(error) });
-      }
+      } finally { release("create:new"); }
     },
-    [adoptCase],
+    [adoptCase, release],
   );
 
   const send = useCallback(
-    async (text: string): Promise<boolean> => {
+    async (text: string, evidence: File[] = []): Promise<boolean> => {
       const trimmed = text.trim();
       if (!trimmed) return false;
       const current = latest.current;
@@ -291,12 +330,13 @@ export function useCaseSession({ apiMode, plans, measuring }: UseCaseSessionOpti
       const at = nowIso();
 
       if (session === null) {
+        if (!claim("create:new")) return false;
         selectionVersion.current += 1;
         const key = createLocalId();
         const picked = current.apiMode === "fixture" ? (current.scenario ?? inferScenario(trimmed)) : null;
         const api = current.sharedApi ?? createFixtureApi(picked, current.fixtureSettings);
         const attachments = attachmentsFor(trimmed, current.plans, current.apiMode);
-        const input: CreateCaseInput = { summary: trimmed, files: attachments.files, ...attachments.prefill };
+        const input: CreateCaseInput = { summary: trimmed, files: [...(attachments.files ?? []), ...evidence], ...attachments.prefill };
         createInputs.current.set(key, input);
         dispatch({
           type: "session/started",
@@ -304,7 +344,7 @@ export function useCaseSession({ apiMode, plans, measuring }: UseCaseSessionOpti
           api,
           scenario: picked,
           text: trimmed,
-          attachments: attachments.names,
+          attachments: [...attachments.names, ...evidence.map(file => file.name)],
           notice: attachments.notice,
           at,
         });
@@ -317,18 +357,25 @@ export function useCaseSession({ apiMode, plans, measuring }: UseCaseSessionOpti
       if (session.caseId === null) {
         // The case was never created: try again with everything said so far.
         const summary = `${session.summary}\n\n${trimmed}`;
-        const input: CreateCaseInput = { ...(createInputs.current.get(session.key) ?? {}), summary };
+        const previousInput = createInputs.current.get(session.key);
+        const input: CreateCaseInput = { ...previousInput, summary, files: [...(previousInput?.files ?? []), ...evidence] };
         createInputs.current.set(session.key, input);
         dispatch({ type: "create/message", key: session.key, text: trimmed, summary, at });
         void create(session.key, session.api, input);
         return true;
       }
 
-      // No chat endpoint exists in the contract, so the note stays in this browser.
-      dispatch({ type: "note/added", key: session.key, text: trimmed, reply: noteReply(), at });
+      if (session.api.mode === "http") {
+        const manager = workflowSessions.current.get(session.caseId);
+        if (!manager || !session.caseData) return false;
+        manager.setRevision(session.caseData.revision);
+        return evidence.length ? manager.upload(evidence, trimmed) : manager.message(trimmed);
+      }
+      // Fixture engines exist only in tests; runtime always uses the HTTP branch.
+      dispatch({ type: "note/added", key: session.key, text: trimmed, reply: "Test conversation note.", at });
       return true;
     },
-    [create],
+    [create, claim],
   );
 
   const retryCreate = useCallback(() => {
@@ -557,5 +604,16 @@ export function useCaseSession({ apiMode, plans, measuring }: UseCaseSessionOpti
     stepIn,
     leaveCall,
     downloadPacket,
+    workflow: workflowSession ? {
+      ...workflowState,
+      refresh: () => workflowSession.refresh(),
+      retry: () => workflowSession.retry(),
+      analyze: () => workflowSession.analyze(),
+      upload: files => {
+        if (latest.current.active?.caseId !== activeCaseId || !latest.current.active.caseData) return Promise.resolve(false);
+        workflowSession.setRevision(latest.current.active.caseData.revision);
+        return workflowSession.upload(files);
+      },
+    } : undefined,
   };
 }
