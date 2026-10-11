@@ -1,0 +1,145 @@
+/* The person acts here, so this is the one bordered panel under the outcome. */
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid var(--rc-border);
+  border-radius: var(--rc-radius-panel);
+  background: var(--rc-canvas);
+}
+
+.eyebrow {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--rc-ink-2);
+}
+
+.form {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.field {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Lines the button up with the 32px input under its 18px label and 6px gap. */
+.form .submit {
+  height: 32px;
+  min-height: 32px;
+  margin-top: 24px;
+}
+
+.errorRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.error {
+  margin: 0;
+  color: var(--rc-danger);
+}
+
+.delivered {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.sentRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sentLine {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  color: var(--rc-ink);
+  overflow-wrap: anywhere;
+}
+
+.sentLine:focus {
+  outline: none;
+}
+
+.sentLine:focus-visible {
+  outline: 2px solid var(--rc-accent);
+  outline-offset: 2px;
+  border-radius: var(--rc-radius);
+}
+
+.time {
+  font-variant-numeric: tabular-nums;
+}
+
+.note {
+  margin: 0;
+  color: var(--rc-ink-2);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.open {
+  text-decoration: none;
+}
+
+.message {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.subject {
+  margin: 0;
+  display: flex;
+  gap: 8px;
+  overflow-wrap: anywhere;
+}
+
+.subjectLabel {
+  flex: none;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 21px;
+  color: var(--rc-ink-2);
+}
+
+.lines {
+  margin: 0;
+  padding: 0 0 0 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 520px) {
+  .form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .form .submit {
+    margin-top: 0;
+  }
+}

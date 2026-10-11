@@ -149,7 +149,7 @@ Transcripts sit in a figure with a visually hidden caption, since `aria-label` i
 ## Copy
 
 Sentence case everywhere.
-Buttons name the outcome: "Approve this call", "Step into the call", "Download packet".
+Buttons name the outcome: "Approve this call", "Step in now", "Hand back to the agent", "Download packet".
 Status words come from the contract and are shown as written, never reworded to sound better.
 Simulated and fixture modes are always labelled where the data appears.
 
@@ -184,3 +184,28 @@ and Refero's craft guidance for visible focus and non-drag interaction alternati
 | Tabular timer readout | craft rule: one memorable detail | live call | the agent on hold is the product |
 | Phone-style call screen | user brief, screens research on in-call views | live call | people already know what a call screen means |
 | 120 and 200ms transitions | Refero motion guide 2 | feedback and state | product UI stays fast and quiet |
+
+### Call plan and step-in
+
+The call screen shows the agent's plan as a map of ordered steps and a one-line dashboard of the step it is on.
+The plan is the agent's intent; a step reads as done only when the backend reports it done.
+The user can step in at any point of a live call, dialing included, and the agent pauses until they hand back.
+The step-in controls stay pinned to the bottom of the call column so they are reachable without scrolling.
+
+| Decision | Source | Role | Why |
+| --- | --- | --- | --- |
+| Plan map and dashboard line | user brief (October 11: see what the agent will do and which step it is on), dividers over cards | live call | the plan is a numbered list between dividers, no card, so it reads as status and not as a control |
+| Progress bar token roles | October 11 lock: graphite primary, cobalt for the active item, amber pending | live call | done steps in ink, the current step in the accent, a paused step in warning, upcoming in the border tone; no green, since nothing has been paid or approved |
+| Step in at any time | user brief (October 11: interrupt the agent at any time), buttons name the outcome | live call | "Step in now" is enabled in every live phase and "Hand back to the agent" resumes it; the plan marks the interrupted step "Paused - you are on the line" |
+
+### Landing page
+
+The public page at `/welcome` (src/features/landing) says what Recourse is in a headline and two sentences, then proves it with a replica of the call column that runs a simulated call on its own.
+It repeats the token values of the `.app` block on its own root, imports the icons and primitives, and links "Start a case" to the app's first page.
+The replica is decoration for sighted users: it is `aria-hidden` and `inert`, and a visually hidden sentence describes it; under `prefers-reduced-motion` it shows the finished call without motion.
+
+| Decision | Source | Role | Why |
+| --- | --- | --- | --- |
+| The product is the hero | Refero craft rule: one memorable detail; anti-slop tells on stock imagery and card grids | landing hero | a call that runs itself (status, timer, plan, transcript, outcome) explains the product faster than any illustration |
+| Split-flap outcome figure | componentry split-flap pattern, ported by hand in CSS; motion guide level 4 | landing outcome | each character steps through a glyph strip with `transform` only, and green appears only on the approved refund |
+| One timeline, layout reserved | Refero motion guide (transform and opacity only, reduced motion not optional) | landing animation | beats in `demo.ts` drive every change; untyped text stays in the layout as transparent glyphs, so nothing reflows while the call plays |

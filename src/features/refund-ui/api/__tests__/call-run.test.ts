@@ -115,7 +115,59 @@ describe("runCall: decision gate", () => {
   });
 });
 
+const TAGGED: CallScript = {
+  steps: [
+    { at: 0, phase: "dialing" },
+    { at: 1_000, phase: "ringing", step: "reach" },
+    { at: 3_000, phase: "talking", step: "explain" },
+    { at: 4_000, note: "Asked.", step: "ask" },
+    { at: 6_000, phase: "ended", step: "record" },
+  ],
+  gate: null,
+};
+
+describe("runCall: plan steps", () => {
+  it("tracks the plan step the script entered last", () => {
+    expect(runCall(TAGGED, [], 500).stepId).toBeNull();
+    expect(runCall(TAGGED, [], 1_000).stepId).toBe("reach");
+    expect(runCall(TAGGED, [], 3_500).stepId).toBe("explain");
+    expect(runCall(TAGGED, [], 4_000).stepId).toBe("ask");
+    expect(runCall(TAGGED, [], 6_000)).toMatchObject({ phase: "ended", stepId: "record" });
+  });
+
+  it("keeps the step while the user is on the line and moves on after they hand back", () => {
+    const join: Intervention[] = [{ kind: "join", at: 3_500 }];
+    expect(runCall(TAGGED, join, 10_000)).toMatchObject({ phase: "user_joined", stepId: "explain" });
+    expect(runCall(TAGGED, join, 23_999).stepId).toBe("explain");
+    expect(runCall(TAGGED, join, 24_000)).toMatchObject({ phase: "talking", stepId: "ask" });
+  });
+});
+
 describe("runCall: stepping in", () => {
+  it("lets the user step in while dialing and resumes the script where it stopped", () => {
+    const join: Intervention[] = [{ kind: "join", at: 500 }];
+    const joined = runCall(BASIC, join, 500);
+    expect(joined).toMatchObject({ phase: "user_joined", joined: true });
+    expect(notes(joined).at(-1)).toBe(`500 ${JOIN_NOTE}`);
+    expect(runCall(BASIC, join, 20_499)).toMatchObject({ phase: "user_joined", joined: true });
+    // Nothing in the script moved on while the user was on the line.
+    expect(phases(runCall(BASIC, join, 20_499))).toEqual([]);
+
+    const back = runCall(BASIC, join, 20_500);
+    expect(back).toMatchObject({ phase: "dialing", joined: false });
+    expect(notes(back).at(-1)).toBe(`20500 ${LEAVE_NOTE}`);
+    // Half a second of dialing was left when the user stepped in.
+    expect(runCall(BASIC, join, 20_999).phase).toBe("dialing");
+    expect(runCall(BASIC, join, 21_000).phase).toBe("ringing");
+    expect(runCall(BASIC, join, 28_000)).toMatchObject({ phase: "ended", endedAt: 28_000 });
+  });
+
+  it("lets the user step in while ringing", () => {
+    const run = runCall(BASIC, [{ kind: "join", at: 1_500 }], 2_000);
+    expect(run).toMatchObject({ phase: "user_joined", joined: true });
+    expect(runCall(BASIC, [{ kind: "join", at: 1_500 }], 22_000).phase).toBe("navigating_menu");
+  });
+
   it("pauses the script while the user is on the line, then hands back to the agent", () => {
     expect(JOIN_WINDOW_MS).toBe(20_000);
     const join: Intervention[] = [{ kind: "join", at: 6_000 }];
@@ -170,5 +222,58 @@ describe("runCall: stepping in", () => {
     expect(kinds(run).slice(-4)).toEqual(["decision_resolved", "note", "left", "note"]);
     expect(runCall(GATED, [{ kind: "join", at: 3_000 }, { kind: "answer", at: 4_000, optionId: "yes" }], 6_000))
       .toMatchObject({ phase: "ended", endedAt: 6_000 });
+  });
+});
+
+describe("runCall: spoken lines", () => {
+  const SPOKEN: CallScript = {
+    steps: [
+      { at: 0, phase: "dialing" },
+      { at: 1_000, phase: "talking", counterpart: { who: "human", confidence: 0.8 } },
+      { at: 1_500, say: { speaker: "support", text: "Billing, this is Sam." } },
+      { at: 2_500, say: { speaker: "agent", text: "Hi Sam. I'm calling about a duplicate charge." } },
+      { at: 4_000, say: { speaker: "support", text: "I can see it." } },
+      { at: 6_000, phase: "ended" },
+    ],
+    gate: null,
+  };
+  const lines = (run: CallRun): string[] => run.turns.map((t) => `${t.at} ${t.speaker}: ${t.text}`);
+
+  it("emits each line as a turn event, in order, at its script time", () => {
+    expect(lines(runCall(SPOKEN, [], 2_000))).toEqual(["1500 support: Billing, this is Sam."]);
+    const done = runCall(SPOKEN, [], 10_000);
+    expect(lines(done)).toEqual([
+      "1500 support: Billing, this is Sam.",
+      "2500 agent: Hi Sam. I'm calling about a duplicate charge.",
+      "4000 support: I can see it.",
+    ]);
+    const events = done.events.flatMap((e) => (e.kind === "turn" ? [`${e.at} ${e.speaker}`] : []));
+    expect(events).toEqual(["1500 support", "2500 agent", "4000 support"]);
+  });
+
+  it("holds the next line while the user is on the call and plays it after the hand back", () => {
+    const joins: Intervention[] = [{ kind: "join", at: 2_000 }];
+    const joined = runCall(SPOKEN, joins, 2_000 + JOIN_WINDOW_MS - 1);
+    expect(joined.joined).toBe(true);
+    expect(lines(joined)).toEqual(["1500 support: Billing, this is Sam."]);
+    // Script time resumes at 2 s when the window ends, so the agent's line lands 0.5 s later.
+    const resumed = runCall(SPOKEN, joins, 2_000 + JOIN_WINDOW_MS + 500);
+    expect(lines(resumed).at(-1)).toBe(`${2_500 + JOIN_WINDOW_MS} agent: Hi Sam. I'm calling about a duplicate charge.`);
+  });
+
+  it("plays the default branch's lines when nobody answers and the chosen branch's when someone does", () => {
+    const gated: CallScript = {
+      ...GATED,
+      gate: {
+        ...GATED.gate!,
+        after: { yes: [{ at: 2_500, say: { speaker: "agent", text: "They accept." } }], no: [{ at: 2_500, say: { speaker: "agent", text: "They decline." } }] },
+        afterByDefault: { no: [{ at: 2_500, say: { speaker: "agent", text: "I could not reach them in time." } }] },
+      },
+    };
+    const byDefault = runCall(gated, [], 2_000 + 5_000 + 1_000);
+    expect(byDefault.resolution).toMatchObject({ optionId: "no", by: "default" });
+    expect(byDefault.turns.map((t) => t.text)).toEqual(["I could not reach them in time."]);
+    const byUser = runCall(gated, [{ kind: "answer", at: 3_000, optionId: "no" }], 5_000);
+    expect(byUser.turns.map((t) => t.text)).toEqual(["They decline."]);
   });
 });

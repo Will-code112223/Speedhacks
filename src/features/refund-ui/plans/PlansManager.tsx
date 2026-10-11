@@ -26,6 +26,8 @@ export interface PlansManagerProps {
 
 export default function PlansManager({ plans, mode, onDone }: PlansManagerProps) {
   const headingId = useId();
+  const removedMessageId = useId();
+  const titleRef = useRef<HTMLHeadingElement>(null);
   const [rejections, setRejections] = useState<string[]>([]);
   const [lastRemoved, setLastRemoved] = useState<PlanRecord | null>(null);
 
@@ -34,6 +36,11 @@ export default function PlansManager({ plans, mode, onDone }: PlansManagerProps)
     const timer = window.setTimeout(() => setLastRemoved(null), UNDO_MS);
     return () => window.clearTimeout(timer);
   }, [lastRemoved]);
+
+  // Opened from the rail: move focus into the view so keyboard and screen reader users land on it.
+  useEffect(() => {
+    if (mode === "manage") titleRef.current?.focus();
+  }, [mode]);
 
   const handleFiles = (files: File[]) => {
     if (files.length === 0) return;
@@ -58,7 +65,7 @@ export default function PlansManager({ plans, mode, onDone }: PlansManagerProps)
     <section className={onboarding ? styles.onboarding : styles.manage} aria-labelledby={headingId}>
       <div className={styles.inner}>
         <header className={styles.intro}>
-          <h1 id={headingId} className={styles.title}>
+          <h1 id={headingId} ref={titleRef} tabIndex={-1} className={styles.title}>
             {onboarding ? "Add your insurance plans" : "Your plans"}
           </h1>
         </header>
@@ -110,14 +117,16 @@ export default function PlansManager({ plans, mode, onDone }: PlansManagerProps)
 
         {lastRemoved ? (
           <Banner
+            key={lastRemoved.id}
             role="status"
             actions={
-              <Button size="small" variant="secondary" onClick={undo}>
+              // The removed row took focus with it, so focus lands on the timed Undo.
+              <Button size="small" variant="secondary" onClick={undo} autoFocus aria-describedby={removedMessageId}>
                 Undo
               </Button>
             }
           >
-            Removed {lastRemoved.fileName}.
+            <span id={removedMessageId}>Removed {lastRemoved.fileName}.</span>
           </Banner>
         ) : null}
 
@@ -130,7 +139,7 @@ export default function PlansManager({ plans, mode, onDone }: PlansManagerProps)
             ) : null}
             {onboarding ? (
               <Button variant="primary" onClick={onDone} disabled={count === 0} data-testid="plans-continue">
-                Continue
+                Save plans and continue
               </Button>
             ) : (
               <Button variant="primary" onClick={onDone} data-testid="plans-continue">

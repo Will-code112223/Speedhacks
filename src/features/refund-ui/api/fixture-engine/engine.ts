@@ -15,10 +15,20 @@ import {
   type FixtureOptions,
   type FixtureScenario,
   type LiveCallV2,
+  type SummaryDelivery,
+  type SummaryDestination,
   type StartCallInput,
 } from "../types";
 import { assertNever } from "../assert-never";
 import { CASE_NOT_FOUND_MESSAGE } from "../messages";
+import {
+  CALL_NOT_COMPLETE_MESSAGE,
+  channelLabel,
+  completedCallFor,
+  composeSummary,
+  DESTINATION_MESSAGE,
+  isValidDestination,
+} from "../summary";
 import { UUID_PATTERN } from "../uuid";
 import { buildPacket } from "./documents";
 import {
@@ -65,6 +75,8 @@ class FixtureCaseApi implements CaseApi {
   readonly mode = "fixture";
   private readonly cases = new Map<string, CaseRecord>();
   private readonly callsByRequestId = new Map<string, CallRecord>();
+  /** Summaries sent, keyed by case, call and destination. */
+  private readonly summaries = new Map<string, SummaryDelivery>();
   private readonly speed: number;
   private readonly now: () => number;
   private readonly latencyMs: number;
@@ -318,11 +330,11 @@ class FixtureCaseApi implements CaseApi {
           "CALL_ENDED",
           live.startedAt === null ? "This call attempt ended without connecting." : "The call has ended.",
         );
-      case "dialing":
-      case "ringing":
-        return fail(409, "CALL_NOT_CONNECTED", "The call has not connected yet.");
       case "user_joined":
         return live;
+      // The user can step in at any live phase, before the call connects too; the script pauses until they hand back.
+      case "dialing":
+      case "ringing":
       case "navigating_menu":
       case "on_hold":
       case "talking":
@@ -356,6 +368,31 @@ class FixtureCaseApi implements CaseApi {
     }
     call.interventions.push({ kind: "answer", at: toVirtual(call.startedAtMs, now, this.speed), optionId });
     return this.liveView(record, call, now);
+  };
+
+  /** Composes and "sends" the summary. Nothing is mailed or texted; the timeline says simulated. */
+  readonly sendSummary = async (caseId: string, destination: SummaryDestination): Promise<SummaryDelivery> => {
+    await this.respond();
+    const now = this.now();
+    const record = this.find(caseId);
+    const caseData = this.view(record, now);
+    const call = completedCallFor(caseData);
+    if (call === null) fail(409, "CALL_NOT_COMPLETE", CALL_NOT_COMPLETE_MESSAGE);
+    if (!isValidDestination(destination)) fail(400, "BAD_REQUEST", `${DESTINATION_MESSAGE}.`, ["to"]);
+    const to = destination.to.trim();
+    // One send per call and destination: a repeat returns the stored delivery.
+    const key = `${record.id}:${call.id}:${destination.channel}:${to}`;
+    const sent = this.summaries.get(key);
+    if (sent !== undefined) return { ...sent, summary: [...sent.summary] };
+    const delivery: SummaryDelivery = { ...composeSummary(caseData, call, { ...destination, to }), sentAt: new Date(now).toISOString() };
+    this.summaries.set(key, delivery);
+    this.log(
+      record,
+      now,
+      "summary_sent",
+      `Transcript and summary sent by ${channelLabel(destination.channel)} to ${to} (simulated).`,
+    );
+    return { ...delivery, summary: [...delivery.summary] };
   };
 
   private find(caseId: string): CaseRecord {

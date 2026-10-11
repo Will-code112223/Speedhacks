@@ -12,10 +12,20 @@
  */
 
 import { assertNever } from "../assert-never";
-import type { Counterpart, DecisionOption, LiveCallPhase } from "../types";
+import type { Counterpart, DecisionOption, LiveCallPhase, TranscriptSpeaker } from "../types";
 
 /** Phases the script sets; `waiting_for_user` and `user_joined` come from pauses. */
 export type ScriptPhase = Exclude<LiveCallPhase, "waiting_for_user" | "user_joined">;
+
+/** Who speaks a scripted line; the user's own words are never scripted. */
+export type ScriptSpeaker = Exclude<TranscriptSpeaker, "user">;
+
+/** One spoken line of the call at a point in script time. */
+export interface RunTurn {
+  at: number;
+  speaker: ScriptSpeaker;
+  text: string;
+}
 
 export interface ScriptStep {
   /** Script time in ms (real ms at speed 1). The script clock stops during pauses. */
@@ -23,6 +33,10 @@ export interface ScriptStep {
   phase?: ScriptPhase;
   note?: string;
   counterpart?: { who: Counterpart; confidence: number };
+  /** The agent enters the plan step with this id here. */
+  step?: string;
+  /** A line spoken here, by the counterpart or the agent. */
+  say?: { speaker: ScriptSpeaker; text: string };
 }
 
 export interface DecisionGate {
@@ -35,6 +49,8 @@ export interface DecisionGate {
   timeoutMs: number;
   /** Steps after the decision, per option. Script time resumes from `at`. */
   after: Record<string, ScriptStep[]>;
+  /** Steps per option when the default applied because nobody answered; falls back to `after`. */
+  afterByDefault?: Record<string, ScriptStep[]>;
 }
 
 export interface CallScript {
@@ -48,6 +64,7 @@ export type Intervention = { kind: "join"; at: number } | { kind: "answer"; at: 
 export type CallRunEvent =
   | { kind: "phase"; at: number; phase: ScriptPhase }
   | { kind: "note"; at: number; text: string }
+  | { kind: "turn"; at: number; speaker: ScriptSpeaker; text: string }
   | { kind: "counterpart"; at: number; who: Counterpart; confidence: number }
   | { kind: "decision_raised"; at: number; expiresAt: number }
   | { kind: "decision_resolved"; at: number; optionId: string; by: "user" | "default" }
@@ -66,13 +83,17 @@ export interface CallRun {
   resolution: { optionId: string; by: "user" | "default"; at: number } | null;
   joined: boolean;
   endedAt: number | null;
+  /** The plan step the agent entered last; null before the first tagged step. */
+  stepId: string | null;
+  /** Every line spoken up to the requested time, in order. */
+  turns: RunTurn[];
 }
 
 /** How long stepping in pauses the agent when no decision answer ends it sooner. */
 export const JOIN_WINDOW_MS = 20_000;
 
-export const JOIN_NOTE = "You joined the call. The agent is listening and will take over again when you leave.";
-export const LEAVE_NOTE = "The agent took over the call again.";
+export const JOIN_NOTE = "You stepped in. The agent is paused and takes over again when you hand back.";
+export const LEAVE_NOTE = "You handed back. The agent took over the call again.";
 
 interface Occurrence {
   at: number;
@@ -83,6 +104,7 @@ interface Occurrence {
 
 export function runCall(script: CallScript, interventions: readonly Intervention[], until: number): CallRun {
   const events: CallRunEvent[] = [];
+  const turns: RunTurn[] = [];
   const queue: ScriptStep[] = [...script.steps];
   let scriptPhase: ScriptPhase = "dialing";
   let counterpart: Counterpart = "unknown";
@@ -95,6 +117,7 @@ export function runCall(script: CallScript, interventions: readonly Intervention
   let resolution: CallRun["resolution"] = null;
   let joinedUntil: number | null = null;
   let endedAt: number | null = null;
+  let stepId: string | null = null;
   let nextIntervention = 0;
 
   const paused = (): boolean => pending !== null || joinedUntil !== null;
@@ -114,6 +137,7 @@ export function runCall(script: CallScript, interventions: readonly Intervention
   };
 
   const applyStep = (step: ScriptStep): void => {
+    if (step.step !== undefined) stepId = step.step;
     if (step.phase !== undefined && step.phase !== scriptPhase) {
       scriptPhase = step.phase;
       events.push({ kind: "phase", at: clock, phase: step.phase });
@@ -124,6 +148,11 @@ export function runCall(script: CallScript, interventions: readonly Intervention
       events.push({ kind: "counterpart", at: clock, who: counterpart, confidence });
     }
     if (step.note !== undefined) note(step.note);
+    if (step.say !== undefined) {
+      const turn: RunTurn = { at: clock, speaker: step.say.speaker, text: step.say.text };
+      turns.push(turn);
+      events.push({ kind: "turn", ...turn });
+    }
     if (step.phase === "ended") endedAt = clock;
   };
 
@@ -139,7 +168,8 @@ export function runCall(script: CallScript, interventions: readonly Intervention
     const label = gate.options.find((o) => o.id === optionId)?.label ?? optionId;
     events.push({ kind: "decision_resolved", at: clock, optionId, by });
     note(by === "user" ? `You chose "${label}".` : `No answer before the deadline. Went with the default: "${label}".`);
-    queue.push(...(gate.after[optionId] ?? []));
+    const after = (by === "default" ? gate.afterByDefault?.[optionId] : undefined) ?? gate.after[optionId];
+    queue.push(...(after ?? []));
     queue.sort((a, b) => a.at - b.at);
   };
 
@@ -229,6 +259,8 @@ export function runCall(script: CallScript, interventions: readonly Intervention
     resolution,
     joined: joinedUntil !== null,
     endedAt,
+    stepId,
+    turns,
   };
 }
 

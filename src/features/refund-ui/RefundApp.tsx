@@ -303,6 +303,7 @@ function Workspace({ apiMode, plans }: WorkspaceProps) {
 // Call sheet (under 1024px)
 // ---------------------------------------------------------------------------
 
+/** The header's demo panel: a disclosure that also closes on Escape and on a pointer press outside it. */
 function CallSheet({ titleId, onClose, children }: { titleId: string; onClose: () => void; children: ReactNode }) {
   const panelRef = useRef<HTMLDivElement | null>(null);
 

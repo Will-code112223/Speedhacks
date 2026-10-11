@@ -26,7 +26,17 @@ import { createCaseApi } from "../api/client";
 import { inferScenario } from "../api/fixture";
 import { useActiveTime, useCasePolling, useLiveCall } from "../api/hooks";
 import { browserSessionStorage, getOrCreateRequestId } from "../api/request-id";
-import type { ApiMode, CaseApi, CaseApiCapabilities, CreateCaseInput, FixtureScenario, LiveCallV2 } from "../api/types";
+import { DESTINATION_MESSAGE, inferDestination } from "../api/summary";
+import {
+  ApiRequestError,
+  type ApiMode,
+  type CaseApi,
+  type CaseApiCapabilities,
+  type CreateCaseInput,
+  type FixtureScenario,
+  type LiveCallV2,
+  type SummaryDestination,
+} from "../api/types";
 import type { PlanRecord } from "../plans/store";
 import { attachmentsFor } from "./attachments";
 import { currentCall } from "./call";
@@ -34,7 +44,20 @@ import type { CaseSessionController, FixtureSettings } from "./controller";
 import { toUiError } from "./errors";
 import { createLocalId } from "./ids";
 import { createCaseRecovery, readRecoveryIndex, recoveryIndex, writeRecoveryIndex, type CaseRecovery } from "./recovery";
-import { initialSessionsState, pendingDecision, sessionsReducer, type CaseSession } from "./session";
+import { initialSessionsState, pendingDecision, sessionsReducer, summaryAutoSend, type CaseSession } from "./session";
+
+/**
+ * The post-call transcript and summary. Kept beside CaseSessionController so
+ * views built against the controller alone keep working; the chat shows the
+ * summary card only when these are present.
+ */
+export interface SummaryController {
+  /** Infers email or text message from what was typed, then sends (fixture) or composes (http). */
+  sendSummary(text: string): void;
+  editSummaryDestination(text: string): void;
+  /** Back to the form, to send to another address. */
+  resetSummary(): void;
+}
 
 export interface UseCaseSessionOptions {
   apiMode: ApiMode;
@@ -105,7 +128,7 @@ function saveBlob(blob: Blob, fileName: string): void {
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-export function useCaseSession({ apiMode, plans, measuring }: UseCaseSessionOptions): CaseSessionController {
+export function useCaseSession({ apiMode, plans, measuring }: UseCaseSessionOptions): CaseSessionController & SummaryController {
   const [state, dispatch] = useReducer(sessionsReducer, initialSessionsState);
   const [scenario, setScenarioState] = useState<FixtureScenario | null>(null);
   const [fixtureSettings, setFixtureSettingsState] = useState<FixtureSettings>(DEFAULT_FIXTURE_SETTINGS);
@@ -512,6 +535,66 @@ export function useCaseSession({ apiMode, plans, measuring }: UseCaseSessionOpti
     }
   }, [claim, release]);
 
+  const deliverSummary = useCallback(
+    async (session: CaseSession, text: string, destination: SummaryDestination, autoCallId: string | null) => {
+      if (session.caseId === null) return;
+      const guard = `summary:${session.key}`;
+      if (!claim(guard)) return;
+      const { key, api } = session;
+      dispatch({ type: "summary/sending", key, text, autoCallId });
+      try {
+        const delivery = await api.sendSummary(session.caseId, destination);
+        dispatch({ type: "summary/sent", key, delivery });
+        // The fixture logs the send on the case timeline; read it now.
+        void fetchCase(key, api, session.caseId);
+      } catch (error) {
+        dispatch({ type: "summary/failed", key, error: toUiError(error) });
+      } finally {
+        release(guard);
+      }
+    },
+    [claim, fetchCase, release],
+  );
+
+  const sendSummary = useCallback(
+    (text: string) => {
+      const session = latest.current.active;
+      if (!session || session.caseId === null) return;
+      const destination = inferDestination(text);
+      if (destination === null) {
+        dispatch({ type: "summary/edited", key: session.key, text });
+        dispatch({
+          type: "summary/failed",
+          key: session.key,
+          error: toUiError(new ApiRequestError(400, "BAD_REQUEST", DESTINATION_MESSAGE, ["to"])),
+        });
+        return;
+      }
+      void deliverSummary(session, text, destination, null);
+    },
+    [deliverSummary],
+  );
+
+  const editSummaryDestination = useCallback((text: string) => {
+    const session = latest.current.active;
+    if (session) dispatch({ type: "summary/edited", key: session.key, text });
+  }, []);
+
+  const resetSummary = useCallback(() => {
+    const session = latest.current.active;
+    if (session) dispatch({ type: "summary/reset", key: session.key });
+  }, []);
+
+  // Once the call completes with a transcript, send it to the email on file, once per call.
+  const autoSend = summaryAutoSend(active);
+  const autoCallId = autoSend?.callId ?? null;
+  useEffect(() => {
+    const session = latest.current.active;
+    const target = summaryAutoSend(session);
+    if (!session || !target || target.callId !== autoCallId) return;
+    void deliverSummary(session, target.destination.to, target.destination, target.callId);
+  }, [autoCallId, deliverSummary]);
+
   const selectCase = useCallback((key: string | null) => {
     selectionVersion.current += 1;
     dispatch({ type: "session/selected", key });
@@ -557,5 +640,8 @@ export function useCaseSession({ apiMode, plans, measuring }: UseCaseSessionOpti
     stepIn,
     leaveCall,
     downloadPacket,
+    sendSummary,
+    editSummaryDestination,
+    resetSummary,
   };
 }

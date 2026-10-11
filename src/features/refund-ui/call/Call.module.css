@@ -180,16 +180,16 @@
   cursor: default;
 }
 
-/* Counterpart labels carry meaning without competing with warning states. */
+/* A person stays neutral; an automated agent is marked in the accent, never a warning tone. */
 .badgeHuman {
   color: var(--rc-ink);
   background: var(--rc-canvas);
 }
 
 .badgeAgent {
-  color: var(--rc-ink);
-  background: var(--rc-surface);
-  border-color: var(--rc-border-strong);
+  color: var(--rc-accent);
+  background: var(--rc-accent-tint);
+  border-color: var(--rc-accent);
 }
 
 .badgeNeutral {
@@ -232,6 +232,249 @@
   transform: translateY(0);
 }
 
+/* ------------------------------------------------------------------------- */
+/* Call plan: dashboard line, segmented progress, then the ordered map.       */
+/* ------------------------------------------------------------------------- */
+
+.plan {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px;
+  border-bottom: 1px solid var(--rc-border);
+}
+
+.decisionSlot + .plan {
+  margin-top: 20px;
+  border-top: 1px solid var(--rc-border);
+}
+
+.planNow {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--rc-ink);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.planBar {
+  display: flex;
+  gap: 2px;
+  height: 4px;
+}
+
+.planSegment {
+  flex: 1;
+  min-width: 0;
+  border-radius: 2px;
+  background: var(--rc-border);
+  transition: background-color var(--rc-default) var(--rc-ease);
+}
+
+.segment_done {
+  background: var(--rc-ink);
+}
+
+.segment_current {
+  background: var(--rc-accent);
+}
+
+.segment_paused {
+  background: var(--rc-warning);
+}
+
+.planList {
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.planItem {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  gap: 8px;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.planNumber {
+  font-family: var(--rc-mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--rc-ink-3);
+}
+
+.planItem_current .planNumber,
+.planItem_paused .planNumber {
+  color: var(--rc-ink);
+}
+
+.planBody {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.planTitleRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 20px;
+}
+
+.planTitle {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--rc-ink);
+}
+
+.planItem_done .planTitle {
+  color: var(--rc-ink-2);
+}
+
+.planItem_current .planTitle,
+.planItem_paused .planTitle {
+  font-weight: 600;
+}
+
+.planItem_upcoming .planTitle {
+  color: var(--rc-ink-3);
+}
+
+.planCheck {
+  display: inline-flex;
+  color: var(--rc-ink-3);
+}
+
+.planPaused {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--rc-warning);
+  background: var(--rc-warning-tint);
+  white-space: nowrap;
+}
+
+.planDetail {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--rc-ink-2);
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ------------------------------------------------------------------------- */
+/* Live transcript: the spoken lines as they happen, newest kept in view.    */
+/* ------------------------------------------------------------------------- */
+
+.liveTranscript {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+  border-bottom: 1px solid var(--rc-border);
+}
+
+.liveTranscript > .sectionLabel {
+  margin-bottom: 12px;
+}
+
+/* About five lines tall; it scrolls on its own so the plan and activity stay put. */
+.turnList {
+  max-height: 232px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.turn {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 8px;
+  padding: 4px 0 4px 10px;
+  border-left: 2px solid transparent;
+  animation: noteIn var(--rc-default) var(--rc-ease);
+}
+
+/* The edge marks who is speaking; the words stay in the ink colour. */
+.turnAgent {
+  border-left-color: var(--rc-accent-tint);
+}
+
+.turnSpeaker {
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 19px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--rc-ink-3);
+}
+
+.turnText {
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--rc-ink);
+  overflow-wrap: anywhere;
+}
+
+.turnEmpty {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--rc-ink-2);
+}
+
+.listening {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 12px;
+  margin: 8px 0 0 12px;
+}
+
+.listeningDot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--rc-ink-3);
+  animation: beat 1.2s ease-in-out 4;
+}
+
+.listeningDot:nth-child(2) {
+  animation-delay: 150ms;
+}
+
+.listeningDot:nth-child(3) {
+  animation-delay: 300ms;
+}
+
 .liveError {
   flex: none;
   display: flex;
@@ -261,6 +504,11 @@
   flex-direction: column;
   gap: 16px;
   padding: 20px;
+}
+
+/* Keep room for the agent's notes under the plan; the column scrolls instead and the controls stay pinned. */
+.notes {
+  min-height: 180px;
 }
 
 .noteList {
@@ -330,14 +578,20 @@
   line-height: 1.6;
 }
 
+/* Pinned to the bottom of the column so stepping in is always one click away. */
 .controls {
   flex: none;
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
   display: flex;
   flex-direction: column;
   align-items: stretch;
   gap: 12px;
+  margin-top: auto;
   padding: 20px;
   border-top: 1px solid var(--rc-border);
+  background: var(--rc-canvas);
 }
 
 .controls > button {
@@ -420,6 +674,20 @@
   white-space: nowrap;
 }
 
+.callBarStep {
+  flex: none;
+  margin-left: auto;
+  font-family: var(--rc-mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--rc-ink-2);
+  white-space: nowrap;
+}
+
+.callBarStep + .callBarTimer {
+  margin-left: 0;
+}
+
 .callBarTimer {
   margin-left: auto;
   font-family: var(--rc-mono);
@@ -459,8 +727,17 @@
 @media (prefers-reduced-motion: reduce) {
   .dot_live,
   .badgePulse .badgeDot,
-  .note {
+  .note,
+  .turn {
     animation: none;
+  }
+
+  .listening {
+    display: none;
+  }
+
+  .planSegment {
+    transition: none;
   }
 }
 

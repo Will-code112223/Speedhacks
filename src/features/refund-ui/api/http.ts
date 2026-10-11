@@ -10,11 +10,13 @@
  */
 
 import { CASE_NOT_FOUND_MESSAGE } from "./messages";
+import { CALL_NOT_COMPLETE_MESSAGE, completedCallFor, composeSummary, DESTINATION_MESSAGE, isValidDestination } from "./summary";
 import {
   ApiRequestError,
   ApiUnreachableError,
   type CaseApi,
   type CaseApiCapabilities,
+  type CaseV1,
   type CreateCaseInput,
 } from "./types";
 import { isCallV1, isCaseV1, isLiveCallV2, isRecord, readApiError, readCapabilities } from "./validate";
@@ -96,6 +98,10 @@ export function createHttpCaseApi(options: HttpCaseApiOptions = {}): CaseApi {
   const callPath = (caseId: string, callId: string): string =>
     `${casePath(caseId)}/calls/${encodeURIComponent(callId)}`;
 
+  async function getCase(caseId: string, signal?: AbortSignal): Promise<CaseV1> {
+    return envelope(await send("GET", casePath(caseId), null, "application/json", signal), "case", isCaseV1, CASE_NOT_FOUND_MESSAGE);
+  }
+
   return {
     mode: "http",
 
@@ -103,9 +109,7 @@ export function createHttpCaseApi(options: HttpCaseApiOptions = {}): CaseApi {
       return envelope(await send("POST", "/api/cases", { form: toFormData(input) }), "case", isCaseV1);
     },
 
-    async getCase(caseId, signal) {
-      return envelope(await send("GET", casePath(caseId), null, "application/json", signal), "case", isCaseV1, CASE_NOT_FOUND_MESSAGE);
-    },
+    getCase,
 
     async patchCase(caseId, expectedRevision, changes) {
       const res = await send("PATCH", casePath(caseId), { json: { expectedRevision, changes } });
@@ -152,6 +156,17 @@ export function createHttpCaseApi(options: HttpCaseApiOptions = {}): CaseApi {
       return envelope(res, "liveCall", isLiveCallV2);
     },
 
+    // No summary route yet (proposed in docs/handoffs/frontend.txt): compose from the
+    // case here and return it unsent (sentAt null), so the person sends it from their own app.
+    async sendSummary(caseId, destination) {
+      const caseData = await getCase(caseId);
+      const call = completedCallFor(caseData);
+      if (call === null) throw new ApiRequestError(409, "CALL_NOT_COMPLETE", CALL_NOT_COMPLETE_MESSAGE);
+      if (!isValidDestination(destination)) {
+        throw new ApiRequestError(400, "BAD_REQUEST", `${DESTINATION_MESSAGE}.`, ["to"]);
+      }
+      return composeSummary(caseData, call, destination);
+    },
     async answerDecision(caseId, callId, decisionId, optionId) {
       if (!(await capabilities()).decisions) throw notSupported("Answering a decision");
       const path = `${callPath(caseId, callId)}/decisions/${encodeURIComponent(decisionId)}`;
