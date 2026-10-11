@@ -15,6 +15,8 @@ import {
   type FixtureOptions,
   type FixtureScenario,
   type LiveCallV2,
+  type SummaryDelivery,
+  type SummaryDestination,
   type StartCallInput,
 } from "../types";
 import { assertNever } from "../assert-never";
@@ -356,6 +358,13 @@ class FixtureCaseApi implements CaseApi {
     }
     call.interventions.push({ kind: "answer", at: toVirtual(call.startedAtMs, now, this.speed), optionId });
     return this.liveView(record, call, now);
+  };
+
+  readonly sendSummary = async (caseId: string, destination: SummaryDestination): Promise<SummaryDelivery> => {
+    await this.respond();
+    this.find(caseId);
+    void destination;
+    return fail(501, "NOT_SUPPORTED", "Sending the summary is not implemented yet.");
   };
 
   private find(caseId: string): CaseRecord {

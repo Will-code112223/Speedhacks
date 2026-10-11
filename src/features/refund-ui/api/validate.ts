@@ -21,6 +21,8 @@ import type {
   LiveCallNote,
   LiveCallPhase,
   LiveCallV2,
+  LiveCallTurn,
+  TranscriptSpeaker,
   CallPlan,
   CallPlanStep,
   CallPlanStepStatus,
@@ -204,6 +206,12 @@ function isPlan(v: unknown): v is CallPlan {
   return isRecord(v) && isArrayOf(v.steps, isPlanStep);
 }
 
+const SPEAKERS: Record<TranscriptSpeaker, true> = { support: true, agent: true, user: true };
+
+function isTurn(v: unknown): v is LiveCallTurn {
+  return isRecord(v) && isString(v.at) && oneOf(SPEAKERS, v.speaker) && isString(v.text);
+}
+
 export function isLiveCallV2(v: unknown): v is LiveCallV2 {
   return (
     isRecord(v) &&
@@ -222,6 +230,7 @@ export function isLiveCallV2(v: unknown): v is LiveCallV2 {
     (v.pendingDecision === null || isPendingDecision(v.pendingDecision)) &&
     isBoolean(v.userJoined) &&
     (v.progress === undefined || v.progress === null || isPlan(v.progress)) &&
+    (v.turns === undefined || isArrayOf(v.turns, isTurn)) &&
     isString(v.updatedAt)
   );
 }

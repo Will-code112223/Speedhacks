@@ -85,6 +85,15 @@ export interface LiveCallNote {
   text: string;
 }
 
+export type TranscriptSpeaker = "support" | "agent" | "user";
+
+/** One spoken line of the call, as the agent heard or said it. */
+export interface LiveCallTurn {
+  at: string;
+  speaker: TranscriptSpeaker;
+  text: string;
+}
+
 export interface DecisionOption {
   id: string;
   label: string;
@@ -148,7 +157,38 @@ export interface LiveCallV2 {
    * from the phase with `callPlanFor` in state/call.ts.
    */
   progress?: CallPlan | null;
+  /**
+   * Spoken lines so far, in order (V2 proposal, additive). Absent when the
+   * backend streams no transcript; the call's final transcript on CallV1 is
+   * still the record.
+   */
+  turns?: LiveCallTurn[];
   updatedAt: string;
+}
+
+export type SummaryChannel = "email" | "sms";
+
+/** Where to send the post-call summary: an email address or a mobile number. */
+export interface SummaryDestination {
+  channel: SummaryChannel;
+  to: string;
+}
+
+/**
+ * The transcript and short summary sent after a call by email or text
+ * message (V2 proposal). The fixture sends it and sets sentAt; a backend
+ * without a mail or SMS route returns it composed with sentAt null, and the
+ * UI offers to open it in the user's mail app or Messages instead.
+ */
+export interface SummaryDelivery {
+  channel: SummaryChannel;
+  to: string;
+  /** Email only. */
+  subject: string | null;
+  /** Short lines: outcome, reference, next step, call length. Sentence case. */
+  summary: string[];
+  transcript: string;
+  sentAt: string | null;
 }
 
 export interface CaseApiCapabilities {
@@ -185,6 +225,14 @@ export interface CaseApi {
   getLiveCall(caseId: string, callId: string): Promise<LiveCallV2 | null>;
   stepIn(caseId: string, callId: string): Promise<LiveCallV2>;
   answerDecision(caseId: string, callId: string, decisionId: string, optionId: string): Promise<LiveCallV2>;
+  /**
+   * Sends the transcript and a short summary of the case's latest completed
+   * call to an email address or a mobile number. Rejects 409 CALL_NOT_COMPLETE
+   * before a call has finished and 400 BAD_REQUEST (fields ["to"]) for an
+   * invalid destination. The http client composes the message client-side
+   * and returns sentAt null while the backend has no route.
+   */
+  sendSummary(caseId: string, destination: SummaryDestination): Promise<SummaryDelivery>;
 }
 
 // ---------------------------------------------------------------------------
