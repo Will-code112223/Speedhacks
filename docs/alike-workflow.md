@@ -1,6 +1,6 @@
 # Team workflow with Alike
 
-We are four people and several coding agents working on one repo for one day. [Alike](https://alike.help) gives every agent the same shared memory. Each session starts with a brief of what teammates decided and what they are working on right now, so no one re-litigates a decision or builds the same thing twice.
+We are a small team with several coding agents working on one repo for one day. [Alike](https://alike.help) gives every agent the same shared memory. Each session starts with a brief of what teammates decided and what they are working on right now, so no one re-litigates a decision or builds the same thing twice.
 
 ## Setup (10 minutes, once per laptop)
 
@@ -20,7 +20,7 @@ If anything fails, run `npx @alikeai/setup --doctor`.
 
 **One branch per workstream.** Start each agent session by naming the branch. Alike links the session to it and briefs the agent on related work.
 
-| Workstream | Branch | Covers |
+| Workstream (suggested; rename to fit the team) | Branch | Covers |
 | --- | --- | --- |
 | Inspect pipeline | `jonathan/factory-ai-demo` | `src/factory_ai/inspect`, `synth`, `cad` |
 | Maintain + Monitor | `<name>/maintain-monitor` | `src/factory_ai/maintain`, `monitor`, `spine.py` |
@@ -52,4 +52,4 @@ Ask your agent to record these on first use so the workspace starts with them:
 
 ## For the submission
 
-Alike is a SpeedHacks partner tool, with a $1,000 best-use prize. List it under technologies used, and say in one line how it helped, for example: "4 people, N agent sessions, decisions shared through Alike."
+Alike is a SpeedHacks partner tool, with a $1,000 best-use prize. List it under technologies used, and say in one line how it helped, for example: "N people, N agent sessions, decisions shared through Alike." (fill in the real numbers)
