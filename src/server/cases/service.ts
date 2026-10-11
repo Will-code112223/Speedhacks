@@ -53,6 +53,9 @@ export interface ServiceDeps {
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+/** Adapter rejection codes that mean "this server is misconfigured", not "the provider refused". */
+const CONFIG_REJECTION_CODES = new Set(["MISSING_CONFIG", "INVALID_CONFIG", "SERVER_ONLY", "INVALID_MODE"]);
+
 export class CaseService {
   constructor(private readonly deps: ServiceDeps) {}
 
@@ -68,6 +71,17 @@ export class CaseService {
     const row = this.deps.repo.getOwnedCase(id, ownerSession);
     if (!row) throw notFound();
     return row;
+  }
+
+  /** A case created in one mode never dispatches through the other mode's provider (e.g. after a restart with REFUND_MODE=live). */
+  private assertSameMode(row: CaseRow): void {
+    if (row.mode !== this.deps.config.mode) {
+      throw new ApiHttpError(
+        409,
+        "MODE_MISMATCH",
+        `Case was created in ${row.mode} mode but the server is running in ${this.deps.config.mode} mode`,
+      );
+    }
   }
 
   private assemble(id: string): CaseV1 {
@@ -260,6 +274,7 @@ export class CaseService {
     const { repo } = this.deps;
     repo.transaction(() => {
       const row = this.ownedRow(ownerSession, id);
+      this.assertSameMode(row);
       const calls = repo.listCalls(id);
       if (hasActiveCall(calls)) {
         throw new ApiHttpError(409, "CALL_IN_PROGRESS", "A new authorization is rejected while a call is active or its dispatch is unknown");
@@ -344,6 +359,7 @@ export class CaseService {
     let snapshot: AuthorizationSnapshot | null = null;
     const stored = repo.transaction((): CallRow | null => {
       const row = this.ownedRow(ownerSession, id);
+      this.assertSameMode(row);
       const auth = repo.getAuthorization(input.authorizationId);
       if (!auth || auth.caseId !== id) {
         throw new ApiHttpError(409, "AUTHORIZATION_CONFLICT", "Unknown authorization for this case");
@@ -408,6 +424,11 @@ export class CaseService {
       if (result.state === "accepted") {
         repo.updateCall(attemptId, { providerCallId: result.providerCallId, state: "queued", updatedAt: after });
         timeline.push(this.entry("call_dispatched", `Provider accepted the call (provider id ${result.providerCallId}, ${result.mode}).`));
+      } else if (result.state === "rejected" && CONFIG_REJECTION_CODES.has(result.code)) {
+        // Server misconfiguration surfaced by the adapter: nothing reached the provider and the
+        // user did nothing wrong, so the attempt is released instead of consuming the authorization.
+        repo.deleteCall(attemptId);
+        timeline.push(this.entry("call_dispatch_config_error", `Live configuration error before dispatch: ${result.code} ${result.message}`));
       } else if (result.state === "rejected") {
         // Definitive pre-dispatch refusal. MVP allows one attempt per authorization, so the
         // attempt is retained as failed and the authorization is consumed (audit trail kept).
@@ -429,6 +450,9 @@ export class CaseService {
       repo.updateCase(id, { doc: { ...row.doc, timeline, outcome }, updatedAt: after });
     });
 
+    if (result.state === "rejected" && CONFIG_REJECTION_CODES.has(result.code)) {
+      throw new ApiHttpError(503, "LIVE_CONFIGURATION_MISSING", `${result.code}: ${result.message}`);
+    }
     if (result.state === "rejected") {
       throw new ApiHttpError(503, "PROVIDER_UNAVAILABLE", `Provider rejected the call before dispatch: ${result.message}`);
     }
@@ -507,12 +531,13 @@ export class CaseService {
   // -------------------------------------------------------------------------
   private async reconcileDueCalls(caseId: string): Promise<void> {
     const { repo, config } = this.deps;
-    const due = repo.listCalls(caseId).filter((c) => {
-      if (!c.providerCallId || (c.state !== "queued" && c.state !== "in_progress")) return false;
-      if (!c.lastReconciledAt) return true;
-      return Date.parse(this.nowIso()) - Date.parse(c.lastReconciledAt) >= config.reconcile.minIntervalMs;
-    });
-    for (const call of due) {
+    const nowMs = Date.parse(this.nowIso());
+    const sinceReconcile = (c: CallRow) => (c.lastReconciledAt ? nowMs - Date.parse(c.lastReconciledAt) : Number.POSITIVE_INFINITY);
+    const calls = repo.listCalls(caseId).filter((c) => c.providerCallId !== null && c.mode === config.mode);
+    const inFlight = calls.filter(
+      (c) => (c.state === "queued" || c.state === "in_progress") && sinceReconcile(c) >= config.reconcile.minIntervalMs,
+    );
+    for (const call of inFlight) {
       try {
         await this.processCall(call.id, "poll");
       } catch (err) {
@@ -520,6 +545,62 @@ export class CaseService {
         repo.updateCall(call.id, { lastReconciledAt: this.nowIso(), updatedAt: this.nowIso() });
       }
     }
+    // Read-only recovery of a transcript that arrived after the wait window expired. Never redials.
+    const lateTranscript = calls.filter(
+      (c) =>
+        c.state === "completed" &&
+        c.transcript === null &&
+        nowMs - Date.parse(c.createdAt) <= config.reconcile.lateTranscriptWindowMs &&
+        sinceReconcile(c) >= config.reconcile.lateTranscriptIntervalMs,
+    );
+    for (const call of lateTranscript) await this.refreshLateTranscript(call.id);
+  }
+
+  private async refreshLateTranscript(callId: string): Promise<void> {
+    const { repo } = this.deps;
+    const call = repo.getCall(callId);
+    if (!call?.providerCallId) return;
+    let snapshot: VoiceSnapshot;
+    try {
+      snapshot = await this.deps.voice().getCall(call.providerCallId);
+    } catch (err) {
+      console.error("[reconcile] late transcript lookup failed", err);
+      repo.updateCall(callId, { lastReconciledAt: this.nowIso(), updatedAt: this.nowIso() });
+      return;
+    }
+    repo.transaction(() => {
+      const fresh = repo.getCall(callId);
+      if (!fresh || fresh.state !== "completed" || fresh.transcript !== null) return;
+      const now = this.nowIso();
+      if (!snapshot.transcript?.trim()) {
+        repo.updateCall(callId, { lastReconciledAt: now, updatedAt: now });
+        return;
+      }
+      const row = repo.getCase(fresh.caseId);
+      if (!row) return;
+      const auth = repo.getAuthorization(fresh.authorizationId);
+      const ctx = auth
+        ? { amountMinor: auth.snapshot.amountMinor, currency: auth.snapshot.currency, merchantName: auth.snapshot.merchant.name }
+        : { amountMinor: row.doc.amountMinor ?? 0, currency: row.doc.currency, merchantName: row.doc.merchant.name ?? "the merchant" };
+      const timeline = [...row.doc.timeline, this.entry("transcript_received_late", "Transcript arrived after the wait window; attached read-only.")];
+      let outcome = row.doc.outcome;
+      if (outcome.decision === "unknown") {
+        try {
+          outcome = analyzeTranscript(snapshot.transcript, ctx);
+        } catch (err) {
+          outcome = unknownOutcome(`Transcript analysis failed: ${String((err as Error).message ?? err)}.`);
+        }
+        timeline.push(
+          this.entry(
+            "outcome_published",
+            `Decision: ${outcome.decision}; reference: ${outcome.referenceNumber ?? "none"}; payment: ${outcome.paymentStatus}.`,
+          ),
+        );
+      }
+      // State stays completed: terminal states never regress; only the missing transcript and outcome are filled in.
+      repo.updateCall(callId, { transcript: snapshot.transcript, lastReconciledAt: now, updatedAt: now });
+      repo.updateCase(fresh.caseId, { doc: { ...row.doc, outcome, timeline }, updatedAt: now });
+    });
   }
 
   /** Fetch authenticated provider details and publish them atomically. Terminal states never regress. */
@@ -531,6 +612,7 @@ export class CaseService {
       repo.markEventsProcessed(call.providerCallId, call.id, this.nowIso());
       return;
     }
+    if (call.mode !== this.deps.config.mode) return; // a simulated call is never looked up through the live provider
     const snapshot = await this.deps.voice().getCall(call.providerCallId);
     this.publishSnapshot(call.id, snapshot, source);
   }

@@ -1,7 +1,8 @@
 import type { CaseChanges, CaseV1 } from "@/contracts/case";
 import type { CaseDoc } from "@/server/persistence/repository";
 
-export const E164 = /^\+[1-9]\d{1,14}$/;
+/** E.164 with at least 8 digits, matching the Dial adapter's own validation so dispatch never fails on format. */
+export const E164 = /^\+[1-9]\d{7,14}$/;
 export const CURRENCY = /^[A-Z]{3}$/;
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 

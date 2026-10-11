@@ -54,5 +54,19 @@ describe("late transcript reconciliation", () => {
     expect(cs.outcome.decision).toBe("unknown");
     expect(cs.outcome.nextAction).toMatch(/no transcript/);
     expect(cs.status).toBe("awaiting_response");
+
+    // A transcript that arrives later is attached read-only; state never regresses, outcome is evaluated once.
+    snapshot = { ...snapshot, transcript: "Support: I've processed the refund. Reference number is REF-99999." };
+    h.clock.advance(5000); // below LATE_TRANSCRIPT_INTERVAL_MS: no provider read yet
+    cs = await h.service.getCase(SESSION_A, c.id);
+    expect(cs.calls[0]?.transcript).toBeNull();
+    h.clock.advance(30_000);
+    cs = await h.service.getCase(SESSION_A, c.id);
+    expect(cs.calls[0]?.state).toBe("completed");
+    expect(cs.calls[0]?.transcript).toContain("REF-99999");
+    expect(cs.outcome.decision).toBe("approved");
+    expect(cs.outcome.referenceNumber).toBe("REF-99999");
+    expect(cs.timeline.filter((t) => t.type === "transcript_received_late")).toHaveLength(1);
+    expect(cs.status).toBe("approved");
   });
 });

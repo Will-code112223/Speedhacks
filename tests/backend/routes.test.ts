@@ -121,6 +121,39 @@ describe("HTTP routes", () => {
     expect(stale.status).toBe(409);
   });
 
+  it("webhook route cancels an oversized streamed body at 1 MiB without Content-Length (413)", async () => {
+    const total = 3 * 1024 * 1024;
+    const chunk = new Uint8Array(64 * 1024);
+    let pulled = 0;
+    let cancelled = false;
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (pulled >= total) {
+          controller.close();
+          return;
+        }
+        pulled += chunk.byteLength;
+        controller.enqueue(chunk);
+      },
+      cancel() {
+        cancelled = true;
+      },
+    });
+    const request = new Request("http://localhost/api/webhooks/dial", {
+      method: "POST",
+      body: stream,
+      headers: { "x-dial-signature": "t=1,v1=00" },
+      // @ts-expect-error duplex is required by Node for streamed request bodies
+      duplex: "half",
+    });
+    const res = await routes.webhook.POST(request);
+    expect(res.status).toBe(413);
+    expect(((await res.json()) as { error: { code: string } }).error.code).toBe("PAYLOAD_TOO_LARGE");
+    expect(cancelled).toBe(true);
+    expect(pulled).toBeLessThan(total);
+    expect(pulled).toBeLessThanOrEqual(1024 * 1024 + 2 * chunk.byteLength);
+  });
+
   it("webhook route returns 401 for an unsigned body and 204 for a ping", async () => {
     const unsigned = await routes.webhook.POST(new Request("http://localhost/api/webhooks/dial", { method: "POST", body: "{}" }));
     expect(unsigned.status).toBe(401);

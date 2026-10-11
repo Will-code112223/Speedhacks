@@ -134,6 +134,8 @@ export type ApiErrorCode =
   | "REVISION_CONFLICT" // 409 expectedRevision mismatch
   | "AUTHORIZATION_CONFLICT" // 409 authorization missing/stale/mismatched
   | "CALL_IN_PROGRESS" // 409 edit/authorize while a call is active or dispatch_unknown
+  | "MODE_MISMATCH" // 409 case was created in a different mode than the server runs in
+  | "PAYLOAD_TOO_LARGE" // 413 webhook body exceeds the limit
   | "MISSING_REQUIRED_FACTS" // 422 fields lists what is missing
   | "LIVE_CONFIGURATION_MISSING" // 503 live mode requested without configuration
   | "PROVIDER_UNAVAILABLE" // 503 provider rejected before dispatch

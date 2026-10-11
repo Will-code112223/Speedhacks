@@ -1,6 +1,6 @@
 import type { Mode } from "@/contracts/case";
 import type { VoiceAdapter } from "@/contracts/voice";
-import { createDialAdapter } from "@/integrations/dial";
+import { createDialAdapter, type DialDependencies } from "@/integrations/dial";
 import { CaseService } from "@/server/cases/service";
 import { createSimulatedVoiceAdapter } from "@/server/cases/simulated-voice";
 import { type AppConfig, loadConfig } from "@/server/config";
@@ -15,7 +15,12 @@ import { CaseRepository } from "@/server/persistence/repository";
  * handoff in docs/handoffs/dial.txt); simulated mode uses T2's own adapter so the
  * demo never depends on provider credentials.
  */
-const liveVoiceFactory: ((opts: { mode: Mode }) => VoiceAdapter) | null = createDialAdapter;
+const liveVoiceFactory: ((opts: { mode: Mode }, deps?: DialDependencies) => VoiceAdapter) | null = createDialAdapter;
+
+/** Test seam: inject the adapter's transport/clock without touching the composition logic. */
+export interface CompositionOverrides {
+  dialDependencies?: Omit<DialDependencies, "config">;
+}
 
 function buildExtractor(config: AppConfig): Extractor {
   if (config.mode === "live" && config.llm.model && config.llm.apiKey) {
@@ -25,7 +30,7 @@ function buildExtractor(config: AppConfig): Extractor {
   return new HeuristicExtractor();
 }
 
-function buildVoiceResolver(config: AppConfig): () => VoiceAdapter {
+function buildVoiceResolver(config: AppConfig, overrides: CompositionOverrides = {}): () => VoiceAdapter {
   let simulated: VoiceAdapter | null = null;
   let live: VoiceAdapter | null = null;
   return () => {
@@ -42,11 +47,31 @@ function buildVoiceResolver(config: AppConfig): () => VoiceAdapter {
     if (missing.length > 0) {
       throw new ApiHttpError(503, "LIVE_CONFIGURATION_MISSING", `Live voice requires ${missing.join(", ")}`, missing);
     }
+    if (config.dial.maxCallDurationInvalid !== null) {
+      throw new ApiHttpError(
+        503,
+        "LIVE_CONFIGURATION_MISSING",
+        `DIAL_MAX_CALL_DURATION_SECONDS must be an integer from 60 to 3600 (got "${config.dial.maxCallDurationInvalid}")`,
+        ["DIAL_MAX_CALL_DURATION_SECONDS"],
+      );
+    }
     if (!liveVoiceFactory) {
       throw new ApiHttpError(503, "LIVE_CONFIGURATION_MISSING", "Live voice adapter is not wired yet (teammate 3 handoff pending)");
     }
     try {
-      live ??= liveVoiceFactory({ mode: "live" });
+      // The adapter dispatches with exactly the values validated here; it never reads process.env on its own.
+      live ??= liveVoiceFactory(
+        { mode: "live" },
+        {
+          ...overrides.dialDependencies,
+          config: {
+            apiKey: config.dial.apiKey as string,
+            fromNumber: config.dial.fromNumber as string,
+            webhookSecret: config.dial.webhookSecret ?? undefined,
+            maxCallDurationSeconds: config.dial.maxCallDurationSeconds,
+          },
+        },
+      );
     } catch (err) {
       const code = (err as { code?: unknown })?.code;
       if (code === "MISSING_CONFIG" || code === "INVALID_CONFIG") {
@@ -58,14 +83,14 @@ function buildVoiceResolver(config: AppConfig): () => VoiceAdapter {
   };
 }
 
-export function buildCaseService(config: AppConfig = loadConfig()): CaseService {
+export function buildCaseService(config: AppConfig = loadConfig(), overrides: CompositionOverrides = {}): CaseService {
   const db = openDatabase(config.dataDir);
   return new CaseService({
     config,
     repo: new CaseRepository(db),
     uploads: new UploadStore(config.dataDir),
     extractor: buildExtractor(config),
-    voice: buildVoiceResolver(config),
+    voice: buildVoiceResolver(config, overrides),
   });
 }
 

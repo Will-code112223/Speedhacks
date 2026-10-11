@@ -8,10 +8,25 @@ export interface AppConfig {
   invalidMode: string | null;
   dataDir: string;
   llm: { provider: string; model: string | null; apiKey: string | null; baseUrl: string };
-  dial: { apiKey: string | null; webhookSecret: string | null; fromNumber: string | null };
+  dial: {
+    apiKey: string | null;
+    webhookSecret: string | null;
+    fromNumber: string | null;
+    /** Validated 60..3600; absent or blank defaults to 300. */
+    maxCallDurationSeconds: number;
+    /** Raw DIAL_MAX_CALL_DURATION_SECONDS when it is set but invalid (fails visibly). */
+    maxCallDurationInvalid: string | null;
+  };
   simulated: { webhookSecret: string; queuedMs: number; inProgressMs: number };
   upload: { maxFiles: number; maxBytes: number };
-  reconcile: { minIntervalMs: number; transcriptWaitMs: number };
+  reconcile: {
+    minIntervalMs: number;
+    transcriptWaitMs: number;
+    /** After a completed call was published without a transcript, re-read the provider at most this often. */
+    lateTranscriptIntervalMs: number;
+    /** Stop looking for a late transcript this long after the attempt was created. */
+    lateTranscriptWindowMs: number;
+  };
 }
 
 function str(v: string | undefined): string | null {
@@ -25,6 +40,14 @@ function int(v: string | undefined, fallback: number): number {
 }
 
 export type EnvSource = Record<string, string | undefined>;
+
+function parseDuration(raw: string | undefined): { maxCallDurationSeconds: number; maxCallDurationInvalid: string | null } {
+  const t = (raw ?? "").trim();
+  if (t === "") return { maxCallDurationSeconds: 300, maxCallDurationInvalid: null };
+  const n = /^\d+$/.test(t) ? Number.parseInt(t, 10) : Number.NaN;
+  if (Number.isInteger(n) && n >= 60 && n <= 3600) return { maxCallDurationSeconds: n, maxCallDurationInvalid: null };
+  return { maxCallDurationSeconds: 300, maxCallDurationInvalid: t };
+}
 
 export function loadConfig(env: EnvSource = process.env): AppConfig {
   const rawMode = (env.REFUND_MODE ?? "simulated").trim();
@@ -44,6 +67,7 @@ export function loadConfig(env: EnvSource = process.env): AppConfig {
       apiKey: str(env.DIAL_API_KEY),
       webhookSecret: str(env.DIAL_WEBHOOK_SECRET),
       fromNumber: str(env.DIAL_FROM_NUMBER),
+      ...parseDuration(env.DIAL_MAX_CALL_DURATION_SECONDS),
     },
     simulated: {
       webhookSecret: str(env.SIMULATED_WEBHOOK_SECRET) ?? "simulated-webhook-secret",
@@ -55,6 +79,8 @@ export function loadConfig(env: EnvSource = process.env): AppConfig {
       minIntervalMs: int(env.RECONCILE_MIN_INTERVAL_MS, 2000),
       // Dial's call.ended arrives before the transcript; keep reading for this long before publishing without one.
       transcriptWaitMs: int(env.TRANSCRIPT_WAIT_MS, 45_000),
+      lateTranscriptIntervalMs: int(env.LATE_TRANSCRIPT_INTERVAL_MS, 30_000),
+      lateTranscriptWindowMs: int(env.LATE_TRANSCRIPT_WINDOW_MS, 24 * 60 * 60 * 1000),
     },
   };
 }

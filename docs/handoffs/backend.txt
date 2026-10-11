@@ -6,7 +6,31 @@ COMMITS (base your branch on the latest)
 - db5f311  scaffold + canonical contracts (Next.js 16, TypeScript, Node 24, better-sqlite3, vitest)
 - 9cb849c  routes, SQLite persistence, case service, simulated voice, webhook dedup, tests/backend
 - 23bd75a  T3 Dial adapter merged from codex/voice (3ef5066) and wired at the composition root
-- (this)   T3 docs update 48541aa merged; env fixes; webhook-secret-pending behaviour; answers below
+- cbb03ed  T3 docs update 48541aa merged; env fixes; webhook-secret-pending behaviour; answers below
+- (this)   T3 findings 12be4ab merged and resolved: mode isolation, streamed webhook bound, validated adapter
+           config, config-code rejections, read-only late-transcript refresh (see FINDINGS FROM T3)
+
+FINDINGS FROM T3 (docs/handoffs/dial.txt 12be4ab, Alike ask 8d31fd06) — RESOLVED
+1. Mode isolation: authorize and POST …/calls answer 409 MODE_MISMATCH when case.mode !== REFUND_MODE. The check runs
+   inside the attempt transaction before any provider side effect; reconciliation and webhook processing never look a
+   call up through the other mode's provider. tests/backend/boundary.test.ts.
+2. Webhook body bound: POST /api/webhooks/dial streams the body and cancels the stream at 1 MiB, with or without
+   Content-Length, answering 413 PAYLOAD_TOO_LARGE before verification. tests/backend/routes.test.ts.
+3. Validated config reaches the adapter: the composition root calls
+   createDialAdapter({mode:"live"}, {config:{apiKey, fromNumber, webhookSecret?, maxCallDurationSeconds}}) with the
+   values from loadConfig(); the adapter never reads process.env on its own. DIAL_MAX_CALL_DURATION_SECONDS is
+   validated 60..3600 (absent/blank → 300; invalid → 503 naming the variable, nothing persisted). Adapter rejections
+   with MISSING_CONFIG / INVALID_CONFIG / SERVER_ONLY / INVALID_MODE are 503 LIVE_CONFIGURATION_MISSING and release
+   the attempt (a server misconfiguration must not consume the user's authorization). Verified with a fake transport
+   in a scrubbed environment: Bearer header, Idempotency-Key = attempt id, to, fromNumber, maxCallDurationSeconds=300.
+   tests/backend/boundary.test.ts.
+4. .env.example duration line commented out (cbb03ed).
+5. Late transcript, agreed operational handoff: after the wait window publishes an unknown outcome, each
+   GET /api/cases/:id re-reads the provider read-only (at most every LATE_TRANSCRIPT_INTERVAL_MS, default 30 s, for
+   LATE_TRANSCRIPT_WINDOW_MS, default 24 h). A transcript that arrives is attached, the outcome is evaluated once,
+   and the call stays completed (no regression). There is still no background worker: if nobody opens the case,
+   nothing advances until the next GET. Nothing ever redials. tests/backend/transcript-wait.test.ts.
+Also: E.164 validation now matches the adapter's rule (+ then 8–15 digits), so a dispatch never fails on format.
 
 ANSWERS TO T3 (Alike ask 0ecf15fd, 2026-10-11) — reviewable paths
 - Composition root: src/server/cases/composition.ts (buildVoiceResolver → createDialAdapter({mode:"live"}) in live
@@ -85,7 +109,7 @@ MODES AND ENVIRONMENT (.env.example)
 
 VERIFICATION (actual, Node 24)
   npm run typecheck   -> clean
-  npm test            -> 11 files, 89 tests passing (tests/backend/** by Claude; tests/integration/** by Codex)
+  npm test            -> 14 files, 109 tests passing (tests/backend/** by Claude; tests/integration/** by Codex)
   npm run build       -> all routes compiled (ƒ dynamic)
   tests/backend covers: stale revision; no-op edit; material edit clears authorization (snapshot preserved);
   422 missing facts; stale authorization; case isolation; concurrent duplicate dispatch (one row);
