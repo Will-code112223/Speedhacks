@@ -19,6 +19,8 @@ import {
   type SessionsState,
   type ThreadItem,
 } from "../session";
+import { summaryAutoSend } from "../session";
+import { inferDestination } from "../../api/summary";
 
 const T0 = Date.parse("2026-10-11T19:00:00.000Z");
 const KEY = "case-1";
@@ -290,5 +292,71 @@ describe("session reducer with the fixture backend", () => {
     expect(state.unassignedActiveMs).toBe(0);
     expect(state.sessions[0]?.activeMs).toBe(5000);
     expect(state.sessions[0]?.thread.map((item) => item.kind)).toEqual(["user", "assistant"]);
+  });
+});
+
+describe("post-call summary", () => {
+  async function completedRefund(input: { customerEmail?: string } = {}) {
+    const h = harness("duplicate_charge");
+    await h.start("Get a refund for a duplicate $49.99 charge from Ridgeline Outfitters", input);
+    await h.approve();
+    await h.poll();
+    return h;
+  }
+
+  it("sends to the email on file once, when the call completes with a transcript", async () => {
+    const h = await completedRefund({ customerEmail: "jordan@example.com" });
+    h.seconds(10);
+    await h.poll();
+    expect(summaryAutoSend(h.session())).toBeNull();
+
+    h.seconds(30);
+    await h.poll();
+    const callId = h.session().caseData!.calls[0]!.id;
+    const target = summaryAutoSend(h.session());
+    expect(target).toEqual({ callId, destination: { channel: "email", to: "jordan@example.com" } });
+
+    // What useCaseSession does with the target.
+    h.run({ type: "summary/sending", key: KEY, text: target!.destination.to, autoCallId: target!.callId });
+    expect(summaryAutoSend(h.session())).toBeNull();
+    const delivery = await h.api.sendSummary(h.session().caseId!, target!.destination);
+    h.run({ type: "summary/sent", key: KEY, delivery });
+    expect(h.session().summaryShare).toMatchObject({ status: "sent", delivery, error: null, autoSentCallId: callId });
+
+    // Going back to the form to send elsewhere never re-triggers the automatic send for this call.
+    h.run({ type: "summary/reset", key: KEY });
+    expect(h.session().summaryShare).toMatchObject({ status: "idle", delivery: null, destinationText: "", autoSentCallId: callId });
+    await h.poll();
+    expect(summaryAutoSend(h.session())).toBeNull();
+    expect(h.session().caseData!.timeline.filter((t) => t.type === "summary_sent")).toHaveLength(1);
+  });
+
+  it("stores the delivery the person sends from the form when no email is on file", async () => {
+    const h = await completedRefund();
+    h.seconds(30);
+    await h.poll();
+    expect(summaryAutoSend(h.session())).toBeNull();
+
+    h.run({ type: "summary/edited", key: KEY, text: "+1 415 555 0123" });
+    const destination = inferDestination(h.session().summaryShare.destinationText)!;
+    h.run({ type: "summary/sending", key: KEY, text: "+1 415 555 0123", autoCallId: null });
+    expect(h.session().summaryShare.status).toBe("sending");
+    const delivery = await h.api.sendSummary(h.session().caseId!, destination);
+    h.run({ type: "summary/sent", key: KEY, delivery });
+    expect(h.session().summaryShare).toEqual({
+      status: "sent",
+      delivery,
+      error: null,
+      destinationText: "+1 415 555 0123",
+      autoSentCallId: null,
+    });
+    expect(delivery).toMatchObject({ channel: "sms", to: "+1 415 555 0123", subject: null });
+
+    // A composed message (http path, sentAt null) is "composed", not "sent".
+    h.run({ type: "summary/sent", key: KEY, delivery: { ...delivery, sentAt: null } });
+    expect(h.session().summaryShare.status).toBe("composed");
+
+    h.run({ type: "summary/failed", key: KEY, error: toUiError(new ApiRequestError(409, "CALL_NOT_COMPLETE", "The call has not finished yet.")) });
+    expect(h.session().summaryShare).toMatchObject({ status: "error", error: { message: "The call has not finished yet." } });
   });
 });

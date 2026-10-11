@@ -1,0 +1,210 @@
+/* Recourse landing. Token values repeat the .app block in refund-ui/RefundApp.module.css. */
+.page {
+  --rc-canvas: #ffffff;
+  --rc-surface: #f3f4f4;
+  --rc-hover: #e6e9e8;
+  --rc-border: #dfe3e2;
+  --rc-border-strong: #858d8a;
+  --rc-ink: #202625;
+  --rc-ink-2: #505a57;
+  --rc-ink-3: #64706b;
+  --rc-accent: #2457e6;
+  --rc-accent-hover: #1d49c4;
+  --rc-accent-tint: #eaf0ff;
+  --rc-on-accent: #ffffff;
+  --rc-success: #15803d;
+  --rc-success-tint: #ecfdf3;
+  --rc-font: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --rc-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --rc-fast: 120ms;
+  --rc-ease: cubic-bezier(0.2, 0, 0, 1);
+  --rc-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --rc-radius: 4px;
+  --rc-radius-control: 6px;
+  --gutter: 24px;
+
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow-x: clip;
+  background: var(--rc-canvas);
+  color: var(--rc-ink);
+  font-family: var(--rc-font);
+  font-size: 14px;
+  line-height: 1.5;
+  color-scheme: light;
+  -webkit-font-smoothing: antialiased;
+}
+
+.page :focus-visible { outline: 2px solid var(--rc-accent); outline-offset: 2px; }
+
+.container {
+  width: 100%;
+  max-width: calc(1120px + 2 * var(--gutter));
+  margin: 0 auto;
+  padding: 0 var(--gutter);
+  box-sizing: border-box;
+}
+
+/* Header and footer ------------------------------------------------------- */
+.header { border-bottom: 1px solid var(--rc-border); }
+.headerInner { display: flex; align-items: center; justify-content: space-between; height: 68px; }
+.home { color: var(--rc-ink); text-decoration: none; border-radius: var(--rc-radius); }
+.brand { display: flex; align-items: center; gap: 10px; }
+.brandMark { width: 28px; height: 28px; }
+.wordmark { font-size: 21px; font-weight: 600; letter-spacing: -0.055em; }
+.textLink,
+.demoLink {
+  color: var(--rc-accent);
+  font-size: 15px;
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+  border-radius: 2px;
+  transition: color var(--rc-fast) var(--rc-ease);
+}
+.textLink:hover,
+.demoLink:hover { color: var(--rc-accent-hover); }
+.footer { margin-top: auto; border-top: 1px solid var(--rc-border); }
+.footerInner { margin-top: 0; margin-bottom: 0; padding-top: 24px; padding-bottom: 24px; font-size: 12px; color: var(--rc-ink-3); }
+
+/* Hero -------------------------------------------------------------------- */
+.main { padding-bottom: 96px; }
+.hero { padding-top: 120px; }
+.headline {
+  margin: 0;
+  font-size: clamp(31px, 7vw, 92px);
+  font-weight: 600;
+  line-height: 1.02;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+}
+.leadLine { display: block; }
+
+/* Kinetic reveal, once on load: each word rises out of a blur. */
+.reveal {
+  display: inline-block;
+  animation: reveal 720ms var(--rc-ease-out) both;
+  animation-delay: var(--reveal-delay, 0ms);
+}
+@keyframes reveal {
+  from { opacity: 0; transform: translateY(20px); filter: blur(6px); }
+}
+
+/* The rolling slot: a stage that animates its width, two stacked layers, the period attached. */
+.slotLine { position: relative; display: flex; align-items: flex-start; color: var(--rc-accent); }
+.filterDefs { position: absolute; width: 0; height: 0; overflow: hidden; pointer-events: none; }
+.stage { position: relative; display: block; flex: none; max-width: 100%; user-select: none; }
+.layer {
+  display: block;
+  width: max-content;
+  white-space: pre;
+  transform-origin: left center;
+}
+.layerNext { position: absolute; top: 0; left: 0; opacity: 0; filter: blur(12px); transform: scale(0.992); }
+.period { flex: none; }
+
+.explanation { max-width: 56ch; margin: 32px 0 0; font-size: 20px; line-height: 1.5; color: var(--rc-ink-2); text-wrap: pretty; }
+.actions { display: flex; align-items: center; flex-wrap: wrap; gap: 16px 28px; margin-top: 40px; }
+.primary {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 20px;
+  border-radius: var(--rc-radius-control);
+  background: var(--rc-ink);
+  color: var(--rc-canvas);
+  font-size: 15px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: background-color var(--rc-fast) var(--rc-ease), transform var(--rc-fast) var(--rc-ease);
+}
+.primary:hover { background: #3c4843; }
+.primary:active { transform: translateY(1px); }
+.demoLink { display: inline-flex; align-items: center; gap: 4px; }
+.demoLink svg { flex: none; transition: transform var(--rc-fast) var(--rc-ease); }
+.demoLink:hover svg { transform: translateX(2px); }
+
+/* Velocity band ------------------------------------------------------------ */
+.band {
+  display: grid;
+  gap: 12px;
+  margin-top: 96px;
+  padding: 24px 0;
+  border-top: 1px solid var(--rc-border);
+  border-bottom: 1px solid var(--rc-border);
+  overflow: hidden;
+}
+.row { position: relative; }
+.track { display: flex; width: max-content; will-change: transform; }
+.copy {
+  flex: none;
+  white-space: nowrap;
+  font-size: clamp(40px, 6.5vw, 88px);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  color: var(--rc-ink);
+}
+.accent { color: var(--rc-accent); }
+.sep { display: inline-block; width: 0.6em; height: 0.6em; margin: 0 0.5em; color: var(--rc-accent); vertical-align: 0.02em; }
+.sep svg { display: block; width: 100%; height: 100%; stroke-width: 2; }
+
+/* Steps and proof ---------------------------------------------------------- */
+.steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 96px 0 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--rc-border);
+}
+.step { display: flex; flex-direction: column; gap: 4px; padding: 24px 24px 0; border-left: 1px solid var(--rc-border); }
+.step:first-child { padding-left: 0; border-left: 0; }
+.stepNumber { margin-bottom: 8px; font-family: var(--rc-mono); font-size: 12px; color: var(--rc-ink-3); font-variant-numeric: tabular-nums; }
+.stepTitle { font-size: 16px; font-weight: 600; letter-spacing: -0.01em; }
+.stepBody { max-width: 32ch; color: var(--rc-ink-2); }
+.proof {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 56px 0 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--rc-ink-3);
+}
+.proofIcon { display: inline-flex; flex: none; margin-top: 2px; color: var(--rc-success); }
+
+/* Phones ------------------------------------------------------------------- */
+@media (max-width: 767px) {
+  .page { --gutter: 16px; }
+  .main { padding-bottom: 64px; }
+  .hero { padding-top: 64px; }
+  .explanation { font-size: 18px; }
+  .band { margin-top: 64px; }
+  .steps { grid-template-columns: minmax(0, 1fr); margin-top: 64px; }
+  .proof { margin-top: 32px; }
+  .step,
+  .step:first-child { padding: 20px 0; border-left: 0; }
+  .step + .step { border-top: 1px solid var(--rc-border); }
+}
+
+/* Reduced motion: the finished state. First word, still band showing each sentence once. */
+@media (prefers-reduced-motion: reduce) {
+  .page { --rc-fast: 0ms; }
+  .reveal { animation: none; }
+  .track {
+    display: block;
+    width: auto;
+    max-width: calc(1120px + 2 * var(--gutter));
+    margin: 0 auto;
+    padding: 0 var(--gutter);
+    box-sizing: border-box;
+    transform: none !important;
+  }
+  .copy { white-space: normal; text-wrap: balance; }
+  .copy:not(:first-child),
+  .sep { display: none; }
+}

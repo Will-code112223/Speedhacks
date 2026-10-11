@@ -274,6 +274,7 @@ function toLiveCall(
     endedAt: run.endedAt === null ? null : at(run.endedAt),
     holdSeconds: Math.floor(run.holdMs / speed / 1000),
     notes: run.events.flatMap((e) => (e.kind === "note" ? [{ at: at(e.at), text: e.text }] : [])),
+    turns: run.turns.map((t) => ({ at: at(t.at), speaker: t.speaker, text: t.text })),
     pendingDecision:
       run.pendingDecision !== null && gate !== null
         ? {
@@ -344,6 +345,7 @@ function callTimeline(
         add(event.at, "user_left_call", LEAVE_NOTE);
         break;
       case "note":
+      case "turn":
         break;
       default:
         assertNever(event);
