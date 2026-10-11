@@ -21,6 +21,9 @@ import type {
   LiveCallNote,
   LiveCallPhase,
   LiveCallV2,
+  CallPlan,
+  CallPlanStep,
+  CallPlanStepStatus,
   PendingDecision,
 } from "./types";
 
@@ -185,6 +188,22 @@ function isNote(v: unknown): v is LiveCallNote {
   return isRecord(v) && isString(v.at) && isString(v.text);
 }
 
+const PLAN_STEP_STATUSES: Record<CallPlanStepStatus, true> = { done: true, current: true, paused: true, upcoming: true };
+
+function isPlanStep(v: unknown): v is CallPlanStep {
+  return (
+    isRecord(v) &&
+    isString(v.id) &&
+    isString(v.title) &&
+    (v.detail === undefined || isString(v.detail)) &&
+    oneOf(PLAN_STEP_STATUSES, v.status)
+  );
+}
+
+function isPlan(v: unknown): v is CallPlan {
+  return isRecord(v) && isArrayOf(v.steps, isPlanStep);
+}
+
 export function isLiveCallV2(v: unknown): v is LiveCallV2 {
   return (
     isRecord(v) &&
@@ -202,6 +221,7 @@ export function isLiveCallV2(v: unknown): v is LiveCallV2 {
     isArrayOf(v.notes, isNote) &&
     (v.pendingDecision === null || isPendingDecision(v.pendingDecision)) &&
     isBoolean(v.userJoined) &&
+    (v.plan === undefined || v.plan === null || isPlan(v.plan)) &&
     isString(v.updatedAt)
   );
 }

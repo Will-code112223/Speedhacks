@@ -5,7 +5,7 @@
  */
 
 import type { CallState, CallV1, CaseStatus, CaseV1 } from "../../../contracts/case";
-import type { Counterpart, LiveCallPhase, LiveCallV2 } from "../api/types";
+import type { CallPlan, CallPlanStep, Counterpart, LiveCallPhase, LiveCallV2 } from "../api/types";
 import { statusWord } from "../ui/format";
 
 /** Case statuses where the call flow is over and the outcome card shows. */
@@ -136,19 +136,71 @@ export function phaseEventText(live: LiveCallV2): string {
   }
 }
 
-export function counterpartLabel(counterpart: Counterpart): string {
-  switch (counterpart) {
-    case "human":
-      return "Talking to a person";
-    case "agent":
-      return "Automated agent";
-    case "unknown":
-      return "Identifying who answered";
+/**
+ * The plan to show for a call: the backend's when it reports one, otherwise
+ * four steps derived from the live phase so a V2 backend without plans still
+ * shows where the agent is. Null without live data, since a V1 call state
+ * says nothing about progress.
+ */
+export function callPlanFor(live: LiveCallV2 | null): CallPlan | null {
+  if (live === null) return null;
+  if (live.plan) return live.plan;
+  return derivedPlan(live);
+}
+
+const DERIVED_STEPS: readonly { id: string; title: string; detail: string }[] = [
+  { id: "reach", title: "Reach the line", detail: "Dialing and waiting for an answer." },
+  { id: "route", title: "Get to the right team", detail: "Phone menu and hold." },
+  { id: "case", title: "Make the case", detail: "State the facts and ask for the outcome." },
+  { id: "record", title: "Record the outcome", detail: "Reference number, next step and transcript." },
+];
+
+function derivedStepIndex(phase: LiveCallPhase): number {
+  switch (phase) {
+    case "dialing":
+    case "ringing":
+      return 0;
+    case "navigating_menu":
+    case "on_hold":
+      return 1;
+    case "talking":
+    case "waiting_for_user":
+    case "user_joined":
+      return 2;
+    case "ended":
+      return 3;
     default: {
-      const unreachable: never = counterpart;
+      const unreachable: never = phase;
       return unreachable;
     }
   }
+}
+
+function derivedPlan(live: LiveCallV2): CallPlan {
+  const ended = live.phase === "ended";
+  const current = derivedStepIndex(live.phase);
+  const paused = live.userJoined || live.phase === "user_joined";
+  return {
+    steps: DERIVED_STEPS.map((step, index) => ({
+      ...step,
+      status: ended ? "done" : index < current ? "done" : index === current ? (paused ? "paused" : "current") : "upcoming",
+    })),
+  };
+}
+
+/** The step the agent is on (current or paused), with its 1-based position. */
+export function currentPlanStep(plan: CallPlan): { step: CallPlanStep; position: number } | null {
+  const index = plan.steps.findIndex((step) => step.status === "current" || step.status === "paused");
+  if (index === -1) return null;
+  const step = plan.steps[index];
+  return step ? { step, position: index + 1 } : null;
+}
+
+/** "Step 2 of 5" style summary for the call bar and the dashboard line. */
+export function planProgressText(plan: CallPlan): string {
+  const current = currentPlanStep(plan);
+  if (current) return `Step ${current.position} of ${plan.steps.length}`;
+  return plan.steps.every((step) => step.status === "done") ? "All steps done" : `${plan.steps.length} steps`;
 }
 
 /** The chat line when the counterpart becomes known or changes. */

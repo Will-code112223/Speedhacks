@@ -101,6 +101,28 @@ export interface PendingDecision {
   expiresAt: string;
 }
 
+export type CallPlanStepStatus = "done" | "current" | "paused" | "upcoming";
+
+/** One thing the agent plans to do on the call, in order. */
+export interface CallPlanStep {
+  id: string;
+  /** Sentence case, names the action: "Explain the duplicate charge". */
+  title: string;
+  /** Optional one-line detail shown under the current step. */
+  detail?: string;
+  status: CallPlanStepStatus;
+}
+
+/**
+ * The agent's plan for the call and where it is in it. "paused" marks the
+ * step the user interrupted by stepping in; it becomes "current" again when
+ * the agent takes over. Exactly one step is current or paused while the call
+ * is live; every step is done once the call ends normally.
+ */
+export interface CallPlan {
+  steps: CallPlanStep[];
+}
+
 export interface LiveCallV2 {
   callId: string;
   caseId: string;
@@ -118,6 +140,12 @@ export interface LiveCallV2 {
   notes: LiveCallNote[];
   pendingDecision: PendingDecision | null;
   userJoined: boolean;
+  /**
+   * The agent's plan and progress (V2 proposal, additive). Absent or null
+   * when the backend does not report one; the UI then derives a plan from
+   * the phase with `callPlanFor` in state/call.ts.
+   */
+  plan?: CallPlan | null;
   updatedAt: string;
 }
 
