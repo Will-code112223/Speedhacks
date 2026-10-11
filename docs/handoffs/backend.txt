@@ -241,3 +241,14 @@ V1.1 IMPLEMENTED (T2 + T3 adapter, Jonathan took ownership of the adapter part; 
   409 AUTHORIZATION_CONFLICT. CaseV1.authorization.purpose is set. Brief/outcome text never says "[amount missing]".
 - T1 note: CaseV1.missingFields/status keep V1 semantics (a case without an amount shows needs_information) even though
   it can be authorized for gather_information. Not yet built: slice 2 behavior (transcript answers → proposedUpdates).
+V1.1 SLICE 2 (proposed updates) + purpose-neutral creation
+- ea08e7d: a case with no amount gets an information-request draft ("not requesting a refund"); the live extraction
+  prompt no longer assumes a refund or duplicate charge. With an amount the V1 refund draft is unchanged.
+- src/server/cases/answers.ts proposeUpdates(): deterministic answers to the plan's approved questions from LABELED
+  support-side transcript lines only (reference, timeline, requirements; amount → fact amountMinor only when the plan
+  had it as null). Verbatim quote, status "pending". Stored on CaseDoc.proposedUpdates once per call, only when the call
+  belongs to the current authorization AND revision (in-time and late-transcript paths). Nothing is applied.
+- POST /api/cases/:id/proposed-updates/:updateId {decision: "accept"|"reject", expectedRevision}: reject records only;
+  accepting a question answer records only; accepting a fact is patchCase (new revision, authorization cleared) and
+  requires the proposal's revision === current revision (409 otherwise). Already-reviewed → 400.
+- T1: CaseV1.proposedUpdates (optional) is ready to render with quote + accept/reject.

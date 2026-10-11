@@ -15,6 +15,7 @@ import {
 } from "@/server/cases/facts";
 import { evaluateHistory, unavailableHistory, type HistoryCheck, type TransactionHistory } from "@/server/cases/history";
 import { merchantRecordSummary, type FrozenMerchantRecord, type MerchantInsights, type MerchantInsightsResult } from "@/server/cases/insights";
+import { proposeUpdates } from "@/server/cases/answers";
 import { analyzeTranscript, unknownOutcome } from "@/server/cases/outcome";
 import { type AppConfig, assertLiveLlmConfig, assertModeValid } from "@/server/config";
 import type { ExtractedFields, Extractor } from "@/server/documents/extractor";
@@ -250,6 +251,49 @@ export class CaseService {
   // -------------------------------------------------------------------------
   // PATCH /api/cases/:id
   // -------------------------------------------------------------------------
+  /**
+   * V1.1: the user reviews one transcript proposal. Rejecting only records the decision.
+   * Accepting a fact proposal is an ordinary user edit through patchCase (new revision,
+   * authorization cleared); accepting a question answer records it without changing facts.
+   */
+  reviewProposedUpdate(ownerSession: string, id: string, updateId: string, decision: "accept" | "reject", expectedRevision: number): CaseV1 {
+    const { repo } = this.deps;
+    repo.transaction(() => {
+      const row = this.ownedRow(ownerSession, id);
+      this.assertSameMode(row);
+      if (expectedRevision !== row.revision) {
+        throw new ApiHttpError(409, "REVISION_CONFLICT", `Case is at revision ${row.revision}, not ${expectedRevision}`);
+      }
+      const update = row.doc.proposedUpdates?.find((u) => u.id === updateId);
+      if (!update) throw notFound("Proposed update not found");
+      if (update.status !== "pending") throw new ApiHttpError(400, "BAD_REQUEST", `Proposed update was already ${update.status}`);
+      if (decision === "accept" && update.target.kind === "fact") {
+        // Facts may only change from the revision the answer was heard against.
+        if (update.revision !== row.revision) {
+          throw new ApiHttpError(409, "REVISION_CONFLICT", `This answer was proposed for revision ${update.revision}; the case is at revision ${row.revision}`);
+        }
+        if (update.target.field !== "amountMinor") throw new ApiHttpError(400, "BAD_REQUEST", `Unsupported proposed field ${update.target.field}`);
+        const amountMinor = Number(update.value);
+        if (!isValidAmountMinor(amountMinor)) throw new ApiHttpError(400, "BAD_REQUEST", "Proposed amount is invalid");
+        this.patchCase(ownerSession, id, expectedRevision, { amountMinor });
+      }
+      const current = repo.getCase(id);
+      if (!current) throw notFound();
+      const now = this.nowIso();
+      const status = decision === "accept" ? "accepted" : "rejected";
+      const doc: CaseDoc = {
+        ...current.doc,
+        proposedUpdates: (current.doc.proposedUpdates ?? []).map((u) => (u.id === updateId ? { ...u, status } : u)),
+        timeline: [
+          ...current.doc.timeline,
+          this.entry(`proposed_update_${status}`, `User ${status} a proposed ${update.target.kind === "fact" ? update.target.field : `answer (${update.target.questionId})`}: "${update.quote}"`),
+        ],
+      };
+      repo.updateCase(id, { doc, updatedAt: now });
+    });
+    return this.assemble(id);
+  }
+
   patchCase(ownerSession: string, id: string, expectedRevision: number, changes: CaseChanges): CaseV1 {
     const { repo } = this.deps;
     repo.transaction(() => {
@@ -789,7 +833,8 @@ export class CaseService {
       }
       // State stays completed: terminal states never regress; only the missing transcript and outcome are filled in.
       repo.updateCall(callId, { transcript: snapshot.transcript, lastReconciledAt: now, updatedAt: now });
-      repo.updateCase(fresh.caseId, { doc: { ...row.doc, outcome, timeline }, updatedAt: now });
+      const proposedUpdates = this.withProposals(row, callId, auth, snapshot.transcript, timeline, now);
+      repo.updateCase(fresh.caseId, { doc: { ...row.doc, outcome, timeline, proposedUpdates }, updatedAt: now });
     });
   }
 
@@ -895,7 +940,31 @@ export class CaseService {
         updatedAt: now,
       });
       repo.markEventsProcessed(call.providerCallId, call.id, now);
-      repo.updateCase(call.caseId, { doc: { ...row.doc, outcome, timeline }, updatedAt: now });
+      const proposedUpdates = this.withProposals(row, call.id, auth, snapshot.transcript, timeline, now);
+      repo.updateCase(call.caseId, { doc: { ...row.doc, outcome, timeline, proposedUpdates }, updatedAt: now });
     });
+  }
+
+  /**
+   * V1.1: proposals from a transcript, only for the call of the CURRENT authorization and
+   * revision (a late transcript can never populate a newer plan), once per call, never applied.
+   */
+  private withProposals(
+    row: CaseRow,
+    callId: string,
+    auth: ReturnType<CaseRepository["getAuthorization"]>,
+    transcript: string | null,
+    timeline: TimelineEntry[],
+    now: string,
+  ): CaseDoc["proposedUpdates"] {
+    const existing = row.doc.proposedUpdates;
+    const plan = auth?.snapshot.plan;
+    if (!auth || !plan || !transcript?.trim()) return existing;
+    if (row.doc.authorization?.id !== auth.id || auth.revision !== row.revision) return existing;
+    if (existing?.some((u) => u.callId === callId)) return existing;
+    const fresh = proposeUpdates({ transcript, plan, callId, authorizationId: auth.id, revision: auth.revision, now });
+    if (fresh.length === 0) return existing;
+    timeline.push(this.entry("updates_proposed", `${fresh.length} answer(s) from call ${callId} proposed for review; nothing was changed.`));
+    return [...(existing ?? []), ...fresh];
   }
 }

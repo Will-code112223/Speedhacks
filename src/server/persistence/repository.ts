@@ -1,4 +1,4 @@
-import type { CallState, CaseV1, Mode } from "@/contracts/case";
+import type { CallState, CaseV1, Mode, ProposedUpdateV1 } from "@/contracts/case";
 import type { CallPlanV1, CallPurpose } from "@/contracts/voice";
 import type { HistoryCheck } from "@/server/cases/history";
 import type { FrozenMerchantRecord } from "@/server/cases/insights";
@@ -20,6 +20,8 @@ export interface CaseDoc {
   history?: HistoryCheck | null;
   /** Pre-authorization merchant track record (Keewano/fixture); absent on older rows. */
   merchantRecord?: FrozenMerchantRecord | null;
+  /** V1.1 transcript answers awaiting review; absent on older rows. */
+  proposedUpdates?: ProposedUpdateV1[];
 }
 
 export interface CaseRow {
