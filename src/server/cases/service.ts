@@ -268,6 +268,9 @@ export class CaseService {
         missingFields: missing,
         draft: buildDraft(next, evidenceList),
         authorization: null,
+        // A decision belongs to the approved facts. Historical calls and timeline
+        // remain available, but their outcome must not apply to a new revision.
+        outcome: { decision: "unknown", referenceNumber: null, nextAction: null, paymentStatus: "unverified", supportingQuote: null },
         timeline: [...row.doc.timeline],
       };
       doc.timeline.push(this.entry("facts_updated", `Facts updated (revision ${revision}); draft rebuilt.`));
@@ -628,7 +631,7 @@ export class CaseService {
     const lateTranscript = calls.filter(
       (c) =>
         c.state === "completed" &&
-        c.transcript === null &&
+        !c.transcript?.trim() &&
         nowMs - Date.parse(c.createdAt) <= config.reconcile.lateTranscriptWindowMs &&
         sinceReconcile(c) >= config.reconcile.lateTranscriptIntervalMs,
     );
@@ -649,7 +652,7 @@ export class CaseService {
     }
     repo.transaction(() => {
       const fresh = repo.getCall(callId);
-      if (!fresh || fresh.state !== "completed" || fresh.transcript !== null) return;
+      if (!fresh || fresh.state !== "completed" || fresh.transcript?.trim()) return;
       const now = this.nowIso();
       if (!snapshot.transcript?.trim()) {
         repo.updateCall(callId, { lastReconciledAt: now, updatedAt: now });
@@ -658,12 +661,12 @@ export class CaseService {
       const row = repo.getCase(fresh.caseId);
       if (!row) return;
       const auth = repo.getAuthorization(fresh.authorizationId);
-      const ctx = auth
-        ? { amountMinor: auth.snapshot.amountMinor, currency: auth.snapshot.currency, merchantName: auth.snapshot.merchant.name }
-        : { amountMinor: row.doc.amountMinor ?? 0, currency: row.doc.currency, merchantName: row.doc.merchant.name ?? "the merchant" };
-      const timeline = [...row.doc.timeline, this.entry("transcript_received_late", "Transcript arrived after the wait window; attached read-only.")];
+      const timeline = [...row.doc.timeline, this.entry("transcript_received_late", `Transcript for call ${callId} arrived after the wait window; attached read-only.`)];
       let outcome = row.doc.outcome;
-      if (outcome.decision === "unknown") {
+      // Recheck ownership after the provider await, inside this transaction. A
+      // completed historical call can gain a transcript without deciding new facts.
+      if (auth && row.doc.authorization?.id === auth.id && auth.revision === row.revision && outcome.decision === "unknown") {
+        const ctx = { amountMinor: auth.snapshot.amountMinor, currency: auth.snapshot.currency, merchantName: auth.snapshot.merchant.name };
         try {
           outcome = analyzeTranscript(snapshot.transcript, ctx);
         } catch (err) {

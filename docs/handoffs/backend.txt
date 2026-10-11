@@ -147,7 +147,7 @@ INSURER KNOWLEDGE BASE (T2, Claude lane) — src/server/insurers/**
 - What: 33 US insurers from the product brief (auto, life, title/property, health, disability, business, pet, travel) with support/claims/billing/cancellation/appeals lines and call-relevant terms (cancellation refund method, free-look, billing-dispute route, grace period, claim filing/timelines, appeal process, identity checks, arbitration). Every fact has sourceUrl, retrievedAt and confidence (verified_official | reported | regulatory_default | unknown); unknown = null, never guessed. Phones are strict US E.164; the loader rejects a bad seed.
 - Use: import { lookupInsurer, getRegulatoryDefaults, listInsurers, listOpenQuestions } from "@/server/insurers".
   lookupInsurer("Geico") -> { id, name, supportPhone, supportPhoneConfidence, claimsPhone, needsPlanOrRegion, contacts[], terms[], openQuestions[], match } or null (unknown/ambiguous — never guess).
-  Fill merchant.supportPhone from supportPhone only when supportPhoneConfidence === "verified_official". If needsPlanOrRegion is true (Kaiser, Anthem, Aetna, UHC members), ask the customer for the number on their ID card / their region. Contacts with scope regional | plan_specific | corporate_only are never auto-dialed.
+  Review every supportPhone candidate against the customer's exact insurer, product/plan, region and contact purpose before including it in frozen authorization. verified_official is source confidence, not permission to call or proof of customer applicability. needsPlanOrRegion=true requires clarification; false is not a guarantee of applicability. No automatic case/destination/brief population is wired.
   getRegulatoryDefaults("health") -> ACA/Medicare/ERISA/state fallbacks (appeal windows, free-look, grace, Reg E card dispute) for the call brief, labelled as "typically", not the insurer's statement.
 - Data: seed/insurers.json + seed/regulatory-defaults.json (source of truth); insurers.sqlite is built under DATA_DIR on first use. Human-readable report: docs/insurer-terms.md. Full details: src/server/insurers/README.md.
 - Tests: tests/backend/insurers.test.ts (seed validation, E.164, lookup, no regional auto-fill). Typecheck clean.
@@ -155,6 +155,7 @@ INSURER KNOWLEDGE BASE (T2, Claude lane) — src/server/insurers/**
 - For T1 (insurance-first onboarding per your pivot): use GET /api/insurers to list, then ?name= for the chosen plan's terms and lines. For T3: the server-generated call brief can carry the insurer's terms; no change to the voice contract.
 - Verification (2026-10-11): every verified_official phone line was re-fetched by an independent skeptic agent: 158 confirmed on their cited page with a matching label; 18 kept with purposeVerified=false (digits present but the page labels them as corporate switchboards, pharmacy/web-help/employer lines, or an unrelated purpose) and one downgraded to reported (Lincoln 800-487-1485 absent from the cited loans page). Lines with purposeVerified=false are never returned as supportPhone/claimsPhone.
 - Coverage: 29/33 insurers have a verified national customer-service line; 4 do not and need the customer's plan/region: First American (corporate switchboard only; claims line verified), Elevance/Anthem and Aetna (number on the member ID card), Kaiser (regional lines recorded). 173 term facts have sourced values, 261 are recorded as unknown; 15 regulatory defaults; 148 open questions in the seed (listOpenQuestions()).
+- Integration guards on codex/voice preserve the seed but withhold multiple matching insurers and distinct tied best phone candidates, request clarification, and exclude unknown/regulatory-default phone confidence. See tests/backend/insurer-boundary.test.ts and docs/handoffs/dial.txt for actual checks. Keewano was not imported with this KB-only update.
 
 KEEWANO (optional sponsor integration; nothing in the shared contract changed)
 - Code: src/integrations/keewano/** (events registry, REST ingest, batching sink, MirroredCaseRepository, MCP client,
@@ -175,7 +176,9 @@ KEEWANO (optional sponsor integration; nothing in the shared contract changed)
   (all batches accepted); MCP tool is run_sql_query({projectId, sqlQuery, maxRows}) → structuredContent {columns, rows};
   projectId comes from KEEWANO_PROJECT_ID, else the SDK key's JWT claim, else list_projects. Keewano numbers custom
   events by position (list_event_types showed 2000..2011), so EVENT_TYPES must stay contiguous (guarded at load).
-  Full simulated case ran against the dev server with the mirror on: no rejected batches.
+  Full simulated case ran against the dev server twice: the check returned duplicate_found from live Keewano and the
+  mirrored case (25 events) is queryable. One ingest POST timed out at 6 s, so ingest now has its own timeout
+  (KEEWANO_INGEST_TIMEOUT_MS, 20000) and the sink retries a failed batch with backoff (3 attempts) before dropping.
 - New dependency: @modelcontextprotocol/sdk (MCP client). T1: nothing to do; the timeline already carries the finding.
   Judging criteria from the quickstart: Keewano must be load-bearing (here: the brief changes with the finding) and at
   least one live query must run in the demo (here: the check on case creation / review screen).

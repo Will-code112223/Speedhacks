@@ -23,14 +23,14 @@ export interface InsurerSummary {
 export interface InsurerLookup extends InsurerSummary {
   /**
    * Best NATIONAL customer-service number: verified_official preferred, then
-   * reported. Null when none is usable — including when the insurer only has
-   * regional or plan-specific lines (see needsPlanOrRegion and contacts).
+   * reported. Null when none is usable or distinct best candidates tie —
+   * national reach alone does not identify the customer's product or plan.
    */
   supportPhone: string | null;
   supportPhoneConfidence: Confidence | null;
   claimsPhone: string | null;
   claimsPhoneConfidence: Confidence | null;
-  /** True when the right number depends on the member's plan/region (ID card, state). Ask the customer before dialing. */
+  /** True when candidate numbers need clarification or depend on plan/region. False does not establish customer applicability. */
   needsPlanOrRegion: boolean;
   contacts: InsurerContact[];
   terms: InsurerTerm[];
@@ -132,12 +132,19 @@ function questionsFor(db: InsurerDb, id: string): OpenQuestion[] {
     .map((r) => ({ question: r.question, whyItMatters: r.why_it_matters }));
 }
 
-function bestPhone(contacts: InsurerContact[], purpose: ContactPurpose): { phone: string | null; confidence: Confidence | null } {
+function bestPhone(contacts: InsurerContact[], purpose: ContactPurpose): { phone: string | null; confidence: Confidence | null; ambiguous: boolean } {
   const candidates = contacts
-    .filter((c) => c.purpose === purpose && c.channel === "phone" && c.phoneE164 !== null && c.scope === "national" && c.purposeVerified !== false)
+    .filter((c) => c.purpose === purpose && c.channel === "phone" && c.phoneE164 !== null && c.scope === "national" && c.purposeVerified !== false &&
+      (c.confidence === "verified_official" || c.confidence === "reported"))
     .sort((a, b) => CONFIDENCE_RANK[b.confidence] - CONFIDENCE_RANK[a.confidence] || Number(b.purposeVerified === true) - Number(a.purposeVerified === true));
   const top = candidates[0];
-  return top ? { phone: top.phoneE164, confidence: top.confidence } : { phone: null, confidence: null };
+  if (!top) return { phone: null, confidence: null, ambiguous: false };
+  const ambiguous = candidates.some((c) => c.confidence === top.confidence &&
+    (c.purposeVerified === true) === (top.purposeVerified === true) && c.phoneE164 !== top.phoneE164);
+  // Never choose a product/plan-specific destination merely by seed order.
+  return ambiguous
+    ? { phone: null, confidence: null, ambiguous: true }
+    : { phone: top.phoneE164, confidence: top.confidence, ambiguous: false };
 }
 
 /**
@@ -152,12 +159,23 @@ export function lookupInsurer(name: string, dataDir: string = defaultDataDir()):
   const db = openInsurerDatabase(dataDir);
   const rows = db.prepare("SELECT * FROM insurers").all() as InsurerRow[];
 
-  let hit: { row: InsurerRow; via: InsurerLookup["match"]["via"]; matched: string } | null = null;
-  for (const row of rows) {
-    if (row.id === name.trim().toLowerCase()) { hit = { row, via: "id", matched: row.id }; break; }
-    if (normalizeInsurerName(row.name) === query) { hit = { row, via: "name", matched: row.name }; break; }
-    const alias = (JSON.parse(row.aliases) as string[]).find((a) => normalizeInsurerName(a) === query);
-    if (alias) { hit = { row, via: "alias", matched: alias }; break; }
+  type Match = { row: InsurerRow; via: InsurerLookup["match"]["via"]; matched: string };
+  // An explicit ID is unique. Names and aliases may collide across insurers;
+  // collect those matches before selecting instead of depending on seed order.
+  const byId = rows.find((row) => row.id === name.trim().toLowerCase());
+  let hit: Match | null = byId ? { row: byId, via: "id", matched: byId.id } : null;
+  if (!hit) {
+    const exact: Match[] = [];
+    for (const row of rows) {
+      if (normalizeInsurerName(row.name) === query) {
+        exact.push({ row, via: "name", matched: row.name });
+        continue;
+      }
+      const alias = (JSON.parse(row.aliases) as string[]).find((a) => normalizeInsurerName(a) === query);
+      if (alias) exact.push({ row, via: "alias", matched: alias });
+    }
+    if (exact.length > 1) return null;
+    hit = exact[0] ?? null;
   }
   if (!hit) {
     const qTokens = query.split(" ");
@@ -176,8 +194,9 @@ export function lookupInsurer(name: string, dataDir: string = defaultDataDir()):
     }
     scored.sort((a, b) => a.score - b.score);
     const best = scored[0];
-    // Ambiguous token matches across different insurers are not a match.
-    if (best && !scored.some((s) => s.score === best.score && s.row.id !== best.row.id)) {
+    // A shorter name is not evidence that a multi-insurer query selected it.
+    // Ranking chooses an alias within one insurer, never between insurers.
+    if (best && !scored.some((s) => s.row.id !== best.row.id)) {
       hit = { row: best.row, via: "tokens", matched: best.matched };
     }
   }
@@ -187,8 +206,9 @@ export function lookupInsurer(name: string, dataDir: string = defaultDataDir()):
   const support = bestPhone(contacts, "customer_service");
   const claims = bestPhone(contacts, "claims");
   const needsPlanOrRegion =
-    support.phone === null &&
-    contacts.some((c) => c.purpose === "customer_service" && (c.scope === "regional" || c.scope === "plan_specific"));
+    support.ambiguous || claims.ambiguous ||
+    (support.phone === null &&
+      contacts.some((c) => c.purpose === "customer_service" && (c.scope === "regional" || c.scope === "plan_specific")));
   return {
     ...toSummary(hit.row),
     supportPhone: support.phone,

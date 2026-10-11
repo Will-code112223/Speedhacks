@@ -1,0 +1,62 @@
+SYNTHETIC/FICTIONAL — INVENTED POLICY REHEARSAL; NOT A REAL INSURANCE CLAIM
+Fixture destination +14155550112: NEVER DIAL. Use explicit simulated mode only.
+
+UPLOADS AND PROVENANCE
+Upload policy.txt, repair-invoice.txt and incident-note.txt as text/plain.
+Every fact and term is authored for this fixture, not retrieved insurer knowledge.
+policy.txt supplies the fictional contact, policyholder and invented terms.
+repair-invoice.txt supplies cost amountMinor=18000 (USD 180.00). incident-note.txt
+supplies the incident date, requested review and proposed amountMinor=13000
+(USD 130.00), from 18000-5000 minor units.
+This calculation is a request under fictional terms, not a coverage determination.
+
+PROPOSED V1 PROJECTION (not a complete CaseV1 response)
+mode:simulated; status before authorization:ready_for_approval
+customer:{name:"Rowan Example",email:"rowan@example.com"}
+merchant:{name:"Moss Lantern Mutual",supportPhone:"+14155550112"}
+amountMinor:13000 (USD 130.00); currency:USD
+reason: Request review of fictional repair reimbursement under DEMO-ML-POLICY-01.
+missingFields:[]; authorization:null; calls:[]
+evidence: the three uploads above with server-generated UUIDs and text/plain.
+Initial outcome: decision=unknown; paymentStatus=unverified;
+referenceNumber=null; supportingQuote=null.
+Map insurer to merchant and all policy references/terms to approved reason/brief
+and evidence. Add no V1 policy fields, insurer KB, route or claim-engine module.
+T2 owns src/server/insurers. T1's insurance-first UI retains the V1 baseline;
+any additive V2 controls are separate context, not permission to change this
+V1 projection or duplicate their work.
+
+EXPECTED APPROVED BRIEF AND AUTHORIZATION
+After reviewing the fictional facts, authorize one simulated review request.
+Brief: Identify as an AI assistant for Rowan Example. Ask Moss Lantern Mutual to
+review DEMO-REPAIR-01 under invented DEMO-ML-POLICY-01: repair amountMinor=18000
+(USD 180.00), invented deductible amountMinor=5000 (USD 50.00), requested
+reimbursement amountMinor=13000 (USD 130.00). Eligibility is undecided. Request
+a reference, requirements and next step. Never dial the fixture, attest to facts
+not in the documents, accept a reduced offer/release, alter policy terms or claim
+funds arrived. End with customer handoff for identity checks or additional consent.
+
+PROPOSED CONVERSATION, NOT AN ADAPTER OUTPUT
+AI: I am an AI assistant asking for review of this fictional reimbursement.
+Support: Reference DEMO-ML-REVIEW-01. Please provide the repair receipt and incident statement.
+AI: I will relay those requirements to the customer; no decision is confirmed.
+Alternative support line: I offer USD 70.00 as a settlement if the customer signs a release.
+AI: I cannot accept or sign. Please provide the offer for the customer's review.
+
+ACCEPTABLE V1 OUTCOMES
+Requirements pending:needs_information with the exact requested documents/reference.
+Reduced offer:needs_information and manual customer approval nextAction; do not
+create a partial_approval enum, accept settlement or overwrite requested amountMinor=13000 (USD 130.00).
+Review opened without requirements or a decision:requested with a nextAction.
+Approved/denied only if an explicit observed support statement actually decides
+the request; preserve it as supportingQuote. referenceNumber is the supplied
+reference, or null if none was given; never invent one or require one for a clear
+decision. Never infer approval from invented policy arithmetic, hypothetical
+conditions or the customer/AI's own statement.
+paymentStatus stays unverified; the repair receipt does not prove reimbursement.
+
+CURRENT IMPLEMENTATION LIMIT
+The adapter's simulated mode returns one generic duplicate-charge transcript,
+DEMO-REFUND-001. It does not execute this policy scenario or insurance dialogue.
+These are proposed rehearsals and upload fixtures, not integrated claim runs,
+real policy advice, insurer knowledge, call authorization or evidence of a payout.

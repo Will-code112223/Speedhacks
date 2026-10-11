@@ -36,7 +36,7 @@ export const CONTACT_CHANNELS = ["phone", "web", "app", "mail"] as const;
 export type ContactChannel = (typeof CONTACT_CHANNELS)[number];
 
 /**
- * national       — one line for every customer; safe to dial for any case.
+ * national       — geographic reach; notes may still limit the product/plan.
  * regional       — only for a region/state (see `region`); never auto-filled.
  * plan_specific  — the real number is on the member's ID card; never auto-filled.
  * corporate_only — switchboard/corporate line that cannot access accounts.
@@ -84,7 +84,7 @@ export interface InsurerContact {
   purpose: ContactPurpose;
   channel: ContactChannel;
   scope: ContactScope;
-  /** Region/state/plan the contact applies to when scope is not national. */
+  /** Recorded region/state/plan; also review notes for restrictions on national contacts. */
   region: string | null;
   /**
    * Result of re-fetching sourceUrl: true = digits present and the page's label

@@ -1,0 +1,66 @@
+ADAPTER COVERAGE REVIEW — 2026-10-11
+
+Reviewed adapter.node-test.mts and scripts.node-test.mts before adding coverage.
+The existing baseline has 183 passing tests, including subtests. New coverage
+belongs only to scenario-boundary.node-test.mts; no business classifier is added.
+Final kit verification: 189/189 tests passed (six added tests including subtests).
+Strict TypeScript/noUncheckedIndexedAccess passed across all owned source,
+scripts and tests. The walkthrough's forbidden-network simulation also passed.
+
+Combined integration verification (separate from the 189 standalone tests):
+At integration base 6590222, 45 backend tests passed in 7 files: 39 published tests plus 6 new late-text
+regressions. Five regressions failed before the fix. The passing suite checks
+atomic authorization/revision rechecks after provider awaits, old-call isolation,
+material-edit outcome reset, current-authorization status, empty/whitespace text
+recovery and no duplicate publication across repeated GETs. Four earlier mode,
+stream-limit and configuration probes also passed. Final review found no material
+findings. Full typechecking and production build passed on Node 25.2.1; Node 24
+was not independently tested. The build had one non-blocking DATA_DIR warning.
+
+Localhost HTTP/SQLite verification passed: synthetic create -> authorize -> call
+-> approved/payment unverified -> packet; identical call ID after restart;
+missing session 404, missing-facts authorization 422, unsigned webhook 401 and
+oversized webhook 413. No credentials or external requests were used. This is
+backend evidence, not T1 UI QA or a real provider interaction. The older backend
+handoff's 109-test claim was not reproduced by this run.
+
+Unavailable facts
+  Existing: null transcript/duration preservation; invalid approved briefs;
+  frozen input snapshot despite caller mutation.
+  Additional target: preserve explicitly unavailable/contradictory case facts
+  inside a quoted approved brief without filling them in or losing its limits.
+  Still T2/manual: identify missing documents, resolve contradictions, refuse
+  authorization when required facts are unknown. The adapter has no CaseV1 input.
+
+Partial offers and denial
+  Existing: a completed call never adds a decision or paymentStatus; HTTP refusal
+  is distinct from the outcome of a successfully connected conversation.
+  Additional target: preserve a conditional partial offer or explicit denial
+  exactly in the transcript while retaining the provider's completed lifecycle.
+  Still T2/manual: partial offer stays unaccepted, requires customer clarification;
+  denial requires an attributable statement; payment remains unverified.
+
+Transfers
+  Existing: transfer_target speaker labels survive transcriptTurns fallback;
+  invalid speakers/timings reject; read retries cannot POST a second call.
+  Additional target: a multi-read transfer conversation preserves the original
+  call ID and ordered speakers without treating transfer as a new dispatch or
+  inventing a V1 transfer/join/decision capability.
+  Still manual: actual provider transfer navigation and voice-agent behavior.
+
+Uncertain outcomes — reuse existing tests; do not duplicate them
+  "ambiguous network and server outcomes cannot redial or become simulations"
+  "request timeout aborts a hung dispatch without retry even when transport ignores abort"
+  "dispatch timeout covers a stalled response body after headers arrive"
+  "late transcripts can be retrieved after a completed call without starting another call"
+  Plus bounded GET retry, unknown provider state/ID mismatch, webhook redelivery,
+  and the guarded smoke script's persisted-attempt/rerun-refusal tests.
+  T2 responsibility: durable dispatch_unknown locks, duplicate HTTP requests,
+  early webhook queues and atomic transcript/outcome publication. The integrated
+  backend suite covers these boundaries; the local HTTP smoke additionally
+  verified duplicate-call persistence across restart. Scenario-specific outcome
+  classification and real voice behavior remain separate acceptance work.
+
+Do not confuse test levels: a fake fetch using mode:"live" exercises parsing and
+transport behavior only. The expected dialogue in the scenario files is a
+rehearsal specification, not a passing test of a voice model or an actual call.

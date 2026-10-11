@@ -1,0 +1,11 @@
+SYNTHETIC/FICTIONAL — QA UPLOAD; NO REAL BANK OR PAYMENT DATA
+Author: Speedhacks demo fixture. Fixture date: 2026-09-22.
+
+Fictional customer: Edda Example
+Currency: USD. All amounts below are integer minor units.
+2026-09-20 | DEMO-TXN-A | Paper Comet Supply | DEMO-PC-1001 | posted | amountMinor=7490 (USD 74.90)
+2026-09-21 | DEMO-TXN-B | Paper Comet Supply | DEMO-PC-1001 | posted | amountMinor=7490 (USD 74.90)
+The two authored entries refer to the same single order in receipt.txt.
+Posted total: amountMinor=14980 (USD 149.80).
+Requested duplicate-charge refund: amountMinor=7490 (USD 74.90), one charge only.
+No account/card number or real transaction is represented.

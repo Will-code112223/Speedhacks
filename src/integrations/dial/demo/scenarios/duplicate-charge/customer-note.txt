@@ -1,0 +1,10 @@
+SYNTHETIC/FICTIONAL — QA UPLOAD; NOT REAL CALL AUTHORIZATION
+Author: fictional customer Edda Example; edda@example.com
+Fixture date: 2026-09-22.
+
+I made one order, DEMO-PC-1001, for a desk lamp at Paper Comet Supply.
+The synthetic statement has two posted charges of amountMinor=7490 (USD 74.90), currency=USD.
+Please request review and refund of one duplicate charge only: amountMinor=7490 (USD 74.90).
+The fixture merchant contact is +14155550111 — NEVER DIAL.
+Do not accept store credit, a partial settlement, a waiver or another purchase.
+Ask for a case reference and next step. This note does not authorize a real call.

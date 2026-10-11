@@ -1,0 +1,14 @@
+SYNTHETIC/FICTIONAL — INVENTED POLICY FOR QA; NO REAL COVERAGE OR LEGAL ADVICE
+Author: Speedhacks demo fixture. No real insurer issued these terms.
+
+Fictional insurer: Moss Lantern Mutual
+Fictional policyholder: Rowan Example; rowan@example.com
+Fictional policy reference: DEMO-ML-POLICY-01
+Fixture policy dates: 2026-01-01 through 2026-12-31
+Authored example terms: eligible accidental repair cost is considered for review
+with a receipt and incident statement. Deduct amountMinor=5000 (USD 50.00)
+from eligible repair cost; maximum considered reimbursement is amountMinor=25000
+(USD 250.00). Eligibility
+must still be reviewed. No payment or coverage decision is established here.
+Fictional review desk: +14155550112 — NEVER DIAL; simulation only.
+These invented terms must not enter a real insurer knowledge base.

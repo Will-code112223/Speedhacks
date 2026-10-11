@@ -24,7 +24,7 @@ export function hasActiveCall(calls: CallRow[]): boolean {
 export function deriveStatus(row: CaseRow, calls: CallRow[]): CaseStatus {
   const doc = row.doc;
   if (hasActiveCall(calls)) return "calling";
-  const latestTerminal = [...calls].reverse().find((c) => c.state === "completed");
+  const latestTerminal = [...calls].reverse().find((c) => c.state === "completed" && c.authorizationId === doc.authorization?.id);
   if (doc.authorization && latestTerminal) {
     switch (doc.outcome.decision) {
       case "approved":

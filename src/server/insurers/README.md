@@ -10,7 +10,7 @@ Every fact carries `sourceUrl`, `retrievedAt` and a confidence:
 
 | confidence | meaning | may the agent dial / state it? |
 | --- | --- | --- |
-| `verified_official` | read from a page on the insurer's own domain | yes |
+| `verified_official` | read from a page on the insurer's own domain | review customer applicability and authorization first |
 | `reported` | third-party source | only after the customer confirms it |
 | `regulatory_default` | a legal/regulatory figure, not the insurer's statement | state it as "typically" |
 | `unknown` | nothing found; `value` is `null` | no — ask the customer or the rep |
@@ -38,10 +38,17 @@ getRegulatoryDefaults("health"); // fallbacks: ACA 180-day appeal window, Medica
 
 Rules for callers:
 
-- Fill `merchant.supportPhone` from `supportPhone` only when `supportPhoneConfidence === "verified_official"`; otherwise leave it for the customer to confirm.
+- Treat `supportPhone` as a review candidate, not authorization to call. Confirm the exact insurer, product/plan, region and contact purpose before including it in the case's approved destination. `supportPhoneConfidence === "verified_official"` establishes source provenance, not applicability to the customer.
+- Multiple equally ranked, distinct national numbers produce a null phone and `needsPlanOrRegion=true`. Unknown or regulatory-default confidence never supplies a phone candidate. A false flag is not proof that a contact fits the customer's plan; read the contact notes and confirm applicability.
 - Never pick a number out of `contacts` whose `scope` is not `"national"` without the customer's region/plan.
 - When building the call brief, include each relevant term's `value` with its confidence; a `regulatory_default` is a "typically" statement, not the insurer's policy.
 - Treat `openQuestions` as the to-do list for sharpening the data.
+
+The read-only API does not automatically populate case facts or call briefs.
+Customer review and the existing frozen case authorization remain required.
+The source seed is preserved; `national` may describe geographic reach while
+contact notes still restrict the product or plan. Name/alias collisions and
+token matches spanning multiple insurers return null (HTTP 404) for clarification.
 
 ## Files
 

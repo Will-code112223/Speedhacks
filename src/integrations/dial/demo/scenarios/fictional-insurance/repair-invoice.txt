@@ -1,0 +1,11 @@
+SYNTHETIC/FICTIONAL — QA UPLOAD; NO REAL REPAIR OR PAYMENT
+Author: Speedhacks demo fixture. Fixture date: 2026-09-21.
+
+Fictional workshop: Quiet Kite Repairs
+Fictional customer: Rowan Example; rowan@example.com
+Invoice: DEMO-REPAIR-01
+Item: Repair of a fictional camera after an accidental drop
+Repair total: amountMinor=18000 (USD 180.00); currency=USD
+Fixture invoice status: paid by the fictional customer
+No card/account data is included. A paid repair invoice is not evidence of an
+insurance reimbursement or of eligibility under any real policy.

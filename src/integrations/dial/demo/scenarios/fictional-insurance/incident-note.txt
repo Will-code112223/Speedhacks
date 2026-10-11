@@ -1,0 +1,12 @@
+SYNTHETIC/FICTIONAL — QA UPLOAD; NOT A REAL CLAIM OR CALL AUTHORIZATION
+Author: fictional policyholder Rowan Example; rowan@example.com
+Fixture date: 2026-09-22.
+
+My fictional camera fell from a shelf on 2026-09-20. The authored repair invoice
+is DEMO-REPAIR-01 for amountMinor=18000 (USD 180.00). I request review under
+invented policy DEMO-ML-POLICY-01. Proposed reimbursement: amountMinor=13000
+(USD 130.00), calculated as 18000-5000 minor units, subject to review. I do not
+assert that coverage has been approved.
+Request the missing requirements, a review reference and the next step.
+Do not accept any reduced offer, release or changed policy terms on my behalf.
+Fixture review desk: +14155550112 — NEVER DIAL. No real claim should be filed.
