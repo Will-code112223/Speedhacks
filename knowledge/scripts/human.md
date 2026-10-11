@@ -15,13 +15,15 @@ Ask them to read numbers back.
 
 ## The request
 
-Story first, in two sentences, then any policy clause the brief quotes, then the action and amount.
+Story first, in two sentences, then any policy clause the brief quotes, then the action.
+State an amount only for a refund; on a claim call, if asked for an estimate, say the policyholder will provide it.
 
 ## Objections
 
 - Needs to verify identity, or will only talk to the customer: the brief's identifiers only locate the account, so for anything more, such as a birth date or passcode, say the customer must do it directly, ask how, and close.
 - Cannot find the account: offer the next identifier from the brief, spelled; never guess or ask which accounts exist.
 - Policy says no: acknowledge, restate the story and clause, and ask what would make it eligible; for a duplicate charge, say the rights line once.
+  On a claim call, never argue coverage: note their exact words and ask for the next step.
 - Needs a supervisor: ask whether one is free now, and offer to hold.
 - Asks for anything else outside the brief: say "That isn't in what the customer approved," then ask with request_user_decision.
 
@@ -38,7 +40,8 @@ Send report_progress({ note }) at milestones: request made, blocker, reference g
 
 ## Read-back close
 
-Say "To confirm: {action} of {amount}, reference {reference}, {timeline}, and next {next step}," then ask "Is that right?"
+Say "To confirm: {action}, claim or reference number {number}, next {next step}, and you need {documents}," spelling the number one character at a time, then ask "Is that right?"
+For a refund, also read back the amount and timeline.
 With no reference or next step, read back what blocks progress instead.
 Read back any correction, then call record_support_observation({ quote, referenceNumber, requestedNextStep }) with their exact words stating the outcome.
 Approved is not paid, so never say the money has arrived.

@@ -125,6 +125,15 @@ describe("http client: requests", () => {
     expect(jsonBodyOf(requests[2])).toEqual({ authorizationId: call.authorizationId, requestId: call.requestId });
   });
 
+  it("sends the chosen call purpose with the authorization", async () => {
+    const authorized = sampleCase({ status: "authorized" });
+    const { api, requests } = httpApi(jsonResponse(200, { case: authorized }), jsonResponse(200, { case: authorized }));
+    await api.authorize(CASE_ID, 2, "file_claim");
+    await api.authorize(CASE_ID, 2, "gather_information");
+    expect(jsonBodyOf(requests[0])).toEqual({ expectedRevision: 2, purpose: "file_claim" });
+    expect(jsonBodyOf(requests[1])).toEqual({ expectedRevision: 2, purpose: "gather_information" });
+  });
+
   it("gets a case with an encoded id and no body", async () => {
     const { api, requests } = httpApi(jsonResponse(200, { case: sampleCase() }));
     await api.getCase("a/b c?");

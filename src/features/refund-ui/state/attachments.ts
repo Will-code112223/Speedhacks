@@ -76,6 +76,28 @@ function listNames(names: readonly string[]): string {
   return `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
 }
 
+/** Capitalized words that do not name a company. */
+const COMMON_CAPITALS = new Set([
+  "i", "im", "ive", "id", "my", "jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "sept", "oct", "nov", "dec",
+  "january", "february", "march", "april", "june", "july", "august", "september", "october", "november", "december",
+  "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday", "er", "usd", "ok",
+]);
+
+/**
+ * Whether the message names a company or person, read as a capitalized word
+ * that does not start a sentence ("with State Farm", "my Progressive claim").
+ */
+export function namesSomeone(message: string): boolean {
+  for (const sentence of message.split(/[.!?]\s+|\n+/)) {
+    const tokens = sentence.trim().split(/\s+/).slice(1);
+    for (const token of tokens) {
+      const word = token.replace(/[^A-Za-z]/g, "");
+      if (/^[A-Z]/.test(word) && !COMMON_CAPITALS.has(word.toLowerCase())) return true;
+    }
+  }
+  return false;
+}
+
 export function attachmentsFor(message: string, plans: readonly PlanRecord[], apiMode: ApiMode): CaseAttachments {
   if (plans.length === 0) return NONE;
   const said = new Set(words(message));
@@ -106,6 +128,10 @@ export function attachmentsFor(message: string, plans: readonly PlanRecord[], ap
     if (insurer) prefill.merchantName = insurer;
     const phone = normalizePhone(only.supportPhone);
     if (phone) prefill.supportPhone = phone;
+  } else if (named.length === 0 && !namesSomeone(message)) {
+    // The message names no insurer: the plans' own insurer is the one to call, when they agree on one.
+    const insurers = [...new Set(chosen.map((plan) => plan.insurer.trim()).filter(Boolean))];
+    if (insurers.length === 1) prefill.merchantName = insurers[0];
   }
 
   return {

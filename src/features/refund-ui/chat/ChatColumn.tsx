@@ -34,6 +34,8 @@ type ChatController = CaseSessionController & Partial<SummaryController>;
 export interface ChatColumnProps {
   controller: ChatController;
   fixture: boolean;
+  /** True when an approved call dials a real number (server REFUND_MODE=live over http). */
+  live?: boolean;
   /** Shown under the support phone field, for example the simulated backend's number rules. */
   phoneHint: string | null;
   planCount: number;
@@ -45,12 +47,13 @@ export interface ChatColumnProps {
 
 const ASSISTANT_KINDS: ReadonlySet<ThreadItem["kind"]> = new Set(["assistant", "understood", "approval", "result"]);
 const SAMPLE_PROMPTS = [
-  "Help me get a refund for Amazon shoes.",
-  "Help me dispute a duplicate subscription charge.",
-  "Help me prepare a car insurance claim.",
+  "File a claim with State Farm for water damage to my kitchen on Oct 3, about $1,200.",
+  "Ask Blue Shield of California what I need to file a claim for an out-of-network visit on Oct 3.",
+  "Check the status of my Progressive auto claim.",
+  "Dispute a duplicate $49.99 charge from Ridgeline Outfitters.",
 ] as const;
 
-export default function ChatColumn({ controller, fixture, phoneHint, callBar, metrics }: ChatColumnProps) {
+export default function ChatColumn({ controller, fixture, live = false, phoneHint, callBar, metrics }: ChatColumnProps) {
   const session = controller.active;
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const draftKey = session?.key ?? "new";
@@ -107,7 +110,7 @@ export default function ChatColumn({ controller, fixture, phoneHint, callBar, me
   const caseData = session?.caseData ?? null;
   const placeholder = caseData
     ? "Add a note to this case…"
-    : "Who charged you, what happened, and how much are you owed?";
+    : "Which insurer or company, what happened, and when?";
 
   const hint = caseData ? "Notes are local. Edit the facts to update the call brief." : null;
 
@@ -140,6 +143,7 @@ export default function ChatColumn({ controller, fixture, phoneHint, callBar, me
               session={session}
               controller={controller}
               fixture={fixture}
+              live={live}
               phoneHint={phoneHint}
               factsDirty={dirtyFacts[session.key] ?? false}
               onFactsDirty={reportFactsDirty}
@@ -178,6 +182,7 @@ function Thread({
   session,
   controller,
   fixture,
+  live,
   phoneHint,
   factsDirty,
   onFactsDirty,
@@ -185,6 +190,7 @@ function Thread({
   session: CaseSession;
   controller: ChatController;
   fixture: boolean;
+  live: boolean;
   phoneHint: string | null;
   factsDirty: boolean;
   onFactsDirty: (key: string, dirty: boolean) => void;
@@ -209,6 +215,7 @@ function Thread({
             currentApprovalId={lastOpenApproval?.id ?? null}
             controller={controller}
             fixture={fixture}
+            live={live}
             phoneHint={phoneHint}
             factsDirty={factsDirty}
             onFactsDirty={onFactsDirty}
@@ -303,6 +310,7 @@ interface ThreadEntryProps {
   currentApprovalId: string | null;
   controller: ChatController;
   fixture: boolean;
+  live: boolean;
   phoneHint: string | null;
   factsDirty: boolean;
   onFactsDirty: (key: string, dirty: boolean) => void;
@@ -317,7 +325,7 @@ function lockedReason(session: CaseSession, caseData: CaseV1, call: CallV1 | nul
 }
 
 function ThreadEntry(props: ThreadEntryProps) {
-  const { item, grouped, session, caseData, call, currentApprovalId, controller, fixture, phoneHint, factsDirty, onFactsDirty } = props;
+  const { item, grouped, session, caseData, call, currentApprovalId, controller, fixture, live, phoneHint, factsDirty, onFactsDirty } = props;
   const startNewCase = () => controller.selectCase(null);
   const groupedClass = grouped ? styles.grouped : "";
 
@@ -393,6 +401,9 @@ function ThreadEntry(props: ThreadEntryProps) {
             caseData={caseData}
             placedCall={placed}
             current={current}
+            live={live}
+            requestText={session.summary}
+            planPreview={!fixture}
             busy={session.approval.busy}
             stage={session.approval.stage}
             error={current ? session.approval.error : null}

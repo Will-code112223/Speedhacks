@@ -1,5 +1,5 @@
 import { getCaseService } from "@/server/cases/composition";
-import { CURRENCY, E164, isValidAmountMinor } from "@/server/cases/facts";
+import { CURRENCY, E164, isIsoDate, isValidAmountMinor } from "@/server/cases/facts";
 import type { UploadInput } from "@/server/documents/storage";
 import { badRequest } from "@/server/http/errors";
 import { handle, json } from "@/server/http/respond";
@@ -50,13 +50,19 @@ export async function POST(request: Request): Promise<Response> {
       amountMinor = /^\d{1,15}$/.test(amountRaw) ? Number.parseInt(amountRaw, 10) : Number.NaN;
       if (!isValidAmountMinor(amountMinor)) invalid.push("amountMinor");
     }
+    // V1.2 insurance facts (optional): policyNumber, incidentDate (YYYY-MM-DD), lossDescription, claimType.
+    const policyNumber = optionalText(form, "policyNumber", 64);
+    const incidentDate = optionalText(form, "incidentDate", 10);
+    if (incidentDate !== null && !isIsoDate(incidentDate)) invalid.push("incidentDate");
+    const lossDescription = optionalText(form, "lossDescription", 2000);
+    const claimType = optionalText(form, "claimType", 120);
     if (invalid.length > 0) throw badRequest(`Invalid fields: ${invalid.join(", ")}`, invalid);
 
     const { session, setCookie } = ensureSession(request);
     const created = await getCaseService().createCase(session, {
       summary,
       files,
-      fields: { customerName, customerEmail, merchantName, supportPhone, amountMinor, currency },
+      fields: { customerName, customerEmail, merchantName, supportPhone, amountMinor, currency, policyNumber, incidentDate, lossDescription, claimType },
     });
     return json({ case: created }, 201, setCookie ? { "set-cookie": setCookie } : undefined);
   });

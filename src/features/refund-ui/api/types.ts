@@ -14,6 +14,7 @@
  */
 
 import type { CallV1, CaseChanges, CaseV1, Mode } from "../../../contracts/case";
+import type { CallPurpose } from "../../../contracts/voice";
 
 export type { CallV1, CaseChanges, CaseV1, Mode };
 
@@ -35,6 +36,15 @@ export interface CreateCaseInput {
   amountMinor?: number;
   currency?: string;
 }
+
+/**
+ * What the call is for. "file_claim" is being added to the voice contract
+ * (CALL_PURPOSES in src/contracts/voice.ts); the UI offers it now and the
+ * authorize route validates it.
+ */
+export type UiCallPurpose = CallPurpose;
+
+export const UI_CALL_PURPOSES: readonly UiCallPurpose[] = ["file_claim", "gather_information", "request_refund"];
 
 export interface StartCallInput {
   authorizationId: string;
@@ -211,7 +221,8 @@ export interface CaseApi {
   /** Optional cancellation applies only to this read, never to dispatch. */
   getCase(caseId: string, signal?: AbortSignal): Promise<CaseV1>;
   patchCase(caseId: string, expectedRevision: number, changes: CaseChanges): Promise<CaseV1>;
-  authorize(caseId: string, expectedRevision: number): Promise<CaseV1>;
+  /** `purpose` absent means "request_refund", the V1 behavior. */
+  authorize(caseId: string, expectedRevision: number, purpose?: UiCallPurpose): Promise<CaseV1>;
   startCall(caseId: string, input: StartCallInput): Promise<CallV1>;
   /** text/plain refund request with evidence index. */
   downloadPacket(caseId: string): Promise<Blob>;

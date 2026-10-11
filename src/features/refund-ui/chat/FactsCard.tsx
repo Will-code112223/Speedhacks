@@ -221,7 +221,11 @@ export default function FactsCard(props: FactsCardProps) {
                 value:
                   caseData.amountMinor !== null ? <Mono>{formatMoney(caseData.amountMinor, caseData.currency)}</Mono> : null,
               },
+              { key: FACT_LABELS.policyNumber, value: caseData.policyNumber ? <Mono>{caseData.policyNumber}</Mono> : null },
+              { key: FACT_LABELS.claimType, value: caseData.claimType ?? null },
+              { key: FACT_LABELS.incidentDate, value: caseData.incidentDate ? <Mono>{caseData.incidentDate}</Mono> : null },
               { key: FACT_LABELS.reason, value: caseData.reason },
+              { key: FACT_LABELS.lossDescription, value: caseData.lossDescription ?? null },
             ]}
           />
           <p className={styles.locked}>{lockedReason}</p>
@@ -279,12 +283,56 @@ export default function FactsCard(props: FactsCardProps) {
               spellCheck={false}
               placeholder="+1 800 555 0199…"
               value={draft.supportPhone}
-              hint={[missingHint("supportPhone"), phoneHint].filter(Boolean).join(". ") || undefined}
+              hint={
+                [missingHint("supportPhone") ? "Needed for the call: type the number from your insurance ID card" : undefined, phoneHint]
+                  .filter(Boolean)
+                  .join(". ") || undefined
+              }
               error={visibleError("supportPhone")}
               onChange={(event) => set("supportPhone")(event.target.value)}
               onBlur={touch("supportPhone")}
               data-testid="facts-edit-supportPhone"
             />
+            <Field
+              id={fieldId("policyNumber")}
+              label={FACT_LABELS.policyNumber}
+              name="policy-number"
+              autoComplete="off"
+              spellCheck={false}
+              value={draft.policyNumber}
+              hint={missingHint("policyNumber")}
+              error={visibleError("policyNumber")}
+              onChange={(event) => set("policyNumber")(event.target.value)}
+              onBlur={touch("policyNumber")}
+              data-testid="facts-edit-policyNumber"
+            />
+            <Field
+              id={fieldId("claimType")}
+              label={FACT_LABELS.claimType}
+              name="claim-type"
+              autoComplete="off"
+              placeholder="Water damage…"
+              value={draft.claimType}
+              hint={missingHint("claimType")}
+              error={visibleError("claimType")}
+              onChange={(event) => set("claimType")(event.target.value)}
+              onBlur={touch("claimType")}
+              data-testid="facts-edit-claimType"
+            />
+            <Field
+              id={fieldId("incidentDate")}
+              label={FACT_LABELS.incidentDate}
+              name="incident-date"
+              type="date"
+              autoComplete="off"
+              value={draft.incidentDate}
+              hint={missingHint("incidentDate")}
+              error={visibleError("incidentDate")}
+              onChange={(event) => set("incidentDate")(event.target.value)}
+              onBlur={touch("incidentDate")}
+              data-testid="facts-edit-incidentDate"
+            />
+            <div className={styles.spacer} aria-hidden="true" />
             <div className={styles.numeric}>
               {/* decimal keeps the numeric keypad and adds the separator cents need */}
               <Field
@@ -332,6 +380,22 @@ export default function FactsCard(props: FactsCardProps) {
                 onChange={(event) => set("reason")(event.target.value)}
                 onBlur={touch("reason")}
                 data-testid="facts-edit-reason"
+              />
+            </div>
+            <div className={styles.wide}>
+              <Field
+                as="textarea"
+                id={fieldId("lossDescription")}
+                label={FACT_LABELS.lossDescription}
+                name="loss-description"
+                autoComplete="off"
+                rows={3}
+                value={draft.lossDescription}
+                hint={missingHint("lossDescription")}
+                error={visibleError("lossDescription")}
+                onChange={(event) => set("lossDescription")(event.target.value)}
+                onBlur={touch("lossDescription")}
+                data-testid="facts-edit-lossDescription"
               />
             </div>
           </div>

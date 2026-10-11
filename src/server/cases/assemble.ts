@@ -1,5 +1,7 @@
 import { ACTIVE_CALL_STATES, type CallV1, type CaseStatus, type CaseV1 } from "@/contracts/case";
 import type { CallRow, CaseRow, EvidenceRow } from "@/server/persistence/repository";
+import { CALL_PURPOSES } from "@/contracts/voice";
+import { missingFields, suggestedPurpose } from "@/server/cases/facts";
 
 export function toCallV1(row: CallRow): CallV1 {
   return {
@@ -50,12 +52,18 @@ export function assembleCase(row: CaseRow, evidence: EvidenceRow[], calls: CallR
     mode: row.mode,
     status: deriveStatus(row, calls),
     customer: { ...doc.customer },
-    merchant: { ...doc.merchant },
+    merchant: { name: doc.merchant.name, supportPhone: doc.merchant.supportPhone, source: doc.merchant.source ? { ...doc.merchant.source } : null },
     amountMinor: doc.amountMinor,
     currency: doc.currency,
     reason: doc.reason,
+    policyNumber: doc.policyNumber ?? null,
+    incidentDate: doc.incidentDate ?? null,
+    lossDescription: doc.lossDescription ?? null,
+    claimType: doc.claimType ?? null,
     evidence: evidence.map((e) => ({ id: e.id, name: e.name, mimeType: e.mimeType })),
     missingFields: [...doc.missingFields],
+    suggestedPurpose: suggestedPurpose(doc),
+    missingFieldsByPurpose: Object.fromEntries(CALL_PURPOSES.map((p) => [p, missingFields(doc, p)])),
     draft: doc.draft ? { ...doc.draft } : null,
     authorization: doc.authorization ? { ...doc.authorization } : null,
     calls: calls.map(toCallV1),

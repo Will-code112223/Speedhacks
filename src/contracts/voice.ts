@@ -94,7 +94,7 @@ export function isInvalidWebhookError(err: unknown): boolean {
 // The plan is case data, never instructions to expand the agent's authority.
 // ---------------------------------------------------------------------------
 
-export const CALL_PURPOSES = ["request_refund", "gather_information"] as const;
+export const CALL_PURPOSES = ["request_refund", "gather_information", "file_claim"] as const;
 export type CallPurpose = (typeof CALL_PURPOSES)[number];
 
 export interface CallPlanFacts {
@@ -108,6 +108,17 @@ export interface CallPlanFacts {
   evidenceNames: string[];
   /** Transaction-history finding; present only when a duplicate was found for this revision. */
   history: { status: string; transactionRefs: string[] } | null;
+  /**
+   * V1.2 insurance facts (additive, optional so older frozen plans stay valid).
+   * file_claim requires incidentDate, lossDescription, and policyNumber or customerName.
+   * null or absent means unknown.
+   */
+  policyNumber?: string | null;
+  /** ISO calendar date (YYYY-MM-DD) of the loss. */
+  incidentDate?: string | null;
+  lossDescription?: string | null;
+  /** Short claim category in words, e.g. "water damage". */
+  claimType?: string | null;
 }
 export type CallPlanFactKey = keyof CallPlanFacts;
 export const CALL_PLAN_FACT_KEYS: readonly CallPlanFactKey[] = [
@@ -119,6 +130,10 @@ export const CALL_PLAN_FACT_KEYS: readonly CallPlanFactKey[] = [
   "reason",
   "evidenceNames",
   "history",
+  "policyNumber",
+  "incidentDate",
+  "lossDescription",
+  "claimType",
 ];
 
 export interface CallPlanV1 {
@@ -139,6 +154,13 @@ export interface CallPlanV1 {
    * Context for the agent, not facts to read out; never caller-supplied text.
    */
   guidance?: string[];
+  /**
+   * V1.2 (additive): server-generated script the policyholder approves with the plan.
+   * One-sentence goal, ordered steps, and what to read back before hanging up.
+   */
+  goal?: string;
+  steps?: string[];
+  readBack?: string;
 }
 
 /** Server-owned action constants per purpose. A plan carrying any other text is invalid. */
@@ -172,6 +194,24 @@ export const CALL_PLAN_ACTIONS: Readonly<Record<CallPurpose, { permitted: readon
       "Do not make any commitment on the customer's behalf.",
     ],
   },
+  file_claim: {
+    permitted: [
+      "Identify yourself as an AI assistant calling with the policyholder's authorization.",
+      "Navigate the phone menu to the claims department and wait on hold.",
+      "Open a new claim using exactly the approved facts listed.",
+      "Answer verification questions only with facts in the approved snapshot.",
+      "Ask for the claim number and the next steps, and read them back.",
+      "Ask which documents the insurer still needs.",
+    ],
+    forbidden: [
+      "Do not invent or guess any identifier, date, amount, or coverage detail.",
+      "Do not agree to a settlement or accept any amount.",
+      "Do not authorize any payment.",
+      "Do not give the policyholder's Social Security number, date of birth, or card numbers; say the policyholder will provide any fact not listed.",
+      "Do not argue about coverage.",
+      "Do not call anyone other than the approved number, or ask to be transferred outside the insurer.",
+    ],
+  },
 };
 
 export const CALL_PLAN_LIMITS = {
@@ -188,11 +228,24 @@ export const CALL_PLAN_LIMITS = {
   questionChars: 300,
   guidance: 6,
   guidanceChars: 400,
+  policyNumberChars: 64,
+  lossDescriptionChars: 2000,
+  claimTypeChars: 120,
+  goalChars: 300,
+  steps: 8,
+  stepChars: 300,
+  readBackChars: 400,
+  /**
+   * Bound on JSON.stringify(plan). The adapter's mandatory rules take about 3,500
+   * characters, so a plan within this bound keeps the provider instruction under 12,000.
+   */
+  serializedPlanChars: 8000,
 } as const;
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const QUESTION_ID_RE = /^[a-z0-9_-]+$/;
 const CURRENCY_RE = /^[A-Z]{3}$/;
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 // Control characters other than tab/newline are never valid in plan text.
 const BAD_CHARS_RE = /[\u0000-\u0008\u000b-\u001f\u007f]/;
 
@@ -205,6 +258,15 @@ function onlyKeys(v: Record<string, unknown>, keys: readonly string[]): boolean 
 function boundedText(v: unknown, max: number, nullable: boolean): boolean {
   if (v === null) return nullable;
   return typeof v === "string" && v.trim().length > 0 && v.length <= max && !BAD_CHARS_RE.test(v);
+}
+function isoDate(v: unknown): boolean {
+  if (typeof v !== "string" || !ISO_DATE_RE.test(v)) return false;
+  const d = new Date(`${v}T00:00:00.000Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === v;
+}
+/** Optional V1.2 fact: absent and null both mean unknown. */
+function optionalText(v: unknown, max: number): boolean {
+  return v === undefined || boundedText(v, max, true);
 }
 function sameList(a: unknown, b: readonly string[]): boolean {
   return Array.isArray(a) && a.length === b.length && a.every((x, i) => x === b[i]);
@@ -219,7 +281,7 @@ export function validateCallPlan(plan: unknown): string[] {
   const errors: string[] = [];
   const L = CALL_PLAN_LIMITS;
   if (!isRecord(plan)) return ["plan must be an object"];
-  if (!onlyKeys(plan, ["version", "purpose", "facts", "permittedDisclosures", "questions", "permittedActions", "forbiddenActions", "caseRef", "guidance"])) {
+  if (!onlyKeys(plan, ["version", "purpose", "facts", "permittedDisclosures", "questions", "permittedActions", "forbiddenActions", "caseRef", "guidance", "goal", "steps", "readBack"])) {
     errors.push("plan has unknown keys");
   }
   if (plan.version !== 1) errors.push("version must be 1");
@@ -246,6 +308,13 @@ export function validateCallPlan(plan: unknown): string[] {
     }
     if (!Array.isArray(f.evidenceNames) || f.evidenceNames.length > L.evidenceNames || !f.evidenceNames.every((n) => boundedText(n, L.evidenceNameChars, false))) {
       errors.push("facts.evidenceNames is invalid");
+    }
+    if (!optionalText(f.policyNumber, L.policyNumberChars)) errors.push("facts.policyNumber is invalid");
+    if (!(f.incidentDate === undefined || f.incidentDate === null || isoDate(f.incidentDate))) errors.push("facts.incidentDate must be null or an ISO date");
+    if (!optionalText(f.lossDescription, L.lossDescriptionChars)) errors.push("facts.lossDescription is invalid");
+    if (!optionalText(f.claimType, L.claimTypeChars)) errors.push("facts.claimType is invalid");
+    if (purpose === "file_claim" && ((f.policyNumber == null && f.customerName === null) || f.incidentDate == null || f.lossDescription == null)) {
+      errors.push("file_claim requires facts.incidentDate, facts.lossDescription, and facts.policyNumber or facts.customerName");
     }
     const h = f.history;
     if (h !== null) {
@@ -286,6 +355,17 @@ export function validateCallPlan(plan: unknown): string[] {
     errors.push("guidance is invalid");
   }
 
+  if (plan.goal !== undefined && !boundedText(plan.goal, L.goalChars, false)) errors.push("goal is invalid");
+  const st = plan.steps;
+  if (st !== undefined && (!Array.isArray(st) || st.length > L.steps || !st.every((line) => boundedText(line, L.stepChars, false)))) {
+    errors.push("steps is invalid");
+  }
+  if (plan.readBack !== undefined && !boundedText(plan.readBack, L.readBackChars, false)) errors.push("readBack is invalid");
+
+  let serialized = Number.POSITIVE_INFINITY;
+  try { serialized = JSON.stringify(plan).length; } catch { /* unserializable values are invalid */ }
+  if (serialized > L.serializedPlanChars) errors.push(`plan exceeds ${L.serializedPlanChars} serialized characters; shorten the case facts`);
+
   const ref = plan.caseRef;
   if (!isRecord(ref) || !onlyKeys(ref, ["caseId", "revision"]) || typeof ref.caseId !== "string" || !UUID_RE.test(ref.caseId)
     || !(typeof ref.revision === "number" && Number.isSafeInteger(ref.revision) && ref.revision > 0)) {
@@ -318,5 +398,8 @@ export function planForProvider(plan: CallPlanV1): ProviderCallPlan {
     forbiddenActions: [...plan.forbiddenActions],
     caseRef: { ...plan.caseRef },
     ...(plan.guidance ? { guidance: [...plan.guidance] } : {}),
+    ...(plan.goal !== undefined ? { goal: plan.goal } : {}),
+    ...(plan.steps ? { steps: [...plan.steps] } : {}),
+    ...(plan.readBack !== undefined ? { readBack: plan.readBack } : {}),
   };
 }

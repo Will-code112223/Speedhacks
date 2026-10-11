@@ -31,6 +31,7 @@ import {
 } from "./call";
 import type { UiError } from "./errors";
 import { createLocalId } from "./ids";
+import { anyPurposeReady } from "./purpose";
 import type { RecoveredCase } from "./recovery";
 
 // ---------------------------------------------------------------------------
@@ -284,8 +285,10 @@ function applyCase(session: CaseSession, next: CaseV1, liveCapable: boolean, at:
   // An approval step whenever the case is ready and no call runs under its authorization.
   // A fresh step starts clean: an error from the previous attempt does not carry over.
   let approval = session.approval;
+  // A case missing facts for its suggested purpose can still be ready for another one
+  // (for example "Ask what is needed" without an amount), so the step is offered then too.
   const needsApproval =
-    (next.status === "ready_for_approval" || next.status === "authorized") &&
+    (next.status === "ready_for_approval" || next.status === "authorized" || (next.status === "needs_information" && anyPurposeReady(next))) &&
     !(call && next.authorization && call.authorizationId === next.authorization.id);
   if (needsApproval && !thread.some((item) => item.kind === "approval" && item.callId === null)) {
     append({ kind: "approval", id: createLocalId(), at, callId: null });

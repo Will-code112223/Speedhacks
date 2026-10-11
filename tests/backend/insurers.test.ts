@@ -20,7 +20,10 @@ const EXPECTED_IDS = [
   "unitedhealthcare", "elevance-health", "aetna", "cigna", "kaiser-permanente", "humana",
   "unum", "principal-financial", "guardian-life", "the-hartford", "cna",
   "trupanion", "healthy-paws", "allianz-global-assistance",
-];
+  "blue-shield-of-california",
+  "anthem-blue-cross-california",
+  "farmers",
+  "lemonade"];
 
 afterAll(() => closeInsurerDatabase());
 
@@ -66,6 +69,12 @@ describe("lookupInsurer", () => {
     expect(lookupInsurer("GEICO", MEM)?.id).toBe("geico");
     expect(lookupInsurer("State Farm Insurance", MEM)?.id).toBe("state-farm");
     expect(lookupInsurer("Anthem Blue Cross", MEM)?.id).toBe("elevance-health");
+    // An exact alias beats a token match: "Blue Shield" is Blue Shield of California, not Anthem BCBS.
+    expect(lookupInsurer("Blue Shield", MEM)?.id).toBe("blue-shield-of-california");
+    expect(lookupInsurer("Blue Shield of California", MEM)?.id).toBe("blue-shield-of-california");
+    expect(lookupInsurer("Blue Shield of California", MEM)?.needsPlanOrRegion).toBe(true);
+    expect(lookupInsurer("Farmers", MEM)?.claimsPhone).toBe("+18004357764");
+    expect(lookupInsurer("Lemonade", MEM)?.id).toBe("lemonade");
     expect(lookupInsurer("Kaiser", MEM)?.id).toBe("kaiser-permanente");
     expect(lookupInsurer("Aetna (CVS Health)", MEM)?.id).toBe("aetna");
     expect(lookupInsurer("Chicago Title", MEM)?.parentId).toBe("fidelity-national-financial");

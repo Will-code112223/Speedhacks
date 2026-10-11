@@ -161,6 +161,46 @@
   flex: none;
 }
 
+/* Run mode: Live is loud and warm because approved calls dial real numbers. */
+.modeBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 10px;
+  border: 1px solid var(--rc-border);
+  border-radius: 999px;
+  background: var(--rc-surface);
+  color: var(--rc-ink-2);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.modeDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.mode_live {
+  border-color: var(--rc-warning);
+  background: var(--rc-warning);
+  color: var(--rc-on-accent);
+}
+
+.mode_simulated {
+  color: var(--rc-ink-2);
+}
+
+.mode_fixture {
+  border-style: dashed;
+  color: var(--rc-ink-3);
+}
+
 /* ------------------------------------------------------------------------- */
 /* Body: rail, chat, call                                                     */
 /* ------------------------------------------------------------------------- */

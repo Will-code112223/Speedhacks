@@ -117,6 +117,11 @@ class FixtureCaseApi implements CaseApi {
       amountMinor: provided.amountMinor ?? found.amountMinor,
       currency: provided.currency ?? found.currency,
       reason: summary.length > 0 ? summary : scenario.documentReason,
+      // The scripted scenarios extract no insurance facts; the person adds them on the facts card.
+      policyNumber: null,
+      incidentDate: null,
+      lossDescription: null,
+      claimType: null,
     };
     const record: CaseRecord = {
       id: newId(),

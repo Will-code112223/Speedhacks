@@ -862,9 +862,9 @@
         "region": null,
         "purposeVerified": true,
         "phoneE164": "+18007764737",
-        "hours": "24/7",
+        "hours": null,
         "url": "https://www.progressive.com/claims/",
-        "notes": "Labeled 'Claims center' / 'Call us' on the official claims page; used to report an accident and for service on an existing claim. The claims page states no hours; the 24/7 availability is stated on the auto FAQ (https://www.progressive.com/auto/faq/), which also carries this number. Also marketed as 1-800-PROGRESSIVE: keypad decode P-R-O-G-R-E-S-S = 776-4737 (trailing letters I-V-E ignored).",
+        "notes": "Labeled 'Claims center' / 'Call us' on the official claims page; used to report an accident and for service on an existing claim. The claims page states no hours; the 24/7 availability is stated on the auto FAQ (https://www.progressive.com/auto/faq/), which also carries this number. Also marketed as 1-800-PROGRESSIVE: keypad decode P-R-O-G-R-E-S-S = 776-4737 (trailing letters I-V-E ignored). Claims page prints no hours (re-checked 2026-10-11).",
         "sourceUrl": "https://www.progressive.com/claims/",
         "retrievedAt": "2026-10-11",
         "confidence": "verified_official"
@@ -11548,6 +11548,506 @@
       {
         "question": "Is there a formal appeal deadline or process for denied claims, and does it depend on the underwriter (Jefferson vs BCS)?",
         "whyItMatters": "Needed for appeals calls; only an informal reconsideration path was found."
+      }
+    ]
+  },
+  {
+    "id": "blue-shield-of-california",
+    "name": "Blue Shield of California",
+    "legalName": null,
+    "parentId": null,
+    "categories": [
+      "health"
+    ],
+    "lines": [
+      "commercial_health",
+      "medicare_advantage",
+      "medicare_supplement",
+      "medicare_part_d"
+    ],
+    "aliases": [
+      "Blue Shield",
+      "Blue Shield CA",
+      "Blue Shield of CA",
+      "BSC"
+    ],
+    "eligibility": "California residents; individual and family (IFP, including Covered California), employer group, and Medicare plans. Medi-Cal is offered under the separate Blue Shield Promise Health Plan brand (contacts not verified here).",
+    "website": "https://www.blueshieldca.com",
+    "officialDomains": [
+      "blueshieldca.com"
+    ],
+    "tosUrl": null,
+    "privacyUrl": null,
+    "notes": "California-only health plan (head office 601 12th Street, Oakland, CA 94607). blueshieldca.com publishes no single general member-services number: the contact-us page lists only head office, technical support and sales, and member pages say to call the number on the member ID card. Published member lines are product-specific (Individual & Family plans, Medicare Advantage, Medicare Supplement, Part D), so every member contact here is scoped regional with the product in `region`; employer-group members must use the ID-card number. Not the same company as Anthem Blue Cross or other Blue Cross Blue Shield plans.",
+    "contacts": [
+      {
+        "purpose": "customer_service",
+        "channel": "phone",
+        "scope": "regional",
+        "region": "California - Individual & Family plan (IFP) members",
+        "purposeVerified": true,
+        "phoneE164": "+18882563650",
+        "hours": "Feb 1 - Oct 31: Mon-Fri 8 a.m.-6 p.m.; Nov 1 - Jan 31: Mon-Fri 7 a.m.-8 p.m., Sat 8 a.m.-6 p.m. (Pacific; hours from blueshieldca.com maintenance page, see notes). Closed Sunday.",
+        "url": "https://www.blueshieldca.com/en/ifp/members/start-here",
+        "notes": "Shown as '(888) 256-3650 (TTY: 711)' in the Contact us header of the IFP member pages (start-here, costs-claims, renewal member resources). The IFP renewal member-resources page labels it: 'Reach out to your broker, or Member Services at (888) 256-3650 (TTY: 711)'. Hours are not printed on those pages; they come from the blueshieldca.com site-maintenance status page (version stamp v. 22.06.25.3, may be stale), which lists this number under 'Member Services' and adds 'If your plan is through an employer, call the number on the back of the Blue Shield member ID card'. Either schedule is closed on Sunday. Blue Shield says operation centers close on its holiday schedule. Covered California enrollees: Blue Shield handles billing, ID cards, benefits, providers and claims; Covered California (800) 300-1506 handles income/address changes and cancellation.",
+        "sourceUrl": "https://www.blueshieldca.com/en/ifp/ifp-renewal/member-resources",
+        "retrievedAt": "2026-10-11T22:13:33Z",
+        "confidence": "verified_official"
+      },
+      {
+        "purpose": "customer_service",
+        "channel": "phone",
+        "scope": "regional",
+        "region": "California - Medicare Advantage members",
+        "purposeVerified": true,
+        "phoneE164": "+18007764466",
+        "hours": "8 a.m.-8 p.m. PT, seven days a week",
+        "url": "https://www.blueshieldca.com/en/medicare/member-resources/customer-service-and-guidance",
+        "notes": "Medicare customer-service page: 'Medicare Advantage members (800) 776-4466 (TTY: 711) 8 a.m. to 8 p.m. PT, seven days a week'. Open on Sundays. Same page lists other Medicare product lines (see other contacts). The older maintenance page shows seasonal hours for this number (Apr 1 - Sep 30 weekends 8 a.m.-5 p.m.), but the current Medicare page states seven days a week, 8 a.m.-8 p.m. PT.",
+        "sourceUrl": "https://www.blueshieldca.com/en/medicare/member-resources/customer-service-and-guidance",
+        "retrievedAt": "2026-10-11T22:13:33Z",
+        "confidence": "verified_official"
+      },
+      {
+        "purpose": "customer_service",
+        "channel": "phone",
+        "scope": "regional",
+        "region": "California - Medicare Advantage members in CalPERS",
+        "purposeVerified": true,
+        "phoneE164": "+18888024599",
+        "hours": "7 a.m.-8 p.m. PT, seven days a week",
+        "url": "https://www.blueshieldca.com/en/medicare/member-resources/customer-service-and-guidance",
+        "notes": "Medicare page: 'Medicare Advantage members in the California Public Employees Retirement System (CalPERS) (888) 802-4599 (TTY: 711) 7 a.m. to 8 p.m. PT, seven days a week'.",
+        "sourceUrl": "https://www.blueshieldca.com/en/medicare/member-resources/customer-service-and-guidance",
+        "retrievedAt": "2026-10-11T22:13:33Z",
+        "confidence": "verified_official"
+      },
+      {
+        "purpose": "customer_service",
+        "channel": "phone",
+        "scope": "regional",
+        "region": "California - Medicare Advantage members in SFHSS",
+        "purposeVerified": true,
+        "phoneE164": "+18003708852",
+        "hours": "8 a.m.-8 p.m. PT, seven days a week",
+        "url": "https://www.blueshieldca.com/en/medicare/member-resources/customer-service-and-guidance",
+        "notes": "Medicare page: 'Medicare Advantage members in the San Francisco Health Service System (SFHSS) (800) 370-8852 (TTY: 711) 8 a.m. to 8 p.m. PT, seven days a week'.",
+        "sourceUrl": "https://www.blueshieldca.com/en/medicare/member-resources/customer-service-and-guidance",
+        "retrievedAt": "2026-10-11T22:13:33Z",
+        "confidence": "verified_official"
+      },
+      {
+        "purpose": "customer_service",
+        "channel": "phone",
+        "scope": "regional",
+        "region": "California - Blue Shield TotalDual Plan (HMO D-SNP) members",
+        "purposeVerified": true,
+        "phoneE164": "+18004524413",
+        "hours": "8 a.m.-8 p.m. PT, seven days a week",
+        "url": "https://www.blueshieldca.com/en/medicare/member-resources/customer-service-and-guidance",
+        "notes": "Medicare page, 'Medicare + Medi-Cal (D-SNP)': 'Blue Shield TotalDual Plan (HMO D-SNP) (800) 452-4413 (TTY: 711) 8 a.m. to 8 p.m. PT, seven days a week'.",
+        "sourceUrl": "https://www.blueshieldca.com/en/medicare/member-resources/customer-service-and-guidance",
+        "retrievedAt": "2026-10-11T22:13:33Z",
+        "confidence": "verified_official"
+      },
+      {
+        "purpose": "customer_service",
+        "channel": "phone",
+        "scope": "regional",
+        "region": "California - Part D Prescription Drug Plan (PDP) members",
+        "purposeVerified": true,
+        "phoneE164": "+18882396469",
+        "hours": "8 a.m.-8 p.m. PT, seven days a week",
+        "url": "https://www.blueshieldca.com/en/medicare/member-resources/customer-service-and-guidance",
+        "notes": "Medicare page: 'Prescription Drug Plan (888) 239-6469 (TTY: 711) Customer Service is available 8 a.m. to 8 p.m. PT, seven days a week'.",
+        "sourceUrl": "https://www.blueshieldca.com/en/medicare/member-resources/customer-service-and-guidance",
+        "retrievedAt": "2026-10-11T22:13:33Z",
+        "confidence": "verified_official"
+      },
+      {
+        "purpose": "customer_service",
+        "channel": "phone",
+        "scope": "regional",
+        "region": "California - Medicare Supplement plan members",
+        "purposeVerified": true,
+        "phoneE164": "+18002482341",
+        "hours": "8 a.m.-8 p.m. PT, seven days a week",
+        "url": "https://www.blueshieldca.com/en/medicare/member-resources/customer-service-and-guidance",
+        "notes": "Medicare page: 'Medicare Supplement plan (800) 248-2341 (TTY: 711) 8 a.m. to 8 p.m. PT, seven days a week'.",
+        "sourceUrl": "https://www.blueshieldca.com/en/medicare/member-resources/customer-service-and-guidance",
+        "retrievedAt": "2026-10-11T22:13:33Z",
+        "confidence": "verified_official"
+      },
+      {
+        "purpose": "customer_service",
+        "channel": "phone",
+        "scope": "plan_specific",
+        "region": "Employer-group (and any other) plans",
+        "purposeVerified": null,
+        "phoneE164": null,
+        "hours": null,
+        "url": "https://www.blueshieldca.com/en/home/contact-us",
+        "notes": "No general member line is published. The contact-us page language-assistance text says 'call us at the number listed on your ID card'; the maintenance page says employer-plan members should call the number on the back of the member ID card. Ask the customer for the number on their card.",
+        "sourceUrl": "https://www.blueshieldca.com/en/home/contact-us",
+        "retrievedAt": "2026-10-11T22:13:33Z",
+        "confidence": "verified_official"
+      },
+      {
+        "purpose": "claims",
+        "channel": "phone",
+        "scope": "plan_specific",
+        "region": null,
+        "purposeVerified": null,
+        "phoneE164": null,
+        "hours": null,
+        "url": "https://www.blueshieldca.com/en/ifp/members/billing-financial-help/costs-claims",
+        "notes": "No separate claims phone line. The IFP costs-and-claims page says claim details are online and, for older claims or other questions, 'call the customer service number listed on your Blue Shield member ID card'. For IFP members that is normally the Member Services line (888) 256-3650; confirm against the card.",
+        "sourceUrl": "https://www.blueshieldca.com/en/ifp/members/billing-financial-help/costs-claims",
+        "retrievedAt": "2026-10-11T22:13:33Z",
+        "confidence": "verified_official"
+      },
+      {
+        "purpose": "customer_service",
+        "channel": "phone",
+        "scope": "corporate_only",
+        "region": null,
+        "purposeVerified": true,
+        "phoneE164": "+15106072000",
+        "hours": null,
+        "url": "https://www.blueshieldca.com/en/home/contact-us",
+        "notes": "Contact-us page: 'Head Office Blue Shield of California 601 12th Street Oakland, CA 94607 (510) 607-2000'. Corporate switchboard; not a member-services line. Hours not stated.",
+        "sourceUrl": "https://www.blueshieldca.com/en/home/contact-us",
+        "retrievedAt": "2026-10-11T22:13:33Z",
+        "confidence": "verified_official"
+      }
+    ],
+    "terms": [],
+    "openQuestions": [
+      {
+        "question": "What are the current published hours for IFP Member Services (888) 256-3650?",
+        "whyItMatters": "Hours come only from a site-maintenance page with an old version stamp; the IFP pages show the number without hours."
+      },
+      {
+        "question": "Is (888) 626-6780 (header of the Covered California member page) a member-service line or a sales line?",
+        "whyItMatters": "It is shown without a purpose label, so it was not recorded as a contact."
+      },
+      {
+        "question": "What are the Blue Shield Promise (Medi-Cal) member-service numbers and hours?",
+        "whyItMatters": "Medi-Cal members are served under a separate brand; those numbers were not fetched."
+      }
+    ]
+  },
+  {
+    "id": "anthem-blue-cross-california",
+    "name": "Anthem Blue Cross (California)",
+    "legalName": null,
+    "parentId": "elevance-health",
+    "categories": [
+      "health"
+    ],
+    "lines": [
+      "commercial_health",
+      "medicaid"
+    ],
+    "aliases": [
+      "Anthem Blue Cross California",
+      "Anthem Blue Cross of California",
+      "Anthem CA",
+      "Anthem Blue Cross Medi-Cal"
+    ],
+    "eligibility": "California: individual/family and employer plans (commercial_health); Medi-Cal and MRMIP members (medicaid).",
+    "website": "https://www.anthem.com/ca",
+    "officialDomains": [
+      "anthem.com"
+    ],
+    "tosUrl": null,
+    "privacyUrl": null,
+    "notes": "California plan of Elevance Health (parent entry elevance-health). anthem.com/ca/contact-us renders member numbers only after login or state/plan selection ('Log in to find contact information specific to your area') and its static HTML contains only campaign-tracked sales numbers (one has a displayed number that differs from its dial link), so no commercial member-services number is recorded. Only the Medi-Cal and MRMIP lines on the Medi-Cal member site were verified; they are Monday-Friday only.",
+    "contacts": [
+      {
+        "purpose": "customer_service",
+        "channel": "phone",
+        "scope": "regional",
+        "region": "California - Medi-Cal members outside Los Angeles County",
+        "purposeVerified": true,
+        "phoneE164": "+18004074627",
+        "hours": "Mon-Fri 7 a.m.-7 p.m.",
+        "url": "https://mss.anthem.com/california-medicaid/contact-us.html",
+        "notes": "Medi-Cal contact page: 'Call the Customer Care Center: Medi-Cal members Outside L.A. County, call 1-800-407-4627 (TTY 711) ... Monday through Friday from 7 a.m. to 7 p.m.' The Medi-Cal welcome page gives the same number with TTY 1-888-757-6034. Closed Sunday. Medi-Cal only.",
+        "sourceUrl": "https://mss.anthem.com/california-medicaid/contact-us.html",
+        "retrievedAt": "2026-10-11T22:12:00Z",
+        "confidence": "verified_official"
+      },
+      {
+        "purpose": "customer_service",
+        "channel": "phone",
+        "scope": "regional",
+        "region": "California - Medi-Cal members in Los Angeles County",
+        "purposeVerified": true,
+        "phoneE164": "+18882857801",
+        "hours": "Mon-Fri 7 a.m.-7 p.m.",
+        "url": "https://mss.anthem.com/california-medicaid/contact-us.html",
+        "notes": "Medi-Cal contact page: 'In L.A. County, call 1-888-285-7801 (TTY 711) Monday through Friday from 7 a.m. to 7 p.m.' Closed Sunday. Medi-Cal only.",
+        "sourceUrl": "https://mss.anthem.com/california-medicaid/contact-us.html",
+        "retrievedAt": "2026-10-11T22:12:00Z",
+        "confidence": "verified_official"
+      },
+      {
+        "purpose": "customer_service",
+        "channel": "phone",
+        "scope": "regional",
+        "region": "California - MRMIP members",
+        "purposeVerified": true,
+        "phoneE164": "+18776870549",
+        "hours": "Mon-Fri 8:30 a.m.-5 p.m.",
+        "url": "https://mss.anthem.com/california-medicaid/contact-us.html",
+        "notes": "Medi-Cal contact page: 'MRMIP members Call 1-877-687-0549 (TTY 711) Monday through Friday from 8:30 a.m. to 5 p.m.' Major Risk Medical Insurance Program only.",
+        "sourceUrl": "https://mss.anthem.com/california-medicaid/contact-us.html",
+        "retrievedAt": "2026-10-11T22:12:00Z",
+        "confidence": "verified_official"
+      },
+      {
+        "purpose": "customer_service",
+        "channel": "phone",
+        "scope": "plan_specific",
+        "region": "California - commercial (individual/family and employer) plans",
+        "purposeVerified": null,
+        "phoneE164": null,
+        "hours": null,
+        "url": "https://www.anthem.com/ca/contact-us",
+        "notes": "No public commercial member-services number on anthem.com/ca/contact-us; the page directs members to the number on the back of their ID card or to log in. Ask the customer for the number on their card.",
+        "sourceUrl": "https://www.anthem.com/ca/contact-us",
+        "retrievedAt": "2026-10-11T22:12:00Z",
+        "confidence": "verified_official"
+      }
+    ],
+    "terms": [],
+    "openQuestions": [
+      {
+        "question": "What member-services number does anthem.com/ca show to logged-in California individual/family and employer members, and is it open weekends?",
+        "whyItMatters": "No commercial Anthem Blue Cross California number is verified; Medi-Cal lines must not be used for commercial members."
+      }
+    ]
+  },
+  {
+    "id": "farmers",
+    "name": "Farmers Insurance",
+    "legalName": null,
+    "parentId": null,
+    "categories": [
+      "auto",
+      "property"
+    ],
+    "lines": [
+      "auto",
+      "homeowners",
+      "umbrella"
+    ],
+    "aliases": [
+      "Farmers",
+      "Farmers Insurance Group",
+      "Farmers Insurance Exchange"
+    ],
+    "eligibility": null,
+    "website": "https://www.farmers.com",
+    "officialDomains": [
+      "farmers.com"
+    ],
+    "tosUrl": null,
+    "privacyUrl": null,
+    "notes": "farmers.com blocks non-browser HTTP clients; numbers were read from the rendered contact page in a real browser (text and tel: links agree). Farmers GroupSelect (Auto & Home) customers have a separate claims line. Status of an existing claim goes to the assigned claim representative, not the claims center.",
+    "contacts": [
+      {
+        "purpose": "claims",
+        "channel": "phone",
+        "scope": "national",
+        "region": null,
+        "purposeVerified": true,
+        "phoneE164": "+18004357764",
+        "hours": "24/7",
+        "url": "https://www.farmers.com/contact-us/",
+        "notes": "Contact page, Claims services: 'Give Farmers Claims Call Center a call 800-435-7764 The Farmers Insurance Claims Center is available 24 hours a day, 7 days a week at 800-435-7764.' Also 'Please contact your claim representative for status on an existing claim.' Spanish claims: 'En Español 877-732-5266' (hours not separately stated). Hearing/speech: dial 711 (TRS). The claims page (farmers.com/claims/) also lists 'Contact Farmers Claims Center 1-800-435-7764'.",
+        "sourceUrl": "https://www.farmers.com/contact-us/",
+        "retrievedAt": "2026-10-11T22:10:30Z",
+        "confidence": "verified_official"
+      },
+      {
+        "purpose": "claims",
+        "channel": "phone",
+        "scope": "plan_specific",
+        "region": "Farmers GroupSelect (Auto & Home) customers",
+        "purposeVerified": true,
+        "phoneE164": "+18008546011",
+        "hours": "24/7",
+        "url": "https://www.farmers.com/contact-us/",
+        "notes": "Contact page, 'Farmers GroupSelect® (Auto & Home customers)': 'To report a claim call 800-854-6011 for 24/7 support. For status on an existing claim, please contact your claim representative directly.' Use only for GroupSelect policies.",
+        "sourceUrl": "https://www.farmers.com/contact-us/",
+        "retrievedAt": "2026-10-11T22:10:30Z",
+        "confidence": "verified_official"
+      },
+      {
+        "purpose": "customer_service",
+        "channel": "phone",
+        "scope": "national",
+        "region": null,
+        "purposeVerified": true,
+        "phoneE164": "+18883276335",
+        "hours": "Mon-Fri 7:00 a.m.-11:00 p.m. CST; Sat-Sun 8:00 a.m.-8:00 p.m. CST",
+        "url": "https://www.farmers.com/contact-us/",
+        "notes": "Contact page, 'Customer care center ... Call us 888-327-6335 Monday – Friday 7:00 a.m. to 11:00 p.m. CST Saturday – Sunday 8:00 a.m. to 8:00 p.m. CST'. Open Sunday until 8 p.m. Central (6 p.m. PT if the page means Central time generally; 7 p.m. PT if literally CST). Same number is listed under 'Agent directory: Call us' and as the personal bill-payment line. Page says auto/home/umbrella customers can also message after logging in.",
+        "sourceUrl": "https://www.farmers.com/contact-us/",
+        "retrievedAt": "2026-10-11T22:10:30Z",
+        "confidence": "verified_official"
+      },
+      {
+        "purpose": "billing",
+        "channel": "phone",
+        "scope": "national",
+        "region": null,
+        "purposeVerified": true,
+        "phoneE164": "+18883276335",
+        "hours": "24/7 (payments)",
+        "url": "https://www.farmers.com/contact-us/",
+        "notes": "Contact page, Payment center: 'Call center (available 24/7) Personal bill payments 888-327-6335'. Commercial bill payments: 855-323-5350 (same 24/7 heading). The same 888 number is the customer care center line, whose staffed hours are shorter (see customer_service contact).",
+        "sourceUrl": "https://www.farmers.com/contact-us/",
+        "retrievedAt": "2026-10-11T22:10:30Z",
+        "confidence": "verified_official"
+      },
+      {
+        "purpose": "claims",
+        "channel": "web",
+        "scope": "national",
+        "region": null,
+        "purposeVerified": null,
+        "phoneE164": null,
+        "hours": null,
+        "url": "https://www.farmers.com/claims/",
+        "notes": "Contact page: 'Report a claim online' and 'Find my claims representative' links under Claims services.",
+        "sourceUrl": "https://www.farmers.com/contact-us/",
+        "retrievedAt": "2026-10-11T22:10:30Z",
+        "confidence": "verified_official"
+      }
+    ],
+    "terms": [],
+    "openQuestions": [
+      {
+        "question": "Does the Spanish claims line 877-732-5266 share the claims center's 24/7 hours?",
+        "whyItMatters": "Only the English claims center line is stated as 24/7 on the page."
+      },
+      {
+        "question": "Does 'CST' on the contact page mean Central time year-round (CDT in summer) or literal CST?",
+        "whyItMatters": "Sunday customer-care close is 6 p.m. or 7 p.m. Pacific depending on reading."
+      }
+    ]
+  },
+  {
+    "id": "lemonade",
+    "name": "Lemonade",
+    "legalName": null,
+    "parentId": null,
+    "categories": [
+      "property",
+      "auto",
+      "pet",
+      "life"
+    ],
+    "lines": [
+      "renters",
+      "homeowners",
+      "auto",
+      "pet",
+      "life"
+    ],
+    "aliases": [
+      "Lemonade Insurance",
+      "Lemonade Inc",
+      "Lemonade Car",
+      "Lemonade Renters"
+    ],
+    "eligibility": null,
+    "website": "https://www.lemonade.com",
+    "officialDomains": [
+      "lemonade.com"
+    ],
+    "tosUrl": null,
+    "privacyUrl": null,
+    "notes": "App-first insurer: claims are filed in the Lemonade app ('File a Claim' button) or on the website; the phone number is offered for emergencies when the app/website is not accessible. One phone number, 1-844-733-8666, appears site-wide (footer, FAQ). Life insurance is issued through partner Banner Life per the FAQ.",
+    "contacts": [
+      {
+        "purpose": "claims",
+        "channel": "phone",
+        "scope": "national",
+        "region": null,
+        "purposeVerified": true,
+        "phoneE164": "+18447338666",
+        "hours": null,
+        "url": "https://www.lemonade.com/faq",
+        "notes": "FAQ: 'For emergencies relating to your car, home, and property where you don't have access to our app or website, you may call us at (844) 733-8666.' The emergency-claims FAQ adds 'We have your back, 24/7' about its emergency response network, but the page does not state staffed phone hours, so 24/7 phone answering is not confirmed. Car-claim email is also offered on the FAQ.",
+        "sourceUrl": "https://www.lemonade.com/faq",
+        "retrievedAt": "2026-10-11T22:09:00Z",
+        "confidence": "verified_official"
+      },
+      {
+        "purpose": "claims",
+        "channel": "app",
+        "scope": "national",
+        "region": null,
+        "purposeVerified": null,
+        "phoneE164": null,
+        "hours": null,
+        "url": "https://www.lemonade.com/claims",
+        "notes": "Claims page: 'Seamlessly file claims from your phone - anytime, anywhere. Tap the File a Claim button in the Lemonade app.'",
+        "sourceUrl": "https://www.lemonade.com/claims",
+        "retrievedAt": "2026-10-11T22:09:00Z",
+        "confidence": "verified_official"
+      },
+      {
+        "purpose": "customer_service",
+        "channel": "phone",
+        "scope": "national",
+        "region": null,
+        "purposeVerified": true,
+        "phoneE164": "+18447338666",
+        "hours": null,
+        "url": "https://www.lemonade.com/faq",
+        "notes": "FAQ: '...give our homeowners team a call at 1-844-733-8666'; the life FAQ says 'To cancel your policy, you can call us at 844-733-8666.' Same number is in the site footer (claims page, tel:1-844-733-8666). Hours not published. The FAQ otherwise steers general contact to the app or website.",
+        "sourceUrl": "https://www.lemonade.com/faq",
+        "retrievedAt": "2026-10-11T22:09:00Z",
+        "confidence": "verified_official"
+      }
+    ],
+    "terms": [
+      {
+        "line": "life",
+        "key": "free_look_days",
+        "value": "30 days, full refund of first month's premium",
+        "valueNumber": 30,
+        "unit": "days",
+        "jurisdictionScope": null,
+        "notes": "Life FAQ; voluntary cancellation has no charge.",
+        "sourceUrl": "https://www.lemonade.com/faq",
+        "sourceQuote": "We even offer a 30-day free look period",
+        "retrievedAt": "2026-10-11T22:09:00Z",
+        "confidence": "verified_official"
+      },
+      {
+        "line": "homeowners",
+        "key": "cancellation_method",
+        "value": "Cancel any time in the Lemonade app; refund for the remaining paid period",
+        "valueNumber": null,
+        "unit": null,
+        "jurisdictionScope": null,
+        "notes": "Homeowners FAQ. If a home closing falls through the policy can be cancelled at no charge.",
+        "sourceUrl": "https://www.lemonade.com/faq",
+        "sourceQuote": "You can cancel your policy at any time through the Lemonade app",
+        "retrievedAt": "2026-10-11T22:09:00Z",
+        "confidence": "verified_official"
+      }
+    ],
+    "openQuestions": [
+      {
+        "question": "What hours is 1-844-733-8666 staffed, and does it answer on Sunday?",
+        "whyItMatters": "Lemonade publishes no phone hours; only its emergency response is described as 24/7."
       }
     ]
   }

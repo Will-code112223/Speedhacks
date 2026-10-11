@@ -10,13 +10,23 @@ import { createProviderResource, providerUrl, type ProviderState } from "./provi
 import styles from "./ProviderKnowledge.module.css";
 import ProviderLibrary from "./ProviderLibrary";
 
-export default function ProviderKnowledge({ api }: { api?: InsurerApi }) {
+export interface ProviderKnowledgeProps {
+  api?: InsurerApi;
+  /** The chosen provider's name, or null when the choice is cleared; the plans keep it as their insurer. */
+  onProviderChange?: (name: string | null) => void;
+}
+
+export default function ProviderKnowledge({ api, onProviderChange }: ProviderKnowledgeProps) {
   // Provider reference data remains real in a simulated calling workspace.
   const client = useMemo(() => api ?? createInsurerApi({ mode: "http" }), [api]);
   const resource = useMemo(() => createProviderResource(client), [client]);
   const state = useSyncExternalStore(resource.subscribe, resource.getSnapshot, resource.getServerSnapshot);
   useEffect(() => { void resource.load(); return () => resource.dispose(); }, [resource]);
-  return <ProviderKnowledgeView state={state} onReload={() => void resource.load()} onSelect={(id) => void resource.select(id)} />;
+  const select = (id: string | null) => {
+    onProviderChange?.(id === null ? null : (state.list.items.find((item) => item.id === id)?.name ?? null));
+    void resource.select(id);
+  };
+  return <ProviderKnowledgeView state={state} onReload={() => void resource.load()} onSelect={select} />;
 }
 
 export function ProviderKnowledgeView({ state, onReload, onSelect }: { state: ProviderState; onReload: () => void; onSelect: (id: string | null) => void }) {

@@ -6,7 +6,16 @@
 import type { CaseChanges, CaseV1 } from "../../../../contracts/case";
 import { isRecord } from "../validate";
 
-export type Facts = Pick<CaseV1, "customer" | "merchant" | "amountMinor" | "currency" | "reason">;
+export type Facts = Pick<CaseV1, "customer" | "merchant" | "amountMinor" | "currency" | "reason"> & {
+  /** V1.2 insurance facts; null when unknown. Not required for a call. */
+  policyNumber: string | null;
+  incidentDate: string | null;
+  lossDescription: string | null;
+  claimType: string | null;
+};
+
+const INSURANCE_FACTS = ["policyNumber", "incidentDate", "lossDescription", "claimType"] as const;
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 export const E164 = /^\+[1-9]\d{1,14}$/;
 export const CURRENCY = /^[A-Z]{3}$/;
@@ -37,6 +46,10 @@ export function copyFacts(facts: Facts): Facts {
     amountMinor: facts.amountMinor,
     currency: facts.currency,
     reason: facts.reason,
+    policyNumber: facts.policyNumber ?? null,
+    incidentDate: facts.incidentDate ?? null,
+    lossDescription: facts.lossDescription ?? null,
+    claimType: facts.claimType ?? null,
   };
 }
 
@@ -93,6 +106,12 @@ export function validateChanges(input: unknown): { changes: CaseChanges; invalid
     if (typeof v === "string" && v.trim().length > 0 && v.length <= MAX_REASON_LENGTH) changes.reason = v.trim();
     else invalid.push("reason");
   }
+  for (const key of INSURANCE_FACTS) {
+    if (!(key in c)) continue;
+    const value = nullableText(c[key], key === "lossDescription" ? MAX_REASON_LENGTH : 200);
+    if (value === undefined || (key === "incidentDate" && value !== null && !ISO_DATE.test(value))) invalid.push(key);
+    else changes[key] = value;
+  }
   return { changes, invalid };
 }
 
@@ -103,6 +122,7 @@ export function applyChanges(facts: Facts, changes: CaseChanges): { next: Facts;
   if (changes.amountMinor !== undefined) next.amountMinor = changes.amountMinor;
   if (changes.currency !== undefined) next.currency = changes.currency;
   if (changes.reason !== undefined) next.reason = changes.reason;
+  for (const key of INSURANCE_FACTS) if (changes[key] !== undefined) next[key] = changes[key] ?? null;
   return { next, changed: JSON.stringify(next) !== JSON.stringify(copyFacts(facts)) };
 }
 

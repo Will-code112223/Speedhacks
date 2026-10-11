@@ -1,4 +1,30 @@
-FRONTEND POLISH CHECKPOINT — 2026-10-11
+LIVE PRODUCT PASS - 2026-10-11 (branch will/live-product)
+- Header mode badge, always visible: Live (warm, filled) when REFUND_MODE=live and the api
+  is http; Simulated when the server simulates; Fixture for ?api=fixture. Page title Recourse.
+- Approval step, live mode: title and button read "Place the call"; one sentence says it dials
+  the shown number now from our number, an AI assistant speaks for the user, capped at 5 minutes;
+  the checkbox says the same.
+- Purpose choice on the approval step: File a claim / Ask what is needed / Request a refund.
+  Prefilled from case.suggestedPurpose, except a question in the request ("what I need",
+  "status", "how do I") starts on Ask what is needed. When the chosen purpose still lacks facts
+  and another is ready (missingFieldsByPurpose), the choice stays offered. authorize always
+  sends { expectedRevision, purpose }. Amount is shown and required only for Request a refund.
+  The approval step also appears for a needs_information case when some purpose is ready.
+- Destination under the approval: "Calling <number>" plus provenance from merchant.source
+  (insurer registry line, confidence, retrieved date, source host, confirm against the ID card)
+  or "From your documents." No number blocks approval and points to the ID card.
+- Call plan preview before approval (http mode): what the agent will say and ask, built on the
+  client from the current facts and the chosen purpose (state/purpose.ts previewPlan). It does
+  not yet read CallPlanV1 goal/steps/readBack, which only exist once authorize builds the plan.
+- Facts card: editable nullable Policy number, Claim type, Incident date (YYYY-MM-DD), What
+  happened (lossDescription), saved through PATCH. The fixture engine accepts them too.
+- Plans: the provider picked in onboarding becomes the insurer of plans that name none and of
+  plans added after it. A case whose text names no company and whose plans share one insurer
+  sends that insurer as merchantName. Plan documents already go to POST /api/cases as files
+  (max 5, 10 MB each, HEIC skipped in http mode) whenever the request is about insurance.
+- Sample prompts are insurance-first; composer placeholder asks for insurer, what and when.
+
+FRONTEND POLISH CHECKPOINT - 2026-10-11
 Branch: codex/frontend-polish, based on main 602069a.
 The user requested publication of this checkpoint to main before the next demo work.
 
@@ -19,7 +45,7 @@ The user requested publication of this checkpoint to main before the next demo w
 - Real insurer form automation and visible generated claim documents are next work,
   not features supplied by this visual checkpoint. No deployment performed.
 
-ORIGINAL FRONTEND HANDOFF — teammate 1 (historical branch snapshot)
+ORIGINAL FRONTEND HANDOFF - teammate 1 (historical branch snapshot)
 Branch: codex/frontend
 Base: db5f311 (T2 scaffold and contracts). No teammate branch is merged into this branch.
 Commit: see git log -1 --format=%H -- src/features/refund-ui docs/handoffs/frontend.txt

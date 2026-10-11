@@ -181,6 +181,9 @@
   .grid {
     grid-template-columns: minmax(0, 1fr);
   }
+  .spacer {
+    display: none;
+  }
   .card {
     padding: 12px;
   }

@@ -24,8 +24,17 @@ export function buildPacket(
   lines.push(`Customer:       ${c.customer.name ?? "[missing]"}${c.customer.email ? ` <${c.customer.email}>` : ""}`);
   lines.push(`Merchant:       ${c.merchant.name ?? "[missing]"}`);
   lines.push(`Support phone:  ${c.merchant.supportPhone ?? "[missing]"}`);
+  const src = c.merchant.source;
+  if (src) {
+    lines.push(`Phone source:   ${src.insurerName} ${src.purpose === "claims" ? "claims" : "customer service"} line, insurer registry (${src.confidence}${src.sourceUrl ? `, ${src.sourceUrl}` : ""})`);
+  }
   lines.push(`Amount:         ${amount}`);
   lines.push(`Reason:         ${c.reason || "[missing]"}`);
+  // V1.2 insurance facts: printed only when known.
+  if (c.policyNumber) lines.push(`Policy number:  ${c.policyNumber}`);
+  if (c.claimType) lines.push(`Claim type:     ${c.claimType}`);
+  if (c.incidentDate) lines.push(`Date of loss:   ${c.incidentDate}`);
+  if (c.lossDescription) lines.push(`What happened:  ${c.lossDescription}`);
   if (c.missingFields.length > 0) lines.push(`Missing fields: ${c.missingFields.join(", ")}`);
   lines.push("");
   lines.push("REQUEST");

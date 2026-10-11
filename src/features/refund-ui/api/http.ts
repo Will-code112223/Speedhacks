@@ -116,8 +116,9 @@ export function createHttpCaseApi(options: HttpCaseApiOptions = {}): CaseApi {
       return envelope(res, "case", isCaseV1, CASE_NOT_FOUND_MESSAGE);
     },
 
-    async authorize(caseId, expectedRevision) {
-      const res = await send("POST", `${casePath(caseId)}/authorize`, { json: { expectedRevision } });
+    async authorize(caseId, expectedRevision, purpose) {
+      const json = purpose === undefined ? { expectedRevision } : { expectedRevision, purpose };
+      const res = await send("POST", `${casePath(caseId)}/authorize`, { json });
       return envelope(res, "case", isCaseV1, CASE_NOT_FOUND_MESSAGE);
     },
 

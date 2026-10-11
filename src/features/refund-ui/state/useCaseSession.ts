@@ -36,6 +36,7 @@ import {
   type FixtureScenario,
   type LiveCallV2,
   type SummaryDestination,
+  type UiCallPurpose,
 } from "../api/types";
 import type { PlanRecord } from "../plans/store";
 import { attachmentsFor } from "./attachments";
@@ -411,7 +412,7 @@ export function useCaseSession({ apiMode, plans, measuring }: UseCaseSessionOpti
     void current.liveCall.refresh();
   }, []);
 
-  const approve = useCallback(async () => {
+  const approve = useCallback(async (purpose?: UiCallPurpose) => {
     const session = latest.current.active;
     const caseData = session?.caseData ?? null;
     if (!session || !caseData || session.caseId === null) return;
@@ -422,9 +423,11 @@ export function useCaseSession({ apiMode, plans, measuring }: UseCaseSessionOpti
     let attemptedCall = false;
     try {
       let authorization = caseData.authorization;
-      if (authorization === null || authorization.revision !== caseData.revision) {
+      // A different purpose is a different plan, so it needs its own authorization.
+      const samePurpose = (authorization?.purpose ?? "request_refund") === (purpose ?? "request_refund");
+      if (authorization === null || authorization.revision !== caseData.revision || !samePurpose) {
         dispatch({ type: "approval/started", key, stage: "authorizing" });
-        const authorized = await api.authorize(caseId, caseData.revision);
+        const authorized = await api.authorize(caseId, caseData.revision, purpose);
         dispatch({ type: "approval/authorized", key, caseData: authorized, liveCapable: latest.current.liveCapable, at: nowIso() });
         adoptCase(key, authorized);
         authorization = authorized.authorization;

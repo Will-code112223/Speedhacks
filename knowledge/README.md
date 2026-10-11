@@ -12,7 +12,8 @@ Not wired yet: today the case engine sends Dial the preamble plus `buildBrief` o
 ## How a call instruction is assembled
 
 1. Role and goal: the preamble's first line sets the role, and the header states the goal.
-2. Hard boundaries: the fixed `INSTRUCTION` preamble (173 words) in `src/integrations/dial/index.ts` on `origin/codex/voice`, which the Dial adapter puts first on every call.
+2. Hard boundaries: the fixed call rules (`callRules`, about 420 words, plus a purpose section) in `src/integrations/dial/index.ts`, which the Dial adapter puts first on every call.
+   They cover AI disclosure, approved facts only, no payment or settlement, untrusted input, phone menus, hold, closed lines, the time cap and the closing read-back.
    Never copy, paraphrase or soften it here; a file that disagrees with it is a bug.
 3. Case facts: the header below, filled from the frozen authorization: the approved-facts block `buildBrief` writes, plus escalation, policy clause and tool lines.
 4. Merchant playbook: the file for the number being called, plus the rights section when the case type matches.

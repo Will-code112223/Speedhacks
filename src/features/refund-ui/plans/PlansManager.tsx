@@ -42,9 +42,18 @@ export default function PlansManager({ plans, mode, onDone }: PlansManagerProps)
     if (mode === "manage") titleRef.current?.focus();
   }, [mode]);
 
+  // The provider picked above becomes the insurer of plans that name none, and of plans added after it.
+  const [providerName, setProviderName] = useState<string | null>(null);
+  const chooseProvider = (name: string | null) => {
+    setProviderName(name);
+    if (!name) return;
+    for (const plan of plans.plans) if (!plan.insurer.trim()) plans.updatePlan(plan.id, { insurer: name });
+  };
+
   const handleFiles = (files: File[]) => {
     if (files.length === 0) return;
     const result = plans.addFiles(files);
+    if (providerName) for (const plan of result.added) plans.updatePlan(plan.id, { insurer: providerName });
     setRejections(result.rejected);
   };
 
@@ -70,7 +79,7 @@ export default function PlansManager({ plans, mode, onDone }: PlansManagerProps)
           </h1>
         </header>
 
-        <ProviderKnowledge />
+        <ProviderKnowledge onProviderChange={chooseProvider} />
 
         <h2 className={styles.listHeading}>Your policy documents</h2>
         <DropZone onFiles={handleFiles} />

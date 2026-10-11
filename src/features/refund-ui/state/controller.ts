@@ -4,7 +4,7 @@
  */
 
 import type { CallV1, CaseChanges, CaseV1 } from "../../../contracts/case";
-import type { ApiMode, CaseApiCapabilities, FixtureScenario, LiveCallV2 } from "../api/types";
+import type { ApiMode, CaseApiCapabilities, FixtureScenario, LiveCallV2, UiCallPurpose } from "../api/types";
 import type { UiError } from "./errors";
 import type { CaseSession, DecisionRecord } from "./session";
 
@@ -50,8 +50,8 @@ export interface CaseSessionController {
   reloadCase(): void;
   /** Reads the active case again after a failed update, keeping any unsaved edits. */
   retryUpdates(): void;
-  /** Authorizes the current revision if needed, then starts the call with a stable requestId. */
-  approve(): void;
+  /** Authorizes the current revision for `purpose` if needed, then starts the call with a stable requestId. */
+  approve(purpose?: UiCallPurpose): void;
   answerDecision(decisionId: string, optionId: string): void;
   dismissDecision(decisionId: string): void;
   stepIn(): void;

@@ -11,6 +11,11 @@ export interface CaseDoc {
   amountMinor: number | null;
   currency: string;
   reason: string;
+  /** V1.2 insurance facts; absent on older rows = null. */
+  policyNumber?: string | null;
+  incidentDate?: string | null;
+  lossDescription?: string | null;
+  claimType?: string | null;
   missingFields: string[];
   draft: CaseV1["draft"];
   authorization: CaseV1["authorization"];
@@ -51,7 +56,8 @@ export interface ProvenanceRow {
   revision: number;
   field: string;
   value: string | null;
-  sourceKind: "summary" | "document" | "user_input" | "llm";
+  /** V1.2 adds "insurer_registry": a support number filled from the insurer registry. */
+  sourceKind: "summary" | "document" | "user_input" | "llm" | "insurer_registry";
   sourceRef: string | null;
   excerpt: string | null;
   createdAt: string;
@@ -62,7 +68,12 @@ export interface AuthorizationSnapshot {
   caseId: string;
   revision: number;
   customer: CaseV1["customer"];
-  merchant: { name: string; supportPhone: string };
+  merchant: { name: string; supportPhone: string; source?: CaseV1["merchant"]["source"] };
+  /** V1.2 insurance facts frozen with the brief; absent on pre-V1.2 rows = null. */
+  policyNumber?: string | null;
+  incidentDate?: string | null;
+  lossDescription?: string | null;
+  claimType?: string | null;
   /** null only for a gather_information authorization (V1.1). */
   amountMinor: number | null;
   currency: string;

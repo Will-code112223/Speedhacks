@@ -13,23 +13,46 @@ import {
   PHONE_HINT,
 } from "../ui/format";
 
-export type FactKey = "customerName" | "customerEmail" | "merchantName" | "supportPhone" | "amountMinor" | "currency" | "reason";
+export type FactKey =
+  | "customerName"
+  | "customerEmail"
+  | "merchantName"
+  | "supportPhone"
+  | "policyNumber"
+  | "claimType"
+  | "incidentDate"
+  | "amountMinor"
+  | "currency"
+  | "reason"
+  | "lossDescription";
 
 export const FACT_KEYS: readonly FactKey[] = [
   "customerName",
   "customerEmail",
   "merchantName",
   "supportPhone",
+  "policyNumber",
+  "claimType",
+  "incidentDate",
   "amountMinor",
   "currency",
   "reason",
+  "lossDescription",
 ];
+
+/** V1.2 insurance facts: optional on the case, null when unknown. */
+type InsuranceFactKey = "policyNumber" | "incidentDate" | "lossDescription" | "claimType";
+const INSURANCE_FACT_KEYS: readonly InsuranceFactKey[] = ["policyNumber", "incidentDate", "lossDescription", "claimType"];
 
 export const FACT_LABELS: Record<FactKey, string> = {
   customerName: "Your name",
   customerEmail: "Your email",
   merchantName: "Insurer or merchant",
   supportPhone: "Support phone",
+  policyNumber: "Policy number",
+  claimType: "Claim type",
+  incidentDate: "Incident date",
+  lossDescription: "What happened",
   amountMinor: "Amount",
   currency: "Currency",
   reason: "Reason",
@@ -46,9 +69,13 @@ export function draftFromCase(caseData: CaseV1): FactsDraft {
     customerEmail: caseData.customer.email ?? "",
     merchantName: caseData.merchant.name ?? "",
     supportPhone: caseData.merchant.supportPhone ?? "",
+    policyNumber: caseData.policyNumber ?? "",
+    claimType: caseData.claimType ?? "",
+    incidentDate: caseData.incidentDate ?? "",
     amountMinor: amountInputValue(caseData.amountMinor, caseData.currency),
     currency: caseData.currency,
     reason: caseData.reason,
+    lossDescription: caseData.lossDescription ?? "",
   };
 }
 
@@ -71,7 +98,16 @@ export function validateFacts(draft: FactsDraft, caseData: CaseV1): FactErrors {
   const amount = parseAmountToMinor(draft.amountMinor, draft.currency);
   if (!amount.ok) errors.amountMinor = amount.error;
   if (!/^[A-Z]{3}$/.test(draft.currency)) errors.currency = "Choose a currency.";
+  if (draft.incidentDate.trim() !== "" && !isIsoDate(draft.incidentDate.trim())) {
+    errors.incidentDate = "Enter the date as YYYY-MM-DD.";
+  }
   return errors;
+}
+
+function isIsoDate(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().startsWith(value);
 }
 
 function nullable(value: string): string | null {
@@ -103,6 +139,10 @@ export function changesFromDraft(caseData: CaseV1, draft: FactsDraft): CaseChang
   if (draft.currency !== caseData.currency) changes.currency = draft.currency;
   const reason = draft.reason.trim();
   if (reason !== caseData.reason.trim()) changes.reason = reason;
+  for (const key of INSURANCE_FACT_KEYS) {
+    const value = nullable(draft[key]);
+    if (value !== (caseData[key] ?? null)) changes[key] = value;
+  }
   return Object.keys(changes).length > 0 ? changes : null;
 }
 
@@ -137,6 +177,16 @@ export function factKeyForServerField(field: string): FactKey | null {
       return "currency";
     case "reason":
       return "reason";
+    case "policynumber":
+    case "policy":
+      return "policyNumber";
+    case "claimtype":
+      return "claimType";
+    case "incidentdate":
+    case "dateofloss":
+      return "incidentDate";
+    case "lossdescription":
+      return "lossDescription";
     default:
       return null;
   }

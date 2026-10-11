@@ -9,10 +9,13 @@
  */
 
 import { useId, useState } from "react";
-import type { CallV1, CaseV1 } from "../../../contracts/case";
+import type { CallV1, CaseV1, MerchantSourceV1 } from "../../../contracts/case";
+import { UI_CALL_PURPOSES, type UiCallPurpose } from "../api/types";
 import { Banner, Button, KeyValueList, Mono, Pill } from "../ui/primitives";
 import { formatClock, formatMoney, formatPhone } from "../ui/format";
 import type { UiError } from "../state/errors";
+import { labelForServerField } from "../state/facts";
+import { blockingMissingFields, initialPurpose, previewPlan, PURPOSE_LABELS, purposeNeedsAmount } from "../state/purpose";
 import styles from "./ApprovalCard.module.css";
 
 export interface ApprovalCardProps {
@@ -21,12 +24,18 @@ export interface ApprovalCardProps {
   placedCall: CallV1 | null;
   /** Whether this is the step the person can act on (the newest open one). */
   current: boolean;
+  /** Approving dials a real number now (server REFUND_MODE=live over http). */
+  live?: boolean;
+  /** The person's own request, used to prefill what the call is for. */
+  requestText?: string;
+  /** Shows what the agent will say and ask, built from the facts and the chosen purpose. */
+  planPreview?: boolean;
   busy: boolean;
   stage: "authorizing" | "dispatching" | null;
   error: UiError | null;
   /** Calls are blocked while the facts card has unsaved edits or a conflict. */
   blockedReason: string | null;
-  onApprove: () => void;
+  onApprove: (purpose: UiCallPurpose) => void;
   /** Offered when the server says the case belongs to a different mode. */
   onStartNewCase?: () => void;
 }
@@ -47,18 +56,53 @@ function errorBody(error: UiError) {
   return error.message;
 }
 
-const CLAIM_WORDS = /\bclaims?\b/i;
+/** What the call asks for, stated from the chosen purpose and the case's amount. */
+function askingFor(purpose: UiCallPurpose, amount: string | null): string | null {
+  switch (purpose) {
+    case "file_claim":
+      return "Claim filed and a claim number";
+    case "gather_information":
+      return "What is needed to file, and the next step";
+    case "request_refund":
+      return amount ? `Refund of ${amount} and a reference number` : null;
+  }
+}
 
-/** What the call asks the merchant for, stated from the case's own reason and amount. */
-function askingFor(reason: string, amount: string | null): string | null {
-  if (CLAIM_WORDS.test(reason)) return "Claim filed and a reference number";
-  return amount ? `Refund of ${amount} and a reference number` : null;
+const dateFormat = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" });
+
+function formatDay(iso: string | null): string | null {
+  if (!iso) return null;
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime()) ? null : dateFormat.format(date);
+}
+
+function hostOf(url: string | null): string | null {
+  if (!url) return null;
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return null;
+  }
+}
+
+/** Where the number about to be dialed came from, in one sentence. */
+function provenance(source: MerchantSourceV1 | null | undefined): string {
+  if (!source || source.kind !== "insurer_registry") return "From your documents.";
+  const line = source.purpose === "claims" ? "Claims line" : "Customer service line";
+  const confidence = source.confidence.replace(/_/g, " ");
+  const day = formatDay(source.retrievedAt);
+  const host = hostOf(source.sourceUrl);
+  const parts = [`${line} from the insurer registry, ${confidence}${day ? ` on ${day}` : ""}`];
+  if (host) parts.push(`source ${host}`);
+  return `${parts.join(", ")}. Confirm it matches the number on your ID card.`;
 }
 
 export default function ApprovalCard(props: ApprovalCardProps) {
-  const { caseData, placedCall, current, busy, stage, error, blockedReason, onApprove, onStartNewCase } = props;
+  const { caseData, placedCall, current, live = false, requestText, planPreview = false, busy, stage, error, blockedReason, onApprove, onStartNewCase } = props;
   const checkboxId = useId();
   const headingId = useId();
+  const purposeName = useId();
+  const [purpose, setPurpose] = useState<UiCallPurpose>(() => initialPurpose(caseData, requestText ?? ""));
   // The confirmation belongs to the revision the person saw; new facts need a new confirmation.
   const [confirmedRevision, setConfirmedRevision] = useState<number | null>(null);
   const confirmed = confirmedRevision === caseData.revision;
@@ -89,8 +133,59 @@ export default function ApprovalCard(props: ApprovalCardProps) {
 
   if (!current) return null;
 
-  if (caseData.status === "needs_information" || caseData.missingFields.length > 0) {
-    return <p className={styles.waiting}>Fill in the missing facts above, then approve the call here.</p>;
+  const missing = blockingMissingFields(caseData, purpose);
+  const noPhone = caseData.merchant.supportPhone === null || caseData.merchant.supportPhone.trim() === "";
+  const needsAmount = purposeNeedsAmount(purpose);
+  const verb = live ? "place" : "approve";
+
+  if (noPhone) {
+    return (
+      <p className={styles.waiting} data-testid="approval-needs-phone">
+        There is no number to call yet. Type the number from your insurance ID card into Support phone above, then {verb} the call here.
+      </p>
+    );
+  }
+
+  const purposePicker = (
+    <fieldset className={styles.purpose} disabled={busy}>
+      <legend className={styles.purposeLegend}>What the call is for</legend>
+      <div className={styles.purposeOptions}>
+        {UI_CALL_PURPOSES.map((option) => (
+          <label key={option} className={[styles.purposeOption, option === purpose ? styles.purposeChosen : ""].join(" ")}>
+            <input
+              type="radio"
+              name={purposeName}
+              value={option}
+              checked={option === purpose}
+              onChange={() => setPurpose(option)}
+              className={styles.purposeRadio}
+              data-testid={`purpose-${option}`}
+            />
+            {PURPOSE_LABELS[option]}
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  );
+
+  if (missing.length > 0) {
+    // Another purpose may be ready (no amount is needed to ask what is needed), so the choice stays offered.
+    const anotherReady = UI_CALL_PURPOSES.some((option) => blockingMissingFields(caseData, option).length === 0);
+    const waiting = (
+      <p className={styles.waiting}>
+        Fill in the missing facts above ({missing.map(labelForServerField).join(", ").toLowerCase()}), then {verb} the call here.
+      </p>
+    );
+    if (!anotherReady) return waiting;
+    return (
+      <section className={styles.card} aria-labelledby={headingId}>
+        <h3 id={headingId} className={styles.title}>
+          What should the call to {merchant} do?
+        </h3>
+        {purposePicker}
+        {waiting}
+      </section>
+    );
   }
 
   const authorizedForRevision = caseData.authorization !== null && caseData.authorization.revision === caseData.revision;
@@ -98,7 +193,7 @@ export default function ApprovalCard(props: ApprovalCardProps) {
   return (
     <section className={styles.card} aria-labelledby={headingId}>
       <h3 id={headingId} className={styles.title}>
-        Approve the call to {merchant}
+        {live ? "Place the call" : "Approve the call"} to {merchant}
         {phone ? (
           <>
             {" "}
@@ -107,15 +202,47 @@ export default function ApprovalCard(props: ApprovalCardProps) {
         ) : null}
       </h3>
 
+      {purposePicker}
+
       <KeyValueList
         items={[
           { key: "On behalf of", value: caseData.customer.name },
-          { key: "Amount", value: amount ? <Mono>{amount}</Mono> : null },
-          { key: "Asking for", value: askingFor(caseData.reason, amount) },
+          ...(needsAmount ? [{ key: "Amount", value: amount ? <Mono>{amount}</Mono> : null }] : []),
+          { key: "Asking for", value: askingFor(purpose, amount) },
           { key: "Reason", value: caseData.reason },
           { key: "Facts", value: `Revision ${caseData.revision}` },
         ]}
       />
+
+      {planPreview ? (
+        <div className={styles.preview} data-testid="approval-plan">
+          <h4 className={styles.previewLabel}>What the agent will say and ask</h4>
+          <ol className={styles.previewList}>
+            {previewPlan(caseData, purpose).map((step, index) => (
+              <li key={step.title} className={styles.previewItem}>
+                <span className={styles.previewNumber}>{String(index + 1).padStart(2, "0")}</span>
+                <span className={styles.previewBody}>
+                  <span className={styles.previewTitle}>{step.title}</span>
+                  <span className={styles.previewDetail}>{step.detail}</span>
+                </span>
+              </li>
+            ))}
+          </ol>
+        </div>
+      ) : null}
+
+      <p className={styles.destination} data-testid="approval-destination">
+        <span className={styles.destinationNumber}>
+          Calling <Mono>{phone}</Mono>
+        </span>
+        <span>{provenance(caseData.merchant.source)}</span>
+      </p>
+
+      {live ? (
+        <p className={styles.liveNote} data-testid="approval-live-note">
+          Placing the call dials <Mono>{phone}</Mono> now from our number, an AI assistant speaks for you, and the call is capped at 5 minutes.
+        </p>
+      ) : null}
 
       {authorizedForRevision ? (
         <p className={styles.note}>
@@ -133,7 +260,11 @@ export default function ApprovalCard(props: ApprovalCardProps) {
           onChange={(event) => setConfirmedRevision(event.target.checked ? caseData.revision : null)}
           data-testid="approve-checkbox"
         />
-        <span>I confirm these facts are accurate and I authorize this call</span>
+        <span>
+          {live
+            ? "I confirm these facts are accurate and I want Recourse to dial this number now, with an AI assistant speaking for me"
+            : "I confirm these facts are accurate and I authorize this call"}
+        </span>
       </label>
 
       {error ? (
@@ -159,13 +290,13 @@ export default function ApprovalCard(props: ApprovalCardProps) {
       <div className={styles.actions}>
         <Button
           variant="primary"
-          onClick={onApprove}
+          onClick={() => onApprove(purpose)}
           disabled={!confirmed || blockedReason !== null}
           busy={busy}
           busyLabel={stage === "dispatching" ? "Placing the call" : "Approving"}
           data-testid="approve-button"
         >
-          {error?.retryable ? "Try again" : "Approve this call"}
+          {error?.retryable ? "Try again" : live ? "Place the call" : "Approve this call"}
         </Button>
         {busy ? (
           <span className={styles.stage} aria-hidden="true">

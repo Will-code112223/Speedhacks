@@ -1,0 +1,12 @@
+node_modules
+.next
+data
+data-demo
+.env
+.env.*
+!.env.example
+sparta/walkthrough-lab/node_modules
+sparta/walkthrough-lab/.worlds
+sparta/walkthrough-lab/.worlds-dashboard
+docs/demo/out
+.git

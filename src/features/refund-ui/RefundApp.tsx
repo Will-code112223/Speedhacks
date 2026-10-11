@@ -38,12 +38,12 @@ export interface RefundAppProps {
   serverMode: Mode;
 }
 
-export default function RefundApp(_props: RefundAppProps) {
+export default function RefundApp({ serverMode }: RefundAppProps) {
   const search = useLocationSearch();
   const plans = usePlans();
   if (search === null || plans.status === "loading") return <BootShell />;
   const apiMode = detectApiMode(search, "http");
-  return <Workspace key={apiMode} apiMode={apiMode} plans={plans} />;
+  return <Workspace key={apiMode} apiMode={apiMode} serverMode={serverMode} plans={plans} />;
 }
 
 // ---------------------------------------------------------------------------
@@ -58,6 +58,32 @@ function Wordmark() {
         <path d="M1 6V1h5M22 1h5v5M27 22v5h-5M6 27H1v-5" stroke="currentColor" />
       </svg>
       <span className={styles.wordmark}>Recourse</span>
+    </span>
+  );
+}
+
+type RunMode = "live" | "simulated" | "fixture";
+
+/** Fixture mode never reaches the server; otherwise the server's REFUND_MODE decides. */
+function runModeFor(apiMode: ApiMode, serverMode: Mode): RunMode {
+  if (apiMode === "fixture") return "fixture";
+  return serverMode === "live" ? "live" : "simulated";
+}
+
+const RUN_MODE_LABELS: Record<RunMode, { label: string; title: string }> = {
+  live: { label: "Live", title: "Live: approved calls dial real phone numbers" },
+  simulated: { label: "Simulated", title: "Simulated: the server simulates calls, no phone is dialed" },
+  fixture: { label: "Fixture", title: "Fixture: a scripted demo in this browser, no server" },
+};
+
+/** Always visible in the header, so nobody mistakes a real call for a demo or the other way round. */
+function ModeBadge({ mode }: { mode: RunMode }) {
+  const { label, title } = RUN_MODE_LABELS[mode];
+  return (
+    <span className={[styles.modeBadge, styles[`mode_${mode}`]].join(" ")} title={title} data-testid="mode-badge">
+      <span className={styles.modeDot} aria-hidden="true" />
+      <VisuallyHidden>Mode: </VisuallyHidden>
+      {label}
     </span>
   );
 }
@@ -88,10 +114,11 @@ type View = "chat" | "plans";
 
 interface WorkspaceProps {
   apiMode: ApiMode;
+  serverMode: Mode;
   plans: PlansController;
 }
 
-function Workspace({ apiMode, plans }: WorkspaceProps) {
+function Workspace({ apiMode, serverMode, plans }: WorkspaceProps) {
   const [view, setView] = useState<View>("chat");
   const onboarding = !plans.onboarded;
   const controller = useCaseSession({ apiMode, plans: plans.plans, measuring: !onboarding && view === "chat" });
@@ -173,6 +200,7 @@ function Workspace({ apiMode, plans }: WorkspaceProps) {
   };
 
   const fixture = apiMode === "fixture";
+  const runMode = runModeFor(apiMode, serverMode);
   const crumb = onboarding ? null : view === "plans" ? "Plans" : active ? caseTitle(caseData, active.summary) : null;
 
   const callScreen = (headingId?: string) =>
@@ -240,6 +268,9 @@ function Workspace({ apiMode, plans }: WorkspaceProps) {
               </span>
             </span>
           ) : null}
+          <div className={styles.headerRight}>
+            <ModeBadge mode={runMode} />
+          </div>
         </div>
       </header>
 
@@ -273,6 +304,7 @@ function Workspace({ apiMode, plans }: WorkspaceProps) {
               <ChatColumn
                 controller={controller}
                 fixture={fixture}
+                live={runMode === "live"}
                 phoneHint={null}
                 planCount={plans.plans.length}
                 callBar={callBar}

@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { TERMINAL_CALL_STATES, type CallV1, type CaseChanges, type CaseV1, type TimelineEntry } from "@/contracts/case";
+import { TERMINAL_CALL_STATES, type CallV1, type CaseChanges, type CaseV1, type MerchantSourceV1, type TimelineEntry } from "@/contracts/case";
 import type { CallPurpose, VoiceAdapter, VoiceSnapshot } from "@/contracts/voice";
 import { CALL_PLAN_ACTIONS, isInvalidWebhookError, validateCallPlan } from "@/contracts/voice";
 import { assembleCase, hasActiveCall, toCallV1 } from "@/server/cases/assemble";
@@ -8,9 +8,11 @@ import {
   buildBrief,
   buildCallPlan,
   buildDraft,
+  E164,
   formatAmount,
   isValidAmountMinor,
   missingFields,
+  suggestedPurpose,
   type Facts,
 } from "@/server/cases/facts";
 import { evaluateHistory, unavailableHistory, type HistoryCheck, type TransactionHistory } from "@/server/cases/history";
@@ -18,7 +20,8 @@ import { merchantRecordSummary, type FrozenMerchantRecord, type MerchantInsights
 import { proposeUpdates } from "@/server/cases/answers";
 import { analyzeTranscript, unknownOutcome } from "@/server/cases/outcome";
 import { type AppConfig, assertLiveLlmConfig, assertModeValid } from "@/server/config";
-import type { ExtractedFields, Extractor } from "@/server/documents/extractor";
+import { EMPTY_FIELDS, type ExtractedFields, type Extractor } from "@/server/documents/extractor";
+import { listInsurers, lookupInsurer, type InsurerLookup, type InsurerSummary } from "@/server/insurers";
 import { buildPacket } from "@/server/documents/packet";
 import { type UploadInput, UploadStore, validateUploads } from "@/server/documents/storage";
 import { ApiHttpError, notFound } from "@/server/http/errors";
@@ -42,7 +45,43 @@ export interface CreateCaseInput {
     supportPhone?: string | null;
     amountMinor?: number | null;
     currency?: string | null;
+    /** V1.2 insurance facts entered by the user; override extraction. */
+    policyNumber?: string | null;
+    incidentDate?: string | null;
+    lossDescription?: string | null;
+    claimType?: string | null;
   };
+}
+
+/** V1.2: read-only access to the insurer registry (src/server/insurers). Injectable for tests. */
+export interface InsurerDirectory {
+  lookup(name: string): InsurerLookup | null;
+  list(): InsurerSummary[];
+}
+
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Finds exactly one registry insurer named in free text. Names and aliases must appear as
+ * whole words with their own capitalization ("Progressive", not "progressive damage");
+ * two different insurers named = no match, never a guess.
+ */
+export function findInsurerInText(text: string, insurers: InsurerSummary[]): { id: string; matched: string; index: number } | null {
+  const hits = new Map<string, { id: string; matched: string; index: number }>();
+  for (const insurer of insurers) {
+    for (const candidate of [insurer.name, ...insurer.aliases]) {
+      const words = candidate.trim().split(/\s+/).filter(Boolean);
+      if (words.length === 0 || candidate.trim().length < 3) continue;
+      const re = new RegExp(`(?<![\\w])${words.map(escapeRegExp).join("\\s+")}(?![\\w])`);
+      const m = re.exec(text);
+      if (m && (!hits.has(insurer.id) || m[0].length > (hits.get(insurer.id)?.matched.length ?? 0))) {
+        hits.set(insurer.id, { id: insurer.id, matched: m[0], index: m.index });
+      }
+    }
+  }
+  return hits.size === 1 ? [...hits.values()][0]! : null;
 }
 
 export interface ServiceDeps {
@@ -50,6 +89,8 @@ export interface ServiceDeps {
   repo: CaseRepository;
   uploads: UploadStore;
   extractor: Extractor;
+  /** V1.2 insurer registry; defaults to the seeded registry under config.dataDir. */
+  insurers?: InsurerDirectory;
   /** Lazily resolves the voice adapter; throws a 503 ApiHttpError when live mode is not configured. */
   voice: () => VoiceAdapter;
   /** Optional transaction-history source (Keewano or fixture); absent = no history check. */
@@ -177,7 +218,7 @@ export class CaseService {
       for (const note of result.notes) timeline.push(this.entry("extraction_note", note));
     } catch (err) {
       // Live extraction failure is visible, not silently replaced by simulation.
-      extracted = { customerName: null, customerEmail: null, merchantName: null, supportPhone: null, amountMinor: null, currency: null };
+      extracted = { ...EMPTY_FIELDS };
       timeline.push(
         this.entry("extraction_failed", `Fact extraction failed (${extractor.kind}): ${String((err as Error).message ?? err)}. Fill in the fields manually.`),
       );
@@ -190,6 +231,10 @@ export class CaseService {
       amountMinor: extracted.amountMinor,
       currency: extracted.currency ?? "USD",
       reason: summary,
+      policyNumber: extracted.policyNumber,
+      incidentDate: extracted.incidentDate,
+      lossDescription: extracted.lossDescription,
+      claimType: extracted.claimType,
     };
     const f = input.fields;
     const userInput = (field: string, value: string | number) =>
@@ -210,15 +255,25 @@ export class CaseService {
     if (f.supportPhone) (facts.merchant.supportPhone = f.supportPhone), userInput("supportPhone", f.supportPhone);
     if (typeof f.amountMinor === "number") (facts.amountMinor = f.amountMinor), userInput("amountMinor", f.amountMinor);
     if (f.currency) (facts.currency = f.currency), userInput("currency", f.currency);
+    if (f.policyNumber) (facts.policyNumber = f.policyNumber), userInput("policyNumber", f.policyNumber);
+    if (f.incidentDate) (facts.incidentDate = f.incidentDate), userInput("incidentDate", f.incidentDate);
+    if (f.lossDescription) (facts.lossDescription = f.lossDescription), userInput("lossDescription", f.lossDescription);
+    if (f.claimType) (facts.claimType = f.claimType), userInput("claimType", f.claimType);
 
-    const missing = missingFields(facts);
+    // V1.2: a named insurer with no extracted or entered number gets its verified official line.
+    const registry = this.fillFromInsurerRegistry(facts, summary);
+    for (const message of registry.messages) timeline.push(this.entry("insurer_registry", message));
+    for (const p of registry.provenance) provenance.push({ id: randomUUID(), caseId, revision: 1, createdAt: now, ...p });
+
+    const purpose = suggestedPurpose(facts);
+    const missing = missingFields(facts, purpose);
     const evidenceList = evidence.map((e) => ({ id: e.id, name: e.name, mimeType: e.mimeType }));
     // Pre-authorization transaction-history check (Keewano or the labeled fixture). Bounded; never blocks.
     const [history, merchantRecord] = await Promise.all([this.checkHistory(facts, 1), this.checkMerchant(facts, 1)]);
     const doc: CaseDoc = {
       ...facts,
       missingFields: missing,
-      draft: buildDraft(facts, evidenceList),
+      draft: buildDraft(facts, evidenceList, purpose),
       authorization: null,
       outcome: { decision: "unknown", referenceNumber: null, nextAction: null, paymentStatus: "unverified", supportingQuote: null },
       timeline,
@@ -309,13 +364,17 @@ export class CaseService {
       if (!changed) return;
       const now = this.nowIso();
       const revision = row.revision + 1;
+      // V1.2: a newly named insurer with no number gets the registry candidate (still editable).
+      const nameChanged = changes.merchant !== undefined && changes.merchant.name !== row.doc.merchant.name;
+      const registry = nameChanged && !next.merchant.supportPhone ? this.fillFromInsurerRegistry(next, "") : null;
       const evidenceList = repo.listEvidence(id).map((e) => ({ id: e.id, name: e.name, mimeType: e.mimeType }));
-      const missing = missingFields(next);
+      const purpose = suggestedPurpose(next);
+      const missing = missingFields(next, purpose);
       const doc: CaseDoc = {
         ...row.doc,
         ...next,
         missingFields: missing,
-        draft: buildDraft(next, evidenceList),
+        draft: buildDraft(next, evidenceList, purpose),
         authorization: null,
         // A decision belongs to the approved facts. Historical calls and timeline
         // remain available, but their outcome must not apply to a new revision.
@@ -323,6 +382,8 @@ export class CaseService {
         timeline: [...row.doc.timeline],
       };
       doc.timeline.push(this.entry("facts_updated", `Facts updated (revision ${revision}); draft rebuilt.`));
+      for (const message of registry?.messages ?? []) doc.timeline.push(this.entry("insurer_registry", message));
+      for (const p of registry?.provenance ?? []) repo.insertProvenance({ id: randomUUID(), caseId: id, revision, createdAt: now, ...p });
       if (row.doc.authorization) {
         doc.timeline.push(this.entry("authorization_cleared", `Authorization ${row.doc.authorization.id} cleared by a material edit.`));
       }
@@ -386,6 +447,12 @@ export class CaseService {
       const now = this.nowIso();
       const evidence = repo.listEvidence(id).map((e) => ({ id: e.id, name: e.name, mimeType: e.mimeType }));
       const merchant = { name: row.doc.merchant.name as string, supportPhone: row.doc.merchant.supportPhone as string };
+      const claim = {
+        policyNumber: row.doc.policyNumber ?? null,
+        incidentDate: row.doc.incidentDate ?? null,
+        lossDescription: row.doc.lossDescription ?? null,
+        claimType: row.doc.claimType ?? null,
+      };
       // gather_information may authorize without an amount; request_refund passed missingFields.
       const amountMinor = isValidAmountMinor(row.doc.amountMinor) ? row.doc.amountMinor : null;
       // Only a check of this exact revision is frozen; a stale one is evidence about other facts.
@@ -395,7 +462,8 @@ export class CaseService {
         caseId: id,
         revision: row.revision,
         customer: { ...row.doc.customer },
-        merchant,
+        merchant: { ...merchant, source: row.doc.merchant.source ?? null },
+        ...claim,
         amountMinor,
         currency: row.doc.currency,
         reason: row.doc.reason,
@@ -412,6 +480,7 @@ export class CaseService {
           history,
           merchantRecord,
           purpose,
+          ...claim,
         }),
         permittedActions: [...CALL_PLAN_ACTIONS[purpose].permitted],
         history,
@@ -429,6 +498,7 @@ export class CaseService {
           evidence,
           history,
           merchantRecord,
+          ...claim,
         }),
       };
       // Validate before freezing: an adapter-side rejection would consume the authorization.
@@ -447,7 +517,9 @@ export class CaseService {
             "authorized",
             purpose === "request_refund"
               ? `Authorized revision ${row.revision}: call ${merchant.supportPhone} (${merchant.name}) about ${formatAmount(amountMinor, row.doc.currency)}.`
-              : `Authorized revision ${row.revision}: call ${merchant.supportPhone} (${merchant.name}) to gather information only (no refund request).`,
+              : (purpose as string) === "file_claim"
+                ? `Authorized revision ${row.revision}: call ${merchant.supportPhone} (${merchant.name}) to file a claim${claim.claimType ? ` (${claim.claimType})` : ""}.`
+                : `Authorized revision ${row.revision}: call ${merchant.supportPhone} (${merchant.name}) to gather information only (no refund request).`,
           ),
         ],
       };
@@ -679,6 +751,126 @@ export class CaseService {
   }
 
   /** Bounded and never throws: an unreachable source yields an explicit "unavailable" result. */
+  private insurerDirectory(): InsurerDirectory {
+    if (this.deps.insurers) return this.deps.insurers;
+    const dataDir = this.deps.config.dataDir;
+    return { lookup: (name) => lookupInsurer(name, dataDir), list: () => listInsurers(dataDir) };
+  }
+
+  /**
+   * V1.2: when the case names a registry insurer (merchant name, else the user's text) and has
+   * no support number, fill the claims line (else customer service) only when it is a
+   * verified_official national line and the registry does not say it depends on plan or
+   * region. Mutates `facts`; returns timeline messages and provenance. A review candidate:
+   * the user confirms it at approval and any manual edit clears merchant.source.
+   */
+  private fillFromInsurerRegistry(
+    facts: Facts,
+    summary: string,
+  ): { messages: string[]; provenance: Omit<ProvenanceRow, "id" | "caseId" | "revision" | "createdAt">[] } {
+    const messages: string[] = [];
+    const provenance: Omit<ProvenanceRow, "id" | "caseId" | "revision" | "createdAt">[] = [];
+    if (facts.merchant.supportPhone) return { messages, provenance };
+    try {
+      const directory = this.insurerDirectory();
+      const named = facts.merchant.name?.trim() || null;
+      let insurer = named ? directory.lookup(named) : null;
+      if (!insurer && !named && summary.trim()) {
+        const found = findInsurerInText(summary, directory.list());
+        insurer = found ? directory.lookup(found.id) : null;
+        if (insurer && found) {
+          facts.merchant = { ...facts.merchant, name: insurer.name };
+          const start = Math.max(0, found.index - 40);
+          provenance.push({
+            field: "merchantName",
+            value: insurer.name,
+            sourceKind: "summary",
+            sourceRef: null,
+            excerpt: summary.slice(start, found.index + found.matched.length + 40).replace(/\s+/g, " ").trim(),
+          });
+        }
+      }
+      if (!insurer) return { messages, provenance };
+      // Distinct verified official national claims numbers; two or more = ambiguous, never filled.
+      const claimsLines = [
+        ...new Set(
+          insurer.contacts
+            .filter(
+              (c) =>
+                c.purpose === "claims" &&
+                c.channel === "phone" &&
+                c.scope === "national" &&
+                c.confidence === "verified_official" &&
+                c.purposeVerified !== false &&
+                c.phoneE164 !== null,
+            )
+            .map((c) => c.phoneE164 as string),
+        ),
+      ];
+      // A case that cannot be a refund (a described loss, or no amount) is a file_claim or
+      // gather_information call, for which the one national claims line is the right desk even
+      // when member services depends on plan or region.
+      const claimOrInquiry = (suggestedPurpose(facts) as string) === "file_claim" || !isValidAmountMinor(facts.amountMinor);
+      let pick: { purpose: MerchantSourceV1["purpose"]; phone: string } | null = null;
+      if (insurer.needsPlanOrRegion) {
+        const onlyClaimsLine = claimsLines.length === 1 ? claimsLines[0]! : null;
+        if (!claimOrInquiry || onlyClaimsLine === null) {
+          messages.push(
+            `${insurer.name}: the right member services number depends on your plan or region, so none was filled automatically. Use the member services number printed on your insurance ID card (or your policy documents).`,
+          );
+          return { messages, provenance };
+        }
+        pick = { purpose: "claims", phone: onlyClaimsLine };
+      } else {
+        pick =
+          insurer.claimsPhone && insurer.claimsPhoneConfidence === "verified_official"
+            ? { purpose: "claims", phone: insurer.claimsPhone }
+            : insurer.supportPhone && insurer.supportPhoneConfidence === "verified_official"
+              ? { purpose: "customer_service", phone: insurer.supportPhone }
+              : null;
+      }
+      const contact = pick
+        ? insurer.contacts.find(
+            (c) =>
+              c.purpose === pick.purpose &&
+              c.channel === "phone" &&
+              c.scope === "national" &&
+              c.confidence === "verified_official" &&
+              c.phoneE164 === pick.phone,
+          )
+        : undefined;
+      if (!pick || !contact || !E164.test(pick.phone)) {
+        messages.push(
+          `${insurer.name} is in the insurer registry, but it has no verified official national number to use. Enter the number from your policy documents or ID card.`,
+        );
+        return { messages, provenance };
+      }
+      const source: MerchantSourceV1 = {
+        kind: "insurer_registry",
+        insurerId: insurer.id,
+        insurerName: insurer.name,
+        purpose: pick.purpose,
+        confidence: contact.confidence,
+        sourceUrl: contact.sourceUrl,
+        retrievedAt: contact.retrievedAt,
+      };
+      facts.merchant = { ...facts.merchant, supportPhone: pick.phone, source };
+      provenance.push({
+        field: "supportPhone",
+        value: pick.phone,
+        sourceKind: "insurer_registry",
+        sourceRef: insurer.id,
+        excerpt: contact.sourceUrl,
+      });
+      messages.push(
+        `Filled the ${pick.purpose === "claims" ? "claims" : "customer service"} line for ${insurer.name} (${pick.phone}) from the insurer registry (verified official source${contact.sourceUrl ? `: ${contact.sourceUrl}` : ""}). Confirm it before approving.`,
+      );
+    } catch (err) {
+      messages.push(`Insurer registry lookup failed: ${String((err as Error).message ?? err)}. Enter the number manually.`);
+    }
+    return { messages, provenance };
+  }
+
   private async checkHistory(facts: Facts, revision: number): Promise<HistoryCheck | null> {
     const source = this.deps.history;
     if (!source) return null;

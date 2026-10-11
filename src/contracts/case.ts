@@ -53,12 +53,29 @@ export interface CaseV1 {
   mode: Mode;
   status: CaseStatus;
   customer: { name: string | null; email: string | null };
-  merchant: { name: string | null; supportPhone: string | null };
+  /** V1.2 adds optional `source`: where supportPhone came from when the server filled it (null = documents or the user). */
+  merchant: { name: string | null; supportPhone: string | null; source?: MerchantSourceV1 | null };
   amountMinor: number | null;
   currency: string;
   reason: string;
+  /** V1.2 insurance facts (additive). Absent on older rows = null. Unknown stays null, never guessed. */
+  policyNumber?: string | null;
+  /** ISO calendar date, YYYY-MM-DD. */
+  incidentDate?: string | null;
+  lossDescription?: string | null;
+  /** Free text such as "water damage" or "auto collision". */
+  claimType?: string | null;
   evidence: { id: string; name: string; mimeType: string }[];
+  /** Required facts still missing for `suggestedPurpose` (request_refund when absent); drives `status`. */
   missingFields: string[];
+  /**
+   * V1.2 (additive): the purpose this case is prepared for. "file_claim" when the case
+   * describes an insurance loss (lossDescription or claimType known), else "request_refund".
+   * Send it as `purpose` to POST /api/cases/:id/authorize.
+   */
+  suggestedPurpose?: CallPurpose;
+  /** V1.2 (additive): missing facts per call purpose, so the UI can offer file_claim or gather_information when no amount is known. */
+  missingFieldsByPurpose?: Partial<Record<CallPurpose, string[]>>;
   draft: { subject: string; body: string } | null;
   /** V1.1 adds optional `purpose` (absent = "request_refund", the V1 behavior). */
   authorization: { id: string; revision: number; approvedAt: string; purpose?: CallPurpose } | null;
@@ -100,10 +117,33 @@ export interface ProposedUpdateV1 {
 
 export interface CaseChanges {
   customer?: { name: string | null; email: string | null };
+  /** A user edit never carries `source`; changing the name or number clears merchant.source. */
   merchant?: { name: string | null; supportPhone: string | null };
   amountMinor?: number | null;
   currency?: string;
   reason?: string;
+  /** V1.2 insurance facts (additive). null clears the fact. */
+  policyNumber?: string | null;
+  incidentDate?: string | null;
+  lossDescription?: string | null;
+  claimType?: string | null;
+}
+
+/**
+ * V1.2: provenance of a support number the server filled from the insurer
+ * registry. A review candidate only: the user confirms it at approval, and any
+ * manual edit of the merchant name or number clears it.
+ */
+export interface MerchantSourceV1 {
+  kind: "insurer_registry";
+  insurerId: string;
+  insurerName: string;
+  /** Which registry line was used: the claims line first, else customer service. */
+  purpose: "claims" | "customer_service";
+  /** Always "verified_official" today; only verified official national lines are filled. */
+  confidence: string;
+  sourceUrl: string | null;
+  retrievedAt: string | null;
 }
 
 export interface ApiError {
