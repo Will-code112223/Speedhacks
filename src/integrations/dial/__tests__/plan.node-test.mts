@@ -210,7 +210,7 @@ test("a request_refund plan tells the agent how to say the amount", () => {
   assert.doesNotMatch(planInstruction(claimPlan()), /say it as/);
 });
 
-test("the largest plan the contract accepts stays under the 12,000-character instruction cap", () => {
+test("the largest plan the contract accepts stays under the outbound instruction cap", () => {
   const L = CALL_PLAN_LIMITS;
   // A realistic worst case: long free text everywhere a person types, then filled up to the
   // serialized plan bound. Anything larger is rejected by validateCallPlan before freezing.

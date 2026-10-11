@@ -48,7 +48,7 @@ export const FACT_LABELS: Record<FactKey, string> = {
   customerName: "Your name",
   customerEmail: "Your email",
   merchantName: "Insurer or merchant",
-  supportPhone: "Support phone",
+  supportPhone: "Number to call",
   policyNumber: "Policy number",
   claimType: "Claim type",
   incidentDate: "Incident date",

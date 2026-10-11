@@ -141,7 +141,7 @@ export default function ApprovalCard(props: ApprovalCardProps) {
   if (noPhone) {
     return (
       <p className={styles.waiting} data-testid="approval-needs-phone">
-        There is no number to call yet. Type the number from your insurance ID card into Support phone above, then {verb} the call here.
+        There is no number to call yet. Type any number into Number to call above, for example the one on your insurance ID card, then {verb} the call here.
       </p>
     );
   }

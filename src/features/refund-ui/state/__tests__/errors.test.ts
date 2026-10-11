@@ -21,7 +21,7 @@ describe("toUiError", () => {
   it("names the missing facts of a 422 by their form labels", () => {
     const error = toUiError(new ApiRequestError(422, "MISSING_REQUIRED_FACTS", "missing", ["merchant.supportPhone", "amountMinor"]));
     expect(error.fieldKeys).toEqual(["supportPhone", "amountMinor"]);
-    expect(error.fieldLabels).toEqual(["Support phone", "Amount"]);
+    expect(error.fieldLabels).toEqual(["Number to call", "Amount"]);
   });
 
   it("maps call and decision codes to their own kinds", () => {

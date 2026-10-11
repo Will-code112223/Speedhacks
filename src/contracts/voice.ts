@@ -237,7 +237,7 @@ export const CALL_PLAN_LIMITS = {
   readBackChars: 400,
   /**
    * Bound on JSON.stringify(plan). The adapter's mandatory rules take about 3,500
-   * characters, so a plan within this bound keeps the provider instruction under 12,000.
+   * characters, so a plan within this bound keeps the provider instruction under 14,000.
    */
   serializedPlanChars: 8000,
 } as const;
