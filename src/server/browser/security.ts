@@ -63,7 +63,20 @@ export function parseCommand(value: unknown): BrowserCommand {
 }
 export function sameOrigin(request: Request): void {
   const origin = request.headers.get("origin");
-  if (!origin || origin !== new URL(request.url).origin || request.headers.get("sec-fetch-site") === "cross-site") {
+  const target = new URL(request.url);
+  let matches = origin === target.origin;
+  // NextURL normalizes loopback IPs to localhost. The browser's Origin and
+  // actual Host still agree; require that exact agreement and the same port,
+  // rather than allowing localhost and 127.0.0.1 interchangeably as origins.
+  if (!matches && origin && target.hostname === "localhost") {
+    try {
+      const source = new URL(origin);
+      matches = source.origin === origin && ["127.0.0.1", "[::1]"].includes(source.hostname)
+        && source.protocol === target.protocol && source.port === target.port
+        && request.headers.get("host") === source.host;
+    } catch { /* Invalid origins remain rejected. */ }
+  }
+  if (!origin || !matches || request.headers.get("sec-fetch-site") === "cross-site") {
     throw new ApiHttpError(403, "ORIGIN_REQUIRED", "Browser mutations require a same-origin request");
   }
 }

@@ -17,6 +17,7 @@ import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 
 import type { Mode } from "../../contracts/case";
 import type { WorkflowAction } from "../../contracts/workflow";
 import BrowserPanel from "./browser/BrowserPanel";
+import WorkflowCallPanel from "./workflow/WorkflowCallPanel";
 import CallBar from "./call/CallBar";
 import CallScreen from "./call/CallScreen";
 import ChatColumn from "./chat/ChatColumn";
@@ -101,6 +102,7 @@ function Workspace({ plans }: WorkspaceProps) {
   const [railOpen, setRailOpen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [browserPreset, setBrowserPreset] = useState<{ caseId: string; revision: number; action: WorkflowAction } | null>(null);
+  const [callPreset, setCallPreset] = useState<{ caseId: string; actionId: string } | null>(null);
   const [sideTab, setSideTab] = useState<"browser" | "call">("browser");
 
   const active = controller.active;
@@ -225,7 +227,7 @@ function Workspace({ plans }: WorkspaceProps) {
       {hasBrowserCase ? <Button variant="ghost" size="small" aria-pressed={selectedTool === "browser"} onClick={() => setSideTab("browser")}>Browser</Button> : null}
       {hasTool ? <Button variant="ghost" size="small" aria-pressed={selectedTool === "call"} onClick={() => setSideTab("call")}>Call support</Button> : null}
     </div>
-    {selectedTool === "browser" && hasBrowserCase && caseData ? <BrowserPanel preset={browserPreset?.caseId === caseData.id && browserPreset.revision === caseData.revision ? browserPreset.action.browser ?? undefined : undefined} key={caseData.id} caseData={caseData} visible={view === "chat" && (wide || sheetOpen)} /> : hasCall ? callScreen() : <div className={styles.callGuide}><h2>Call support</h2><p>{callsSupported ? "Review the contact and request in chat, then approve the call when you are ready." : intakeKind === "auto_insurance" ? "Your call plans are in the action list. Calling additional insurance contacts requires a separate recipient-specific authorization flow." : "Finish preparing the case before reviewing its call contact and request."}</p></div>}
+    {selectedTool === "browser" && hasBrowserCase && caseData ? <BrowserPanel preset={browserPreset?.caseId === caseData.id && browserPreset.revision === caseData.revision ? browserPreset.action.browser ?? undefined : undefined} key={caseData.id} caseData={caseData} visible={view === "chat" && (wide || sheetOpen)} /> : hasCall ? callScreen() : hasBrowserCase && caseData ? <WorkflowCallPanel key={caseData.id} caseData={caseData} workflow={controller.workflow?.workflow ?? null} actionId={callPreset?.caseId === caseData.id ? callPreset.actionId : undefined} visible={view === "chat" && (wide || sheetOpen)} /> : <div className={styles.callGuide}><h2>Call support</h2><p>{callsSupported ? "Review the contact and request in chat, then approve the call when you are ready." : intakeKind === "auto_insurance" ? "Your call plans are in the action list. Calling additional insurance contacts requires a separate recipient-specific authorization flow." : "Finish preparing the case before reviewing its call contact and request."}</p></div>}
   </>;
 
 
@@ -293,7 +295,7 @@ function Workspace({ plans }: WorkspaceProps) {
                 fixture={fixture}
                 phoneHint={null}
                 allowCallApproval={Boolean(callsSupported && (selectedTool === "call" || hasCall))}
-                onWorkflowAction={action => { if (caseData && action.type === "browser" && action.browser) { setBrowserPreset({ caseId: caseData.id, revision: caseData.revision, action }); setSideTab("browser"); setSheetOpen(true); setRailOpen(false); } }}
+                onWorkflowAction={action => { if (!caseData) return; if (action.type === "browser" && action.browser) { setBrowserPreset({ caseId: caseData.id, revision: caseData.revision, action }); setSideTab("browser"); } else if (action.type === "call" && action.call) { setCallPreset({ caseId: caseData.id, actionId: action.id }); setSideTab("call"); } else return; setSheetOpen(true); setRailOpen(false); }}
                 planCount={plans.plans.length}
                 callBar={callBar}
                 metrics={metrics}

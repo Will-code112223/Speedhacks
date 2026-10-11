@@ -1,0 +1,75 @@
+Website information calls — additive handoff, 2026-10-11
+
+User flow
+1. Start or open a live case; finish its initial analysis and resolve conflicting facts.
+2. Choose Review insurer information call (or Call support). Confirm a recipient
+   in international format and a limit of 60–3600 seconds. Default: 300 seconds.
+3. Authorize call. Review the server-frozen brief, recipient and duration.
+4. Place live call. This explicit action spends Dial credits and dispatches once.
+5. Call results shows actual status, quoted recipient statements, next actions,
+   the full transcript/download, and a manually loaded post-call recording.
+
+Purpose and contract
+Canonical additive types: src/contracts/workflow-call.ts. Existing CaseV1 and
+VoiceAdapter contracts are unchanged. This path is gather_information only:
+document requirements/process/next steps or separately authorized incident facts.
+It does not open claims, request refunds, determine coverage, or submit documents.
+The legacy authorized refund path remains separate. Call transcripts are not fed
+to the refund outcome analyzer and do not overwrite the case's facts or outcome.
+
+Endpoints (owner session cookie; private/no-store)
+POST /api/cases/:id/workflow/calls/authorize — exact revision, action, recipient,
+  duration, confirmed recipient, stable requestId; returns frozen authorization.
+POST /api/cases/:id/workflow/calls — authorizationId + stable requestId; one attempt
+  per authorization, including duplicate deliveries or a new ID for the same approval.
+GET /api/cases/:id/workflow/calls — throttled provider polling and persisted output.
+  ?refresh=1 explicitly checks old/terminal attempts again without redialing.
+GET /api/cases/:id/workflow/calls/:callId/transcript — actual private transcript.
+GET /api/cases/:id/workflow/calls/:callId/recording — owner-checked audio proxy.
+
+Reliability
+SQLite reserves dispatch_unknown before crossing the provider POST boundary.
+Interruptions, malformed success or mode mismatch remain uncertain and block a
+new call; never clear this lock merely to retry. An operator must reconcile with
+Dial. Session recovery only performs GET; it never replays a dispatch automatically.
+Old approvals cannot dispatch after a case revision changes or replacement approval.
+Both legacy and information calls check the other path's active/uncertain state.
+Case edits are blocked while a call is active or uncertain. Provider reads use
+cross-process leases. Late/partial transcripts are checked for 24h by default;
+terminal state, known transcript and duration do not regress on missing fields.
+
+Setup and limitations
+Use live mode, funded OpenAI extraction, DIAL_API_KEY and DIAL_FROM_NUMBER on server.
+Start with npm run dev:live (or build then npm run start:live). The launcher loads
+the private Dial file without forwarding --env-file into Next's worker NODE_OPTIONS.
+The per-call approved cap is passed to the actual Dial adapter config. Keep keys
+in private local environment files, never frontend or git. Durable local SQLite
+storage is required; this is not an ephemeral-serverless deployment.
+DIAL_WEBHOOK_SECRET is still pending deployment; this path reconciles by polling
+while the case is open and on later reload/manual refresh. No background push,
+email or SMS delivery is implemented. Existing Keewano case integration is not
+duplicated; this additive call table does not yet mirror call events into Keewano.
+
+Audio
+No managed-call listen-in stream is verified. Use speakerphone to hear a call live.
+Post-call audio retrieval was verified against Dial's actual recording endpoint.
+The proxy permits only its observed t3.storageapi.dev signed media host, never
+exposes signed URLs/keys, forbids redirects and bounds reads to 15s/32MiB. Audio
+signature is checked; actual provider octet-stream WAV is supported. Unavailable
+or oversized recordings show a clear fallback; transcript remains independent.
+
+Verification
+Full suite: 743 tests in 52 files passed, including terminal partial-transcript
+recovery and a reproduction of NextURL's localhost normalization/origin rejection.
+Typecheck and production build passed; all four new API route shapes compiled.
+Real live evidence: the previous independently dispatched willing-participant call
+completed in 67 seconds with a transcript. New recording helper retrieved its actual
+WAV successfully. No new call was placed by this change. Website-call dispatch,
+UI interaction and visual review remain unverified because the saved browser
+permission still blocks 127.0.0.1:3000. Browser permission is not terminal full access.
+Fixed the independent localhost origin bug: only exact Origin/Host agreement with
+the same protocol/port may compensate for NextURL normalization; cross-site or
+different-host requests remain rejected. The live launcher was restarted successfully.
+Mock-provider tests exercise real SQLite reservation/ownership, concurrent dispatch,
+restart uncertainty, stale approvals, mode separation, late transcripts, recording
+access, frontend recovery and strict response bindings. They are not live call proof.

@@ -59,10 +59,12 @@ export function rebuildWorkflow(workflow: CaseWorkflow, c: CaseV1, contacts: Wor
     const contact = contacts.find(x => x.role === role && x.phone);
     const purpose = role === "other_party" ? "Ask the involved person only for missing incident information they are willing to share."
       : workflow.kind === "auto_insurance" ? "Ask the insurer what documents and process apply; do not report an incident or open a claim." : "Ask the merchant about the documented issue and available refund procedure.";
-    const blockedBy = ["Purpose-specific call execution is not connected to this workflow", "Review the exact recipient and authorize this separate call"];
+    const blockedBy = workflow.conflicts.length ? ["Resolve conflicting evidence before approving a call"] : [];
+    if (state === "processing") blockedBy.push("Interview extraction is in progress");
+    if (state === "failed") blockedBy.push("Review the failed interview update before approving a call");
     if (!contact) blockedBy.push("A confirmed recipient phone number is missing");
-    actions.push({ id: `call-${role}`, type: "call", title: role === "other_party" ? "Plan a separate information call" : `Plan ${role === "insurer" ? "insurer" : "merchant"} call`, description: purpose,
-      status: "blocked", blockedBy, browser: null, call: { role, to: contact?.phone ?? null, purpose,
+    actions.push({ id: `call-${role}`, type: "call", title: role === "other_party" ? "Review a separate information call" : `Review ${role === "insurer" ? "insurer" : "merchant"} information call`, description: purpose,
+      status: blockedBy.length ? "blocked" : "ready", blockedBy, browser: null, call: { role, to: contact?.phone ?? null, purpose,
         brief: `${purpose}\nIdentify yourself as an AI assistant. Use only the following reviewed preparation facts. Do not file, submit, seek payment, impersonate anyone, or make commitments.\n\n${body}` } });
   }
   const stage = state === "processing" ? "in_progress" : state === "failed" || workflow.conflicts.length ? "needs_review" : questions.some(q => q.required) ? "collecting" : "ready";

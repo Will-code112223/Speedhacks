@@ -139,7 +139,7 @@ describe("workflow evidence and action UI", () => {
     const html = renderToStaticMarkup(<WorkflowPanel controller={{ ...EMPTY_WORKFLOW, workflow: value.workflow, refresh: async () => {}, upload: async () => false, retry: async () => false, analyze: async () => false }} onAction={onAction} />);
     expect(html).toContain("When did the damage happen?"); expect(html).toContain("Loss date: unknown");
     expect(html).toContain('/api/cases/case-owned/workflow/brief'); expect(html).toContain("Action list");
-    expect(html).toContain("Review call plan"); expect(html).toContain("No call is placed from this checklist");
+    expect(html).toContain("Review call plan"); expect(html).toContain("approve one information call before placing it");
     expect(html).not.toContain("Approve this call"); expect(onAction).not.toHaveBeenCalled();
   });
   it("has a labelled multiple evidence input and preserves chosen file names", () => {

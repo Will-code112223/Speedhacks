@@ -18,6 +18,8 @@ import type { ExtractedFields, Extractor } from "@/server/documents/extractor";
 import { buildPacket } from "@/server/documents/packet";
 import { type StoredUpload, type UploadInput, UploadStore, validateUploads } from "@/server/documents/storage";
 import { ApiHttpError, notFound } from "@/server/http/errors";
+import { openDatabase } from "@/server/persistence/db";
+import { hasActiveWorkflowCall } from "@/server/workflows/call-store";
 import type {
   AuthorizationSnapshot,
   CallRow,
@@ -71,6 +73,10 @@ export class CaseService {
     const row = this.deps.repo.getOwnedCase(id, ownerSession);
     if (!row) throw notFound();
     return row;
+  }
+
+  private hasActiveInformationCall(id: string): boolean {
+    return hasActiveWorkflowCall(openDatabase(this.deps.config.dataDir), id);
   }
 
   /** A case created in one mode never dispatches through the other mode's provider (e.g. after a restart with REFUND_MODE=live). */
@@ -225,7 +231,7 @@ export class CaseService {
     repo.transaction(() => {
       const row = this.ownedRow(ownerSession, id);
       const calls = repo.listCalls(id);
-      if (hasActiveCall(calls)) {
+      if (hasActiveCall(calls) || this.hasActiveInformationCall(id)) {
         throw new ApiHttpError(409, "CALL_IN_PROGRESS", "Edits are rejected while a call is active or its dispatch is unknown");
       }
       if (expectedRevision !== row.revision) {
@@ -287,7 +293,7 @@ export class CaseService {
     repo.transaction(() => {
       const row = this.ownedRow(ownerSession, id);
       this.assertSameMode(row);
-      if (hasActiveCall(repo.listCalls(id))) throw new ApiHttpError(409, "CALL_IN_PROGRESS", "Interview edits are blocked while a call is active or its dispatch is unknown");
+      if (hasActiveCall(repo.listCalls(id)) || this.hasActiveInformationCall(id)) throw new ApiHttpError(409, "CALL_IN_PROGRESS", "Interview edits are blocked while a call is active or its dispatch is unknown");
       if (row.revision !== expectedRevision) throw new ApiHttpError(409, "REVISION_CONFLICT", "Case changed while the interview was being updated");
       const incoming = update.evidence ?? [];
       if (repo.listEvidence(id).length + incoming.length > config.upload.maxFiles) throw new ApiHttpError(400, "BAD_REQUEST", `At most ${config.upload.maxFiles} evidence files per case`, ["files"]);
@@ -313,7 +319,7 @@ export class CaseService {
       const row = this.ownedRow(ownerSession, id);
       this.assertSameMode(row);
       const calls = repo.listCalls(id);
-      if (hasActiveCall(calls)) {
+      if (hasActiveCall(calls) || this.hasActiveInformationCall(id)) {
         throw new ApiHttpError(409, "CALL_IN_PROGRESS", "A new authorization is rejected while a call is active or its dispatch is unknown");
       }
       if (expectedRevision !== row.revision) {
@@ -408,6 +414,7 @@ export class CaseService {
       }
       const byAuth = repo.findCallByAuthorizationId(input.authorizationId);
       if (byAuth) return byAuth; // MVP: one dispatch attempt per authorization id
+      if (this.hasActiveInformationCall(id)) throw new ApiHttpError(409, "CALL_IN_PROGRESS", "An information call is active or its dispatch is unknown.");
       if (row.doc.authorization?.id !== auth.id || auth.revision !== row.revision) {
         throw new ApiHttpError(409, "AUTHORIZATION_CONFLICT", "Authorization is stale; re-authorize the current revision");
       }
