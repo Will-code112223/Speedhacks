@@ -156,11 +156,22 @@ export function normalizeName(input: string): string {
   return input.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim().replace(/\s+/g, " ");
 }
 
-/** Stable customer entity id, or null when neither email nor name is known. */
-export function customerEntityId(customer: { email: string | null; name: string | null }): string | null {
+/**
+ * Candidate entity ids for a customer, best first: the email-derived id, then the
+ * name-derived id. Charges are stored under the email id when an email is known, so a
+ * lookup tries the email id first and falls back to the name id (a case created with a
+ * name only must still find a customer who was seeded with an email).
+ */
+export function customerEntityIds(customer: { email: string | null; name: string | null }): string[] {
+  const ids: string[] = [];
   const email = customer.email?.trim().toLowerCase();
-  if (email) return uuidV5(`speedhacks-refund:customer:email:${email}`);
+  if (email) ids.push(uuidV5(`speedhacks-refund:customer:email:${email}`));
   const name = customer.name ? normalizeName(customer.name) : "";
-  if (name) return uuidV5(`speedhacks-refund:customer:name:${name}`);
-  return null;
+  if (name) ids.push(uuidV5(`speedhacks-refund:customer:name:${name}`));
+  return ids;
+}
+
+/** Stable customer entity id (the best candidate), or null when neither email nor name is known. */
+export function customerEntityId(customer: { email: string | null; name: string | null }): string | null {
+  return customerEntityIds(customer)[0] ?? null;
 }

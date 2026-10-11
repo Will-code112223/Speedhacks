@@ -1,7 +1,7 @@
 import type { ChargeRecord, CustomerRef, TransactionHistory } from "@/server/cases/history";
 import { normalizeMerchant } from "@/server/cases/history";
 import { buildChargesSql, chargesFromRows } from "./charges";
-import { customerEntityId } from "./events";
+import { customerEntityIds } from "./events";
 import type { KeewanoMcpClient } from "./mcp";
 import fixture from "./seed/transactions.json";
 
@@ -16,11 +16,13 @@ export class KeewanoTransactionHistory implements TransactionHistory {
     this.limit = opts.limit ?? 500;
   }
 
+  /** Email-derived entity first; a name-only case falls back to the name-derived entity. */
   async listCharges(customer: CustomerRef): Promise<ChargeRecord[]> {
-    const entityId = customerEntityId(customer);
-    if (!entityId) return [];
-    const rows = await this.mcp.runSql(buildChargesSql(entityId, this.limit));
-    return chargesFromRows(rows);
+    for (const entityId of customerEntityIds(customer)) {
+      const charges = chargesFromRows(await this.mcp.runSql(buildChargesSql(entityId, this.limit)));
+      if (charges.length > 0) return charges;
+    }
+    return [];
   }
 }
 

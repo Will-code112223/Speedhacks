@@ -3,7 +3,7 @@
 // (the dataSessionId is derived from the customer's charges, and Keewano ingestion is idempotent
 // per dataSessionId + batch). Run: npm run keewano:seed
 import { readFileSync } from "node:fs";
-import { EVENTS_HASH, EVENT_TYPES, canonicalJson, customerEntityId, event, uuidV5 } from "./events.ts";
+import { EVENTS_HASH, EVENT_TYPES, canonicalJson, customerEntityIds, event, uuidV5 } from "./events.ts";
 import { DEFAULT_INGEST_URL, KeewanoIngestClient } from "./ingest.ts";
 
 const apiKey = process.env.KEEWANO_API_KEY;
@@ -24,7 +24,8 @@ console.log(`registering ${EVENT_TYPES.length} custom events (hash ${EVENTS_HASH
 console.log("  →", JSON.stringify(await client.registerEventTypes()));
 
 for (const customer of fixture.customers) {
-  const entityId = customerEntityId(customer);
+  // Seeded under the email-derived entity; a name-only lookup falls back to the name-derived one.
+  const entityId = customerEntityIds(customer)[0];
   if (!entityId) continue;
   const charges = [...customer.charges].sort((a, b) => a.at.localeCompare(b.at));
   const events = charges.flatMap((c) => [

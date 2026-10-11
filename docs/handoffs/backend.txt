@@ -170,6 +170,9 @@ KEEWANO (optional sponsor integration; nothing in the shared contract changed)
   the frozen brief (same revision only), and a TRANSACTION HISTORY section in the packet. Never a source of facts; never
   blocks authorization; never queried mid-call. Statuses: duplicate_found | recurring_only | single_charge | no_match |
   no_history | unavailable.
+- DEMO: create the case as Sam Rivera / sam@example.com / Acme Streaming / 4999 USD. Charges are stored under the
+  email-derived entity; a name-only case falls back to the name-derived entity, so "Sam Rivera" without an email also
+  resolves, but any other spelling or customer returns no_history (honest, but not the demo moment).
 - Synthetic data only: src/integrations/keewano/seed/transactions.json (sam@example.com = the duplicate). npm run
   keewano:seed backfills it (idempotent per customer); npm run keewano:sql -- --tools | --charges <email> | "<SQL>" [--raw].
 - Verified live 2026-10-11 (credentials in .env.local, git-ignored): /custom + /in accept the registry and the seed

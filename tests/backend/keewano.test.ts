@@ -13,6 +13,7 @@ import {
   canonicalJson,
   crc32,
   customerEntityId,
+  customerEntityIds,
   event,
   uuidV5,
 } from "@/integrations/keewano/events";
@@ -41,6 +42,7 @@ import { COMPLETE_FIELDS, SESSION_A, TEST_SECRET } from "./helpers";
 // ---------------------------------------------------------------------------
 
 type Captured = KeewanoIngestEvent & { entity: string };
+type SqlRowLike = Record<string, unknown>;
 
 function capturingSink(): EventSink & { events: Captured[] } {
   const events: Captured[] = [];
@@ -148,6 +150,8 @@ describe("keewano event registry", () => {
     expect(customerEntityId({ email: null, name: "Sam   Rivera" })).toBe(customerEntityId({ email: null, name: "sam rivera" }));
     expect(customerEntityId({ email: null, name: "sam rivera" })).not.toBe(b);
     expect(customerEntityId({ email: null, name: null })).toBeNull();
+    expect(customerEntityIds({ email: "sam@example.com", name: "Sam Rivera" })).toEqual([b, customerEntityId({ email: null, name: "Sam Rivera" })]);
+    expect(customerEntityIds({ email: null, name: null })).toEqual([]);
   });
 
   it("builds typed events: seconds timestamps, truncated strings, uint32 prices", () => {
@@ -562,5 +566,19 @@ describe("keewano MCP client helpers", () => {
     expect(evaluateHistory(charges, ACME, OPTS).status).toBe("duplicate_found");
     expect(await history.listCharges({ email: null, name: null })).toEqual([]);
     expect(seen.length).toBe(1);
+
+    // A name-only case: the email entity is unknown, so the name-derived entity is tried next.
+    const byEntity = new Map<string, SqlRowLike[]>([[customerEntityId({ email: null, name: "Sam Rivera" })!, rows]]);
+    const queried: string[] = [];
+    const fallback = new KeewanoTransactionHistory({
+      async runSql(q) {
+        const id = /user_id = '([0-9a-f-]{36})'/.exec(q)?.[1] ?? "";
+        queried.push(id);
+        return byEntity.get(id) ?? [];
+      },
+    });
+    expect((await fallback.listCharges({ email: "other@example.com", name: "Sam Rivera" })).map((c) => c.chargeId)).toEqual(["txn_1", "txn_2"]);
+    expect(queried).toEqual(customerEntityIds({ email: "other@example.com", name: "Sam Rivera" }));
+    expect((await fallback.listCharges({ email: null, name: "Sam Rivera" })).length).toBe(2);
   });
 });
